@@ -624,8 +624,8 @@ export default function FinCFO() {
             </button>
               </>
             )}
-          </>;
-        })()}
+          </>
+        )}
 
         {/* ── REGISTROS ── */}
         {mainTab==="registros" && (()=>{
