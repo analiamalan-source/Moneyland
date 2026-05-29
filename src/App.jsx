@@ -3,7 +3,7 @@ import { useState, useMemo, useRef, useEffect } from "react";
 // ── DATOS AGREGADOS (Rivero·Malan 2026) ──────────────────────────────────────
 const AGG = {"pivot_pers":{"Ocio y cultura":{"1":-173870.17,"2":-8247.7,"3":-7145.0,"4":-7753.77},"Salud":{"1":-29785.46,"2":-9910.72,"3":-20510.21,"4":-47388.03},"Vivienda":{"1":-65798.74,"2":-5353.44,"3":-70192.89,"4":-7930.56},"Otros gastos":{"1":-10228.03,"2":-13386.12,"3":-26356.51,"4":-4903.72},"Cuidado personal":{"1":-37821.65,"2":-17104.56,"3":-22544.74,"4":-21001.54},"Transferencias":{"1":22285.0,"2":0.0},"Alimentación":{"1":-36276.92,"2":-28274.62,"3":-25097.13,"4":-19186.89},"Tarjetas":{"1":-209391.76,"2":-99540.54},"Servicios del hogar":{"1":-31467.96,"2":-55427.55,"3":-26363.26,"4":-22907.19},"Gasto de personal":{"1":-38274.0,"2":-23310.0,"3":-32957.0,"4":-34175.0},"Ingresos":{"1":597453.0,"2":203822.0,"3":547295.0,"4":476695.2},"Transporte":{"1":-31673.77,"2":-3326.85,"3":-24379.36,"4":-10523.03},"Regalos y donaciones":{"1":-8715.0,"2":-2115.0,"3":-10413.35,"4":-2084.0},"Educación":{"1":-600.0,"2":-70658.6,"3":-79147.0,"4":-80437.46},"Finanzas":{"1":-3441.8,"2":-843.75,"3":-3077.08,"4":-843.75},"Inversiones":{"3":-7800.0,"4":-4130.0},"Servicios":{"3":-12475.41,"4":-878.0},"Impuestos y trámites":{"3":-3281.79,"4":-29112.08},"Pagos":{"3":-31231.22,"4":-72889.67},"Mascotas":{"3":-945.0}},"kpi_mes":{"Deseos":{"1":-378701.36,"2":-104162.8,"3":-123771.7,"4":-27744.26},"Necesidades":{"1":-298643.9,"2":-233336.65,"3":-272345.25,"4":-334270.43},"Transferencias":{"1":22285.0,"2":0.0},"Ingresos":{"1":597453.0,"2":203822.0,"3":547295.0,"4":476695.2},"Inversiones":{"3":-7800.0,"4":-4130.0}},"pivot_neg":{"Marketing":{"1":-11700.0,"2":-46800.0,"4":-29403.0},"Servicios":{"2":-1402.05},"Ingresos":{"4":37670.9},"Licencias / suscripciones":{"4":-4680.53}},"flujo_banco":{"ITAU USD":{"1":-34910.46,"2":-47970.0,"3":-15514.2,"4":95399.1},"SCOTIABANK UYU":{"1":-30510.7,"2":67277.07,"3":-836.06,"4":39831.78},"SCOTIABANK USD":{"1":-12278.22,"2":-24960.39},"ITAU UYU":{"1":8392.12,"2":-176226.18,"3":159728.31,"4":-21093.0}},"monthly":{"1":{"ing":1110864.54,"egr":1180171.8},"2":{"ing":345161.21,"egr":527040.71},"3":{"ing":601196.91,"egr":457818.86},"4":{"ing":573496.32,"egr":459358.44}},"top_gastos":{"Tarjetas":308932.3,"Educación":234038.67,"Vivienda":149306.84,"Servicios del hogar":136187.06,"Gasto de personal":128716.0,"Alimentación":112010.87,"Salud":107593.42,"Ocio y cultura":196869.17,"Cuidado personal":98472.49},"recent":[{"f":"2026-04-30","t":"Personal","c1":"Ingresos","c2":"Sueldo","cat":"Ingresos","b":"ITAU UYU","d":"ANMA ABRIL","tot":113902.0},{"f":"2026-04-30","t":"Personal","c1":"Gasto de personal","c2":"Servicio doméstico / Niñera","cat":"Deseos","b":"SCOTIABANK UYU","d":"MIDI/TRN/ABRIL","tot":-23823.0},{"f":"2026-04-29","t":"Personal","c1":"Cuidado personal","c2":"Peluquería / Uñas / Estética","cat":"Deseos","b":"ITAU UYU","d":"Uñas","tot":-1990.0},{"f":"2026-04-28","t":"Negocio","c1":"Ingresos","c2":"Mentorías","cat":"Ingresos","b":"ITAU UYU","d":"Johanna RUMBO","tot":10000.0},{"f":"2026-04-27","t":"Personal","c1":"Pagos","c2":"Pago tarjetas","cat":"Necesidad","b":"SCOTIABANK UYU","d":"INTERNET0 PAGOTARD","tot":-36841.91},{"f":"2026-04-27","t":"Negocio","c1":"Ingresos","c2":"Mentorías","cat":"Ingresos","b":"ITAU USD","d":"METODO RUMBO","tot":27670.9},{"f":"2026-04-20","t":"Personal","c1":"Ingresos","c2":"Otros","cat":"Ingresos","b":"ITAU USD","d":"Renta del campo","tot":95518.2},{"f":"2026-04-20","t":"Negocio","c1":"Marketing","c2":"Publicidad en redes sociales","cat":"Fijo","b":"ITAU USD","d":"","tot":-23820.0}]};
 
-const DISP_REGS = [{"id":577,"f":"2026-04-30","m":"4","b":"ITAU UYU","t":"Personal","c1":"Ingresos","c2":"Sueldo","cat":"Ingresos","d":"ANMA ABRIL 60","fm":"Cobro por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-30","usd":null,"tc":null,"p":113902.0,"iva":null,"tot":113902.0},{"id":578,"f":"2026-04-30","m":"4","b":"ITAU UYU","t":"Personal","c1":"Transporte","c2":"Combustible","cat":"Variable","d":"300426 ANALIA MALAN","fm":"Pago por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-30","usd":null,"tc":null,"p":-1837.1,"iva":null,"tot":-1837.1},{"id":579,"f":"2026-04-30","m":"4","b":"ITAU UYU","t":"Personal","c1":"Salud","c2":"Medicamentos","cat":"Necesidad","d":"300426 ANALIA MALAN","fm":"Pago por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-30","usd":null,"tc":null,"p":-1102.0,"iva":null,"tot":-1102.0},{"id":580,"f":"2026-04-30","m":"4","b":"ITAU UYU","t":"Personal","c1":"Salud","c2":"Medicamentos","cat":"Necesidad","d":"","fm":"Cobro por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-30","usd":null,"tc":null,"p":18.44,"iva":null,"tot":18.44},{"id":581,"f":"2026-04-30","m":"4","b":"ITAU UYU","t":"Personal","c1":"Alimentación","c2":"Supermercado","cat":"Necesidad","d":"300426 ANALIA MALAN","fm":"Pago por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-30","usd":null,"tc":null,"p":-680.7,"iva":null,"tot":-680.7},{"id":582,"f":"2026-04-30","m":"4","b":"ITAU UYU","t":"Personal","c1":"Alimentación","c2":"Supermercado","cat":"Necesidad","d":"","fm":"Cobro por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-30","usd":null,"tc":null,"p":11.16,"iva":null,"tot":11.16},{"id":641,"f":"2026-04-30","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Gasto de personal","c2":"Servicio doméstico / Niñera","cat":"Deseos","d":"MIDI/TRN/ABRIL 26","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-30","usd":null,"tc":null,"p":-23823.0,"iva":null,"tot":-23823.0},{"id":575,"f":"2026-04-29","m":"4","b":"ITAU UYU","t":"Personal","c1":"Cuidado personal","c2":"Peluquería / Uñas / Estética","cat":"Deseos","d":"Uñas","fm":"Pago por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-29","usd":null,"tc":null,"p":-1990.0,"iva":null,"tot":-1990.0},{"id":576,"f":"2026-04-29","m":"4","b":"ITAU UYU","t":"Personal","c1":"Cuidado personal","c2":"Peluquería / Uñas / Estética","cat":"Deseos","d":"Color","fm":"Pago por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-29","usd":null,"tc":null,"p":-1665.0,"iva":null,"tot":-1665.0},{"id":642,"f":"2026-04-29","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Servicios del hogar","c2":"Agua (OSE)","cat":"Necesidad","d":"PAGANZA -               986879","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-29","usd":null,"tc":null,"p":-1142.79,"iva":null,"tot":-1142.79},{"id":643,"f":"2026-04-29","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Alimentación","c2":"Delivery / Restaurantes / Cafeterías","cat":"Deseos","d":"EL RINCON EMPANADAS /MONTEVI","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-29","usd":null,"tc":null,"p":-291.76,"iva":null,"tot":-291.76},{"id":572,"f":"2026-04-28","m":"4","b":"ITAU UYU","t":"Personal","c1":"Educación","c2":"Libros y útiles","cat":"Necesidad","d":"","fm":"Cobro por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-28","usd":null,"tc":null,"p":7.21,"iva":null,"tot":7.21},{"id":573,"f":"2026-04-28","m":"4","b":"ITAU UYU","t":"Personal","c1":"Educación","c2":"Libros y útiles","cat":"Necesidad","d":"280426 ANALIA MALAN","fm":"Pago por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-28","usd":null,"tc":null,"p":-1603.0,"iva":null,"tot":-1603.0},{"id":574,"f":"2026-04-28","m":"4","b":"ITAU UYU","t":"Negocio","c1":"Ingresos","c2":"Mentorías","cat":"Ingresos","d":"Johanna Método RUMBO","fm":"Cobro por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-28","usd":null,"tc":null,"p":10000.0,"iva":null,"tot":10000.0},{"id":644,"f":"2026-04-28","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Alimentación","c2":"Delivery / Restaurantes / Cafeterías","cat":"Deseos","d":"THE COFFEETERIA     /MONTEVI","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-28","usd":null,"tc":null,"p":-533.64,"iva":null,"tot":-533.64},{"id":645,"f":"2026-04-28","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Ingresos","c2":"Sueldo","cat":"Ingresos","d":"SUELDOS SCOTIABANK         - S","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-28","usd":null,"tc":null,"p":238800.0,"iva":null,"tot":238800.0},{"id":568,"f":"2026-04-27","m":"4","b":"ITAU UYU","t":"Personal","c1":"Alimentación","c2":"Delivery / Restaurantes / Cafeterías","cat":"Deseos","d":"","fm":"Cobro por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-27","usd":null,"tc":null,"p":45.74,"iva":null,"tot":45.74},{"id":569,"f":"2026-04-27","m":"4","b":"ITAU UYU","t":"Personal","c1":"Alimentación","c2":"Supermercado","cat":"Necesidad","d":"","fm":"Cobro por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-27","usd":null,"tc":null,"p":15.12,"iva":null,"tot":15.12},{"id":570,"f":"2026-04-27","m":"4","b":"ITAU UYU","t":"Personal","c1":"Alimentación","c2":"Supermercado","cat":"Necesidad","d":"250426 ANALIA MALAN","fm":"Pago por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-27","usd":null,"tc":null,"p":-922.27,"iva":null,"tot":-922.27},{"id":571,"f":"2026-04-27","m":"4","b":"ITAU UYU","t":"Personal","c1":"Alimentación","c2":"Supermercado","cat":"Necesidad","d":"250426 ANALIA MALAN","fm":"Pago por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-27","usd":null,"tc":null,"p":-620.0,"iva":null,"tot":-620.0},{"id":586,"f":"2026-04-27","m":"4","b":"ITAU USD","t":"Negocio","c1":"Ingresos","c2":"Mentorías","cat":"Ingresos","d":"METODO RUMBO DIEGO LUJAMBIO","fm":"Cobro por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-27","usd":697.0,"tc":39.7,"p":27670.9,"iva":null,"tot":27670.9},{"id":646,"f":"2026-04-27","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Pagos","c2":"Pago tarjetas","cat":"Necesidad","d":"INTERNET0 PAGOTARD 1124267700","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-27","usd":null,"tc":null,"p":-36841.91,"iva":null,"tot":-36841.91},{"id":647,"f":"2026-04-27","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Alimentación","c2":"Delivery / Restaurantes / Cafeterías","cat":"Deseos","d":"THE COFFEETERIA     /MONTEVI","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-27","usd":null,"tc":null,"p":-1067.28,"iva":null,"tot":-1067.28},{"id":648,"f":"2026-04-27","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Alimentación","c2":"Supermercado","cat":"Necesidad","d":"MIGUITA DE PAN      /MONTEVI","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-27","usd":null,"tc":null,"p":-927.54,"iva":null,"tot":-927.54},{"id":649,"f":"2026-04-23","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Regalos y donaciones","c2":"Donaciones / Caridad","cat":"Deseos","d":"Pérez scremini","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-23","usd":null,"tc":null,"p":-1000.0,"iva":null,"tot":-1000.0},{"id":650,"f":"2026-04-23","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Pagos","c2":"Pago tarjetas","cat":"Necesidad","d":"Santander","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-23","usd":null,"tc":null,"p":-7952.04,"iva":null,"tot":-7952.04},{"id":651,"f":"2026-04-23","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Servicios del hogar","c2":"Internet / Telefonía","cat":"Necesidad","d":"ANTEL","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-23","usd":null,"tc":null,"p":-2380.0,"iva":null,"tot":-2380.0},{"id":652,"f":"2026-04-23","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Impuestos y trámites","c2":"Tasas municipales","cat":"Necesidad","d":"PAGANZA -               986879","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-23","usd":null,"tc":null,"p":-1146.08,"iva":null,"tot":-1146.08},{"id":653,"f":"2026-04-23","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Gasto de personal","c2":"Servicio doméstico / Niñera","cat":"Deseos","d":"MIDI/TRN/ADEL ABRIL 26","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-23","usd":null,"tc":null,"p":-4000.0,"iva":null,"tot":-4000.0},{"id":654,"f":"2026-04-22","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Gasto de personal","c2":"Servicio doméstico / Niñera","cat":"Deseos","d":"BPS","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-22","usd":null,"tc":null,"p":-6352.0,"iva":null,"tot":-6352.0}];
+const DISP_REGS = [{"id":577,"f":"2026-04-30","m":"4","b":"ITAU UYU","t":"Personal","c1":"Ingresos","c2":"Sueldo","cat":"Ingresos","d":"ANMA ABRIL 60","fm":"Cobro por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-30","usd":null,"tc":null,"p":113902.0,"iva":null,"tot":113902.0},{"id":578,"f":"2026-04-30","m":"4","b":"ITAU UYU","t":"Personal","c1":"Transporte","c2":"Combustible","cat":"Variable","d":"300426 ANALIA MALAN","fm":"Pago por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-30","usd":null,"tc":null,"p":-1837.1,"iva":null,"tot":-1837.1},{"id":579,"f":"2026-04-30","m":"4","b":"ITAU UYU","t":"Personal","c1":"Salud","c2":"Medicamentos","cat":"Necesidad","d":"300426 ANALIA MALAN","fm":"Pago por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-30","usd":null,"tc":null,"p":-1102.0,"iva":null,"tot":-1102.0},{"id":580,"f":"2026-04-30","m":"4","b":"ITAU UYU","t":"Personal","c1":"Salud","c2":"Medicamentos","cat":"Necesidad","d":"","fm":"Cobro por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-30","usd":null,"tc":null,"p":18.44,"iva":null,"tot":18.44},{"id":581,"f":"2026-04-30","m":"4","b":"ITAU UYU","t":"Personal","c1":"Alimentación","c2":"Supermercado","cat":"Necesidad","d":"300426 ANALIA MALAN","fm":"Pago por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-30","usd":null,"tc":null,"p":-680.7,"iva":null,"tot":-680.7},{"id":582,"f":"2026-04-30","m":"4","b":"ITAU UYU","t":"Personal","c1":"Alimentación","c2":"Supermercado","cat":"Necesidad","d":"","fm":"Cobro por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-30","usd":null,"tc":null,"p":11.16,"iva":null,"tot":11.16},{"id":641,"f":"2026-04-30","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Gasto de personal","c2":"Servicio doméstico / Niñera","cat":"Deseos","d":"MIDI/TRN/ABRIL 26","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-30","usd":null,"tc":null,"p":-23823.0,"iva":null,"tot":-23823.0},{"id":575,"f":"2026-04-29","m":"4","b":"ITAU UYU","t":"Personal","c1":"Cuidado personal","c2":"Peluquería / Uñas / Estética","cat":"Deseos","d":"Uñas","fm":"Pago por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-29","usd":null,"tc":null,"p":-1990.0,"iva":null,"tot":-1990.0},{"id":576,"f":"2026-04-29","m":"4","b":"ITAU UYU","t":"Personal","c1":"Cuidado personal","c2":"Peluquería / Uñas / Estética","cat":"Deseos","d":"Color","fm":"Pago por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-29","usd":null,"tc":null,"p":-1665.0,"iva":null,"tot":-1665.0},{"id":642,"f":"2026-04-29","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Servicios del hogar","c2":"Agua (OSE)","cat":"Necesidad","d":"PAGANZA -               986879","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-29","usd":null,"tc":null,"p":-1142.79,"iva":null,"tot":-1142.79},{"id":643,"f":"2026-04-29","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Alimentación","c2":"Delivery / Restaurantes / Cafeterías","cat":"Deseos","d":"EL RINCON EMPANADAS /MONTEVI","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-29","usd":null,"tc":null,"p":-291.76,"iva":null,"tot":-291.76},{"id":572,"f":"2026-04-28","m":"4","b":"ITAU UYU","t":"Personal","c1":"Educación","c2":"Libros y útiles","cat":"Necesidad","d":"","fm":"Cobro por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-28","usd":null,"tc":null,"p":7.21,"iva":null,"tot":7.21},{"id":573,"f":"2026-04-28","m":"4","b":"ITAU UYU","t":"Personal","c1":"Educación","c2":"Libros y útiles","cat":"Necesidad","d":"280426 ANALIA MALAN","fm":"Pago por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-28","usd":null,"tc":null,"p":-1603.0,"iva":null,"tot":-1603.0},{"id":574,"f":"2026-04-28","m":"4","b":"ITAU UYU","t":"Negocio","c1":"Ingresos","c2":"Mentorías","cat":"Ingresos","d":"Johanna Método RUMBO","fm":"Cobro por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-28","usd":null,"tc":null,"p":10000.0,"iva":null,"tot":10000.0},{"id":644,"f":"2026-04-28","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Alimentación","c2":"Delivery / Restaurantes / Cafeterías","cat":"Deseos","d":"THE COFFEETERIA     /MONTEVI","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-28","usd":null,"tc":null,"p":-533.64,"iva":null,"tot":-533.64},{"id":645,"f":"2026-04-28","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Ingresos","c2":"Sueldo","cat":"Ingresos","d":"SUELDOS SCOTIABANK         - S","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-28","usd":null,"tc":null,"p":238800.0,"iva":null,"tot":238800.0},{"id":568,"f":"2026-04-27","m":"4","b":"ITAU UYU","t":"Personal","c1":"Alimentación","c2":"Delivery / Restaurantes / Cafeterías","cat":"Deseos","d":"","fm":"Cobro por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-27","usd":null,"tc":null,"p":45.74,"iva":null,"tot":45.74},{"id":569,"f":"2026-04-27","m":"4","b":"ITAU UYU","t":"Personal","c1":"Alimentación","c2":"Supermercado","cat":"Necesidad","d":"","fm":"Cobro por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-27","usd":null,"tc":null,"p":15.12,"iva":null,"tot":15.12},{"id":570,"f":"2026-04-27","m":"4","b":"ITAU UYU","t":"Personal","c1":"Alimentación","c2":"Supermercado","cat":"Necesidad","d":"250426 ANALIA MALAN","fm":"Pago por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-27","usd":null,"tc":null,"p":-922.27,"iva":null,"tot":-922.27},{"id":571,"f":"2026-04-27","m":"4","b":"ITAU UYU","t":"Personal","c1":"Alimentación","c2":"Supermercado","cat":"Necesidad","d":"250426 ANALIA MALAN","fm":"Pago por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-27","usd":null,"tc":null,"p":-620.0,"iva":null,"tot":-620.0},{"id":586,"f":"2026-04-27","m":"4","b":"ITAU USD","t":"Negocio","c1":"Ingresos","c2":"Mentorías","cat":"Ingresos","d":"METODO RUMBO DIEGO LUJAMBIO","fm":"Cobro por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-27","usd":697.0,"tc":39.7,"p":27670.9,"iva":null,"tot":27670.9},{"id":646,"f":"2026-04-27","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Pagos","c2":"Pago tarjetas","cat":"Necesidad","d":"INTERNET0 PAGOTARD 1124267700","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-27","usd":null,"tc":null,"p":-36841.91,"iva":null,"tot":-36841.91},{"id":647,"f":"2026-04-27","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Alimentación","c2":"Delivery / Restaurantes / Cafeterías","cat":"Deseos","d":"THE COFFEETERIA     /MONTEVI","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-27","usd":null,"tc":null,"p":-1067.28,"iva":null,"tot":-1067.28},{"id":648,"f":"2026-04-27","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Alimentación","c2":"Supermercado","cat":"Necesidad","d":"MIGUITA DE PAN      /MONTEVI","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-27","usd":null,"tc":null,"p":-927.54,"iva":null,"tot":-927.54},{"id":649,"f":"2026-04-23","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Regalos y donaciones","c2":"Donaciones / Caridad","cat":"Deseos","d":"Pérez scremini","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-23","usd":null,"tc":null,"p":-1000.0,"iva":null,"tot":-1000.0},{"id":650,"f":"2026-04-23","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Pagos","c2":"Pago tarjetas","cat":"Necesidad","d":"Santander","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-23","usd":null,"tc":null,"p":-7952.04,"iva":null,"tot":-7952.04},{"id":651,"f":"2026-04-23","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Servicios del hogar","c2":"Internet / Telefonía","cat":"Necesidad","d":"ANTEL","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-23","usd":null,"tc":null,"p":-2380.0,"iva":null,"tot":-2380.0},{"id":652,"f":"2026-04-23","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Impuestos y trámites","c2":"Tasas municipales","cat":"Necesidad","d":"PAGANZA -               986879","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-23","usd":null,"tc":null,"p":-1146.08,"iva":null,"tot":-1146.08},{"id":653,"f":"2026-04-23","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Gasto de personal","c2":"Servicio doméstico / Niñera","cat":"Deseos","d":"MIDI/TRN/ADEL ABRIL 26","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-23","usd":null,"tc":null,"p":-4000.0,"iva":null,"tot":-4000.0},{"id":654,"f":"2026-04-22","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Gasto de personal","c2":"Servicio doméstico / Niñera","cat":"Deseos","d":"BPS","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-22","usd":null,"tc":null,"p":-6352.0,"iva":null,"tot":-6352.0},{"id":655,"f":"2026-04-22","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Servicios del hogar","c2":"Internet / Telefonía","cat":"Necesidad","d":"PAGANZA -               986879","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-22","usd":null,"tc":null,"p":-1709.8,"iva":null,"tot":-1709.8},{"id":656,"f":"2026-04-22","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Alimentación","c2":"Delivery / Restaurantes / Cafeterías","cat":"Deseos","d":"THE COFFEETERIA     /MONTEVI","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-22","usd":null,"tc":null,"p":-533.64,"iva":null,"tot":-533.64},{"id":567,"f":"2026-04-21","m":"4","b":"ITAU UYU","t":"Personal","c1":"Alimentación","c2":"Delivery / Restaurantes / Cafeterías","cat":"Deseos","d":"","fm":"Pago por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-21","usd":null,"tc":null,"p":-988.0,"iva":null,"tot":-988.0},{"id":657,"f":"2026-04-21","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Alimentación","c2":"Delivery / Restaurantes / Cafeterías","cat":"Deseos","d":"THE COFFEETERIA     /MONTEVI","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-21","usd":null,"tc":null,"p":-533.64,"iva":null,"tot":-533.64},{"id":565,"f":"2026-04-20","m":"4","b":"ITAU UYU","t":"Personal","c1":"Ocio y cultura","c2":"Cine / Conciertos","cat":"Deseos","d":"El club de la cumbia","fm":"Pago por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-20","usd":null,"tc":null,"p":-1260.0,"iva":null,"tot":-1260.0},{"id":566,"f":"2026-04-20","m":"4","b":"ITAU UYU","t":"Personal","c1":"Ocio y cultura","c2":"Cine / Conciertos","cat":"Deseos","d":"El club de la cumbia","fm":"Cobro por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-20","usd":null,"tc":null,"p":20.66,"iva":null,"tot":20.66},{"id":584,"f":"2026-04-20","m":"4","b":"ITAU USD","t":"Negocio","c1":"Marketing","c2":"Publicidad en redes sociales","cat":"Fijo","d":"","fm":"Pago por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-20","usd":-600.0,"tc":39.7,"p":-23820.0,"iva":null,"tot":-23820.0},{"id":585,"f":"2026-04-20","m":"4","b":"ITAU USD","t":"Personal","c1":"Ingresos","c2":"Otros","cat":"Ingresos","d":"Renta del campo","fm":"Cobro por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-20","usd":2406.0,"tc":39.7,"p":95518.2,"iva":null,"tot":95518.2},{"id":658,"f":"2026-04-20","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Ocio y cultura","c2":"Cine / Conciertos","cat":"Deseos","d":"SALA DEL MUSEO BARRA/MONTEVI","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-20","usd":null,"tc":null,"p":-1534.43,"iva":null,"tot":-1534.43},{"id":659,"f":"2026-04-20","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Servicios del hogar","c2":"Gas / Saneamiento / Leña","cat":"Necesidad","d":"PUNTO GAS MAESTRO   /MONTEVI","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-20","usd":null,"tc":null,"p":-2691.15,"iva":null,"tot":-2691.15},{"id":660,"f":"2026-04-20","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Alimentación","c2":"Supermercado","cat":"Necesidad","d":"TIENDA INGLESA      /MONTEVI","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-20","usd":null,"tc":null,"p":-2812.32,"iva":null,"tot":-2812.32},{"id":661,"f":"2026-04-20","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Educación","c2":"Cursos / Talleres / Actividades niños","cat":"Deseos","d":"Equipo futbol diconsa","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-20","usd":null,"tc":null,"p":-1400.0,"iva":null,"tot":-1400.0},{"id":662,"f":"2026-04-20","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Alimentación","c2":"Delivery / Restaurantes / Cafeterías","cat":"Deseos","d":"THE COFFEETERIA     /MONTEVI","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-20","usd":null,"tc":null,"p":-533.64,"iva":null,"tot":-533.64},{"id":564,"f":"2026-04-17","m":"4","b":"ITAU UYU","t":"Personal","c1":"Otros gastos","c2":"Otros gastos","cat":"Deseos","d":"","fm":"Cobro por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-17","usd":null,"tc":null,"p":600.0,"iva":null,"tot":600.0},{"id":663,"f":"2026-04-17","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Salud","c2":"Seguro de vida","cat":"Necesidad","d":"PAGANZA -               986879","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-17","usd":null,"tc":null,"p":-7462.0,"iva":null,"tot":-7462.0},{"id":561,"f":"2026-04-16","m":"4","b":"ITAU UYU","t":"Personal","c1":"Alimentación","c2":"Supermercado","cat":"Necesidad","d":"","fm":"Cobro por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-16","usd":null,"tc":null,"p":10.48,"iva":null,"tot":10.48},{"id":562,"f":"2026-04-16","m":"4","b":"ITAU UYU","t":"Personal","c1":"Transporte","c2":"Estacionamiento","cat":"Fijo","d":"160426 ANALIA MALAN","fm":"Pago por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-16","usd":null,"tc":null,"p":-340.0,"iva":null,"tot":-340.0},{"id":563,"f":"2026-04-16","m":"4","b":"ITAU UYU","t":"Personal","c1":"Alimentación","c2":"Supermercado","cat":"Necesidad","d":"160426 ANALIA MALAN","fm":"Pago por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-16","usd":null,"tc":null,"p":-639.0,"iva":null,"tot":-639.0},{"id":664,"f":"2026-04-16","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Alimentación","c2":"Delivery / Restaurantes / Cafeterías","cat":"Deseos","d":"EL RINCON EMPANADAS /MONTEVI","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-16","usd":null,"tc":null,"p":-275.09,"iva":null,"tot":-275.09},{"id":556,"f":"2026-04-15","m":"4","b":"ITAU UYU","t":"Personal","c1":"Impuestos y trámites","c2":"IVA / IRPF / IRAE / Fonasa","cat":"Necesidad","d":"","fm":"Pago por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-15","usd":null,"tc":null,"p":-16971.0,"iva":null,"tot":-16971.0},{"id":557,"f":"2026-04-15","m":"4","b":"ITAU UYU","t":"Personal","c1":"Impuestos y trámites","c2":"IVA / IRPF / IRAE / Fonasa","cat":"Necesidad","d":"","fm":"Pago por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-15","usd":null,"tc":null,"p":-7439.0,"iva":null,"tot":-7439.0},{"id":558,"f":"2026-04-15","m":"4","b":"ITAU UYU","t":"Personal","c1":"Finanzas","c2":"Mantenimiento tarjeta","cat":"Deseos","d":"","fm":"Pago por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-15","usd":null,"tc":null,"p":-781.25,"iva":null,"tot":-781.25},{"id":559,"f":"2026-04-15","m":"4","b":"ITAU UYU","t":"Personal","c1":"Finanzas","c2":"Mantenimiento tarjeta","cat":"Deseos","d":"","fm":"Pago por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-15","usd":null,"tc":null,"p":-68.75,"iva":null,"tot":-68.75},{"id":560,"f":"2026-04-15","m":"4","b":"ITAU UYU","t":"Personal","c1":"Finanzas","c2":"Mantenimiento tarjeta","cat":"Deseos","d":"","fm":"Cobro por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-15","usd":null,"tc":null,"p":6.25,"iva":null,"tot":6.25},{"id":665,"f":"2026-04-15","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Alimentación","c2":"Delivery / Restaurantes / Cafeterías","cat":"Deseos","d":"THE COFFEETERIA     /MONTEVI","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-15","usd":null,"tc":null,"p":-411.52,"iva":null,"tot":-411.52},{"id":555,"f":"2026-04-14","m":"4","b":"ITAU UYU","t":"Personal","c1":"Cuidado personal","c2":"Gimnasio / Deporte","cat":"Deseos","d":"","fm":"Cobro por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-14","usd":null,"tc":null,"p":375.0,"iva":null,"tot":375.0},{"id":666,"f":"2026-04-14","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Alimentación","c2":"Delivery / Restaurantes / Cafeterías","cat":"Deseos","d":"THE COFFEETERIA     /MONTEVI","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-14","usd":null,"tc":null,"p":-533.64,"iva":null,"tot":-533.64},{"id":554,"f":"2026-04-13","m":"4","b":"ITAU UYU","t":"Personal","c1":"Cuidado personal","c2":"Gimnasio / Deporte","cat":"Deseos","d":"","fm":"Pago por transferencia","be":"ITAU","plazo":"","fechaCP":"2026-04-13","usd":null,"tc":null,"p":-3750.0,"iva":null,"tot":-3750.0},{"id":667,"f":"2026-04-13","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Alimentación","c2":"Delivery / Restaurantes / Cafeterías","cat":"Deseos","d":"THE COFFEETERIA     /MONTEVI","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-13","usd":null,"tc":null,"p":-533.64,"iva":null,"tot":-533.64},{"id":668,"f":"2026-04-13","m":"4","b":"SCOTIABANK UYU","t":"Personal","c1":"Alimentación","c2":"Supermercado","cat":"Necesidad","d":"MIGUITA DE PAN      /MONTEVI","fm":"Pago con tarjeta de crédito","be":"SCOTIABANK","plazo":"","fechaCP":"2026-04-13","usd":null,"tc":null,"p":-879.34,"iva":null,"tot":-879.34}];
 
 // ── TAXONOMÍA ────────────────────────────────────────────────────────────────
 const TX = {
@@ -263,20 +263,7 @@ export default function FinCFO() {
                 <div style={{display:"flex",alignItems:"flex-end",gap:8,height:80}}>
                   {MESES_DISP.map(m=>{
                     const v=monthly[m]||{ing:0,egr:0};
-                    const selStyle2 = {background:"#1c1c26",border:"1px solid rgba(255,255,255,0.1)",borderRadius:5,color:"#ede8e0",fontFamily:"DM Mono",fontSize:11,padding:"5px 8px",cursor:"pointer"};
-          const dropZone = (ref, label, tipo, active) => (
-            <div style={{border:"1.5px dashed rgba(255,255,255,0.12)",borderRadius:8,padding:32,textAlign:"center",cursor:active?"pointer":"not-allowed",opacity:active?1:0.5,marginBottom:12}}
-              onClick={()=>active&&ref.current.click()}
-              onMouseEnter={e=>active&&(e.currentTarget.style.borderColor="rgba(200,240,96,0.4)")}
-              onMouseLeave={e=>(e.currentTarget.style.borderColor="rgba(255,255,255,0.12)")}>
-              <div style={{fontSize:28,marginBottom:8}}>{tipo==="banco"?"🏦":"💳"}</div>
-              <div style={{fontSize:13,color:"#888"}}>{fileName||label}</div>
-              <div style={{fontSize:11,color:"#444",marginTop:4}}>PDF · Excel · CSV</div>
-              <input ref={ref} type="file" accept=".csv,.txt,.pdf,.xls,.xlsx" style={{display:"none"}} onChange={e=>handleFile(e.target.files[0],tipo)}/>
-            </div>
-          );
-
-          return (
+                    return (
                       <div key={m} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center"}}>
                         <div style={{width:"100%",display:"flex",gap:2,alignItems:"flex-end",height:72}}>
                           <div style={{flex:1,height:Math.max(Math.round((v.ing/maxBar)*72),2),background:"#60f0a0",borderRadius:"3px 3px 0 0",opacity:.8}} title={fmtN(v.ing)}/>
@@ -329,212 +316,11 @@ export default function FinCFO() {
           </>
         )}
 
-        {/* ── + NUEVO ── */}
-        {mainTab==="form" && (()=>{
-          const [loadType, setLoadType] = useState("manual");
-          const [bancoCarga, setBancoCarga] = useState("");
-          const [periodoMes, setPeriodoMes] = useState("4");
-          const [periodoAno, setPeriodoAno] = useState("2026");
-          const [fileContent, setFileContent] = useState(null);
-          const [fileName, setFileName] = useState("");
-          const [loadStep, setLoadStep] = useState("upload");
-          const [loadMovs, setLoadMovs] = useState([]);
-          const [loadError, setLoadError] = useState("");
-          const fileRef = useRef(null);
-          const fileRef2 = useRef(null);
-
-          const downloadTemplate = () => {
-            const headers = ["Fecha","Banco cobra/paga","Tipo","Concepto 1","Concepto 2","Descripcion","Forma cobro/pago","Banco emisor","Plazo dias","USD","TC","Pesos","IVA"];
-            const example = ["2026-05-01","Itaú UYU","Personal","Alimentación","Supermercado","Devoto","Pago transferencia","Itaú UYU","0","","","1500",""];
-            const csv = [headers.join(","), example.join(",")].join("\n");
-            const blob = new Blob([csv], {type:"text/csv"});
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a"); a.href=url; a.download="FinCFO_plantilla_carga.csv"; a.click();
-          };
-
-          const parseMasiva = (text) => {
-            const lines = text.split("\n").filter(l=>l.trim());
-            const header = lines[0].split(",");
-            const movs = [];
-            for(let i=1;i<lines.length;i++){
-              const cols = lines[i].split(",");
-              if(cols.length<3) continue;
-              const get=(name)=>{const idx=header.findIndex(h=>h.toLowerCase().includes(name.toLowerCase()));return idx>=0?(cols[idx]||"").trim():"";};
-              const fecha=get("fecha"); const c1=get("concepto 1");
-              if(!fecha||!c1) continue;
-              const pesos=parseFloat(get("pesos"))||0; const iva=parseFloat(get("iva"))||null;
-              movs.push({id:i,f:fecha,m:String(new Date(fecha).getMonth()+1),b:get("banco cobra"),t:get("tipo")||"Personal",c1,c2:get("concepto 2"),cat:TX[get("tipo")||"Personal"]?.[c1]?.cat||"",d:get("descripcion"),fm:get("forma"),be:get("banco emisor"),plazo:get("plazo"),usd:parseFloat(get("usd"))||null,tc:parseFloat(get("tc"))||null,p:pesos,iva,tot:pesos+(iva||0),fechaCP:fecha,status:"ok"});
-            }
-            return movs;
-          };
-
-          const procesarConIA = async (texto, tipo) => {
-            setLoadStep("processing");
-            const prompt = tipo==="banco"
-              ? `Analizá este extracto bancario uruguayo. Para cada movimiento determiná: fecha (YYYY-MM-DD), descripcion, monto (positivo=ingreso/negativo=gasto), moneda (UYU/USD), tipo (Personal/Negocio), concepto1 (de: Ingresos,Ventas,Vivienda,Servicios del hogar,Alimentación,Transporte,Salud,Educación,Cuidado personal,Mascotas,Ocio y cultura,Finanzas,Impuestos y trámites,Regalos y donaciones,Imprevistos,Otros gastos,Gasto de personal,Transferencias,Tarjetas,Pagos,Inversiones,Marketing,Servicios,Personal,Honorarios,Impuestos), concepto2, esPagoTarjeta (true si paga OCA/Visa/Master), confianza (alta/media/baja). Banco: ${bancoCarga}, Período: ${MESES_NOM[+periodoMes]} ${periodoAno}. Respondé SOLO JSON: {"movimientos":[{"fecha":"","descripcion":"","monto":0,"moneda":"UYU","tipo":"Personal","concepto1":"","concepto2":"","esPagoTarjeta":false,"confianza":"alta"}]}`
-              : `Analizá este estado de tarjeta de crédito uruguaya. Para cada gasto: fecha (YYYY-MM-DD), descripcion, monto (positivo=gasto), moneda (UYU/USD), tipo (Personal/Negocio), concepto1, concepto2, confianza (alta/media/baja). Ignorá los pagos al banco. Tarjeta: ${bancoCarga}, Período: ${MESES_NOM[+periodoMes]} ${periodoAno}. Respondé SOLO JSON: {"movimientos":[{"fecha":"","descripcion":"","monto":0,"moneda":"UYU","tipo":"Personal","concepto1":"","concepto2":"","confianza":"alta"}],"totalTarjeta":0}`;
-            try {
-              const res = await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:`${prompt}\n\nArchivo:\n${texto.slice(0,4000)}`}]})});
-              const data = await res.json();
-              const raw = data.content?.[0]?.text||"";
-              const parsed = JSON.parse(raw.replace(/```json|```/g,"").trim());
-              const movs = (parsed.movimientos||[]).map((m,i)=>({id:i+1,f:m.fecha,m:String(new Date(m.fecha||"2026-01-01").getMonth()+1),b:bancoCarga,t:m.tipo||"Personal",c1:m.concepto1,c2:m.concepto2||"",cat:TX[m.tipo||"Personal"]?.[m.concepto1]?.cat||"",d:m.descripcion,fm:tipo==="banco"?"Pago transferencia":"Pago crédito",be:bancoCarga,plazo:"0",p:Math.abs(m.monto||0),iva:null,tot:m.monto||0,moneda:m.moneda||"UYU",esPagoTarjeta:m.esPagoTarjeta||false,confianza:m.confianza||"alta",status:m.confianza==="baja"?"revisar":"ok",pendiente:m.esPagoTarjeta||false}));
-              setLoadMovs(movs); setLoadStep("review");
-            } catch(e) { setLoadError("Error al procesar con IA. Verificá el archivo."); setLoadStep("upload"); }
-          };
-
-          const handleFile = async (file, tipo) => {
-            setFileName(file.name); setLoadError("");
-            const text = await file.text();
-            if(tipo==="masiva"){ setLoadMovs(parseMasiva(text)); setLoadStep("review"); }
-            else await procesarConIA(text, tipo);
-          };
-
-          const confirmar = () => {
-            const nuevos = loadMovs.filter(m=>!m.pendiente).map(m=>({...m,id:Date.now()+m.id}));
-            setRegs(prev=>[...nuevos,...prev]);
-            setLoadStep("done"); setLoadMovs([]);
-          };
-
-          const updateMov = (id,field,val) => setLoadMovs(prev=>prev.map(m=>m.id===id?{...m,[field]:val}:m));
-
-          return (
+        {/* ── FORMULARIO ── */}
+        {mainTab==="form" && (
           <>
             <div style={{fontFamily:"Syne",fontSize:18,fontWeight:800,marginBottom:4}}>Nuevo registro</div>
-            <div style={{color:"#555",fontSize:12,marginBottom:16}}>Elegí cómo querés cargar</div>
-
-            {/* Selector de modo */}
-            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:20}}>
-              {[{k:"manual",icon:"✏️",title:"Manual",desc:"Un registro a mano"},{k:"masiva",icon:"📊",title:"Carga masiva",desc:"Excel con muchos registros"},{k:"banco",icon:"🏦",title:"Extracto bancario",desc:"La IA categoriza"},{k:"tarjeta",icon:"💳",title:"Tarjeta de crédito",desc:"La IA categoriza"}].map(opt=>(
-                <div key={opt.k} onClick={()=>{setLoadType(opt.k);setLoadStep("upload");setLoadMovs([]);setLoadError("");}}
-                  style={{...S.card,cursor:"pointer",border:`1px solid ${loadType===opt.k?"rgba(200,240,96,0.4)":"rgba(255,255,255,0.06)"}`,background:loadType===opt.k?"rgba(200,240,96,0.06)":"#131318"}}>
-                  <div style={{fontSize:22,marginBottom:6}}>{opt.icon}</div>
-                  <div style={{fontFamily:"Syne",fontSize:12,fontWeight:700,color:loadType===opt.k?"#c8f060":"#ede8e0",marginBottom:3}}>{opt.title}</div>
-                  <div style={{fontSize:10,color:"#555"}}>{opt.desc}</div>
-                </div>
-              ))}
-            </div>
-
-            {/* ── CARGA MASIVA ── */}
-            {loadType==="masiva" && loadStep==="upload" && (
-              <div style={S.card}>
-                <div style={S.secT}>Carga masiva</div>
-                <p style={{fontSize:12,color:"#888",marginBottom:16}}>Descargá la plantilla, completala y subila. Ideal para carga inicial histórica.</p>
-                <button onClick={downloadTemplate} style={{background:"rgba(200,240,96,0.1)",border:"1px solid rgba(200,240,96,0.3)",borderRadius:6,color:"#c8f060",fontFamily:"Syne",fontSize:13,fontWeight:700,padding:"10px 20px",cursor:"pointer",marginBottom:20,display:"block"}}>⬇ Descargar plantilla CSV</button>
-                <div style={{border:"1.5px dashed rgba(255,255,255,0.12)",borderRadius:8,padding:32,textAlign:"center",cursor:"pointer"}} onClick={()=>fileRef.current.click()}
-                  onMouseEnter={e=>e.currentTarget.style.borderColor="rgba(200,240,96,0.4)"} onMouseLeave={e=>e.currentTarget.style.borderColor="rgba(255,255,255,0.12)"}>
-                  <div style={{fontSize:28,marginBottom:8}}>📂</div>
-                  <div style={{fontSize:13,color:"#888"}}>{fileName||"Subir CSV completado"}</div>
-                  <input ref={fileRef} type="file" accept=".csv,.txt" style={{display:"none"}} onChange={e=>handleFile(e.target.files[0],"masiva")}/>
-                </div>
-                {loadError&&<div style={{color:"#f06060",fontSize:12,marginTop:10}}>{loadError}</div>}
-              </div>
-            )}
-
-            {/* ── BANCO / TARJETA — UPLOAD ── */}
-            {(loadType==="banco"||loadType==="tarjeta") && loadStep==="upload" && (
-              <div style={S.card}>
-                <div style={S.secT}>{loadType==="banco"?"Estado de cuenta bancario":"Estado de cuenta de tarjeta"}</div>
-                <div style={{...S.g3,marginBottom:16}}>
-                  <div>
-                    <label style={S.lbl}>{loadType==="banco"?"Banco":"Tarjeta"}</label>
-                    <select value={bancoCarga} onChange={e=>setBancoCarga(e.target.value)} style={S.sel}>
-                      <option value="">— seleccionar —</option>
-                      {(loadType==="banco"?bancosActivos:tarjetasActivas).map(b=><option key={b}>{b}</option>)}
-                    </select>
-                    {!bancoCarga&&<div style={{fontSize:10,color:"#f06060",marginTop:4}}>Crealo primero en ⚙ Configuración</div>}
-                  </div>
-                  <div><label style={S.lbl}>Mes</label>
-                    <select value={periodoMes} onChange={e=>setPeriodoMes(e.target.value)} style={S.sel}>
-                      {["1","2","3","4","5","6","7","8","9","10","11","12"].map(m=><option key={m} value={m}>{MESES_NOM[+m]}</option>)}
-                    </select>
-                  </div>
-                  <div><label style={S.lbl}>Año</label><input type="number" value={periodoAno} onChange={e=>setPeriodoAno(e.target.value)} style={S.inp}/></div>
-                </div>
-                {dropZone(fileRef2, `Subir ${loadType==="banco"?"extracto bancario":"estado de tarjeta"}`, loadType, !!bancoCarga)}
-                {loadError&&<div style={{color:"#f06060",fontSize:12,marginTop:10}}>{loadError}</div>}
-              </div>
-            )}
-
-            {/* ── PROCESANDO ── */}
-            {loadStep==="processing" && (
-              <div style={{...S.card,textAlign:"center",padding:48}}>
-                <div style={{fontFamily:"Syne",fontSize:16,fontWeight:700,marginBottom:8}}>Procesando con IA...</div>
-                <div style={{fontSize:12,color:"#555",marginBottom:28}}>Leyendo movimientos y categorizando</div>
-                <div style={{display:"flex",justifyContent:"center",gap:6}}>
-                  {[0,1,2].map(i=><div key={i} style={{width:8,height:8,borderRadius:"50%",background:"#c8f060",animation:`bounce 1.2s ${i*0.2}s ease-in-out infinite`}}/>)}
-                </div>
-                <style>{`@keyframes bounce{0%,80%,100%{transform:translateY(0);opacity:.3}40%{transform:translateY(-8px);opacity:1}}`}</style>
-              </div>
-            )}
-
-            {/* ── REVISIÓN ── */}
-            {loadStep==="review" && (
-              <>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:14}}>
-                  {[{l:"Detectados",v:loadMovs.length,c:"#ede8e0"},{l:"Confianza alta",v:loadMovs.filter(m=>m.confianza==="alta"||!m.confianza).length,c:"#60f0a0"},{l:"A revisar",v:loadMovs.filter(m=>m.confianza&&m.confianza!=="alta").length,c:"#f0a060"},{l:"Pagos tarjeta",v:loadMovs.filter(m=>m.esPagoTarjeta).length,c:"#c860f0"}].map(k=>(
-                    <div key={k.l} style={S.card}><div style={{...S.lbl,marginBottom:4}}>{k.l}</div><div style={{fontFamily:"Syne",fontSize:20,fontWeight:800,color:k.c}}>{k.v}</div></div>
-                  ))}
-                </div>
-                <div style={{...S.card,padding:0,marginBottom:12}}>
-                  <div style={{padding:"10px 14px",borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
-                    <div style={{fontFamily:"Syne",fontSize:13,fontWeight:700,marginBottom:4}}>Revisá y ajustá si es necesario</div>
-                    {loadMovs.some(m=>m.esPagoTarjeta)&&<div style={{fontSize:11,color:"#c860f0"}}>💳 Los pagos de tarjeta quedarán pendientes de conciliación</div>}
-                  </div>
-                  <div style={{display:"grid",gridTemplateColumns:"80px 1fr 140px 100px 80px",gap:4,padding:"6px 10px",fontSize:10,color:"#444",textTransform:"uppercase",letterSpacing:0.5}}>
-                    <div>Fecha</div><div>Descripción</div><div>Concepto 1</div><div>Tipo</div><div style={{textAlign:"right"}}>Monto</div>
-                  </div>
-                  {loadMovs.map(m=>(
-                    <div key={m.id} style={{display:"grid",gridTemplateColumns:"80px 1fr 140px 100px 80px",gap:4,padding:"7px 10px",borderTop:"1px solid rgba(255,255,255,0.03)",background:m.esPagoTarjeta?"rgba(200,96,240,0.05)":m.confianza==="baja"?"rgba(240,160,96,0.05)":"transparent",alignItems:"center"}}>
-                      <div style={{fontSize:11,color:"#555"}}>{fmtD(m.f)}</div>
-                      <div>
-                        <div style={{fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.d}</div>
-                        <div style={{display:"flex",gap:4,marginTop:2}}>
-                          {m.esPagoTarjeta&&<span style={{fontSize:9,padding:"1px 6px",borderRadius:3,background:"rgba(200,96,240,0.2)",color:"#c860f0"}}>💳 pendiente</span>}
-                          {m.confianza==="baja"&&<span style={{fontSize:9,padding:"1px 6px",borderRadius:3,background:"rgba(240,160,96,0.2)",color:"#f0a060"}}>⚠ revisar</span>}
-                        </div>
-                      </div>
-                      <select value={m.c1||""} onChange={e=>updateMov(m.id,"c1",e.target.value)}
-                        style={{background:"#1c1c26",border:`1px solid ${m.confianza==="baja"?"rgba(240,160,96,0.4)":"rgba(255,255,255,0.08)"}`,borderRadius:4,color:m.confianza==="baja"?"#f0a060":"#ede8e0",fontFamily:"DM Mono",fontSize:10,padding:"3px 6px",cursor:"pointer"}}>
-                        {Object.keys(TX[m.t||"Personal"]||TX.Personal).map(c=><option key={c}>{c}</option>)}
-                      </select>
-                      <select value={m.t||"Personal"} onChange={e=>updateMov(m.id,"t",e.target.value)}
-                        style={{background:"#1c1c26",border:"1px solid rgba(255,255,255,0.08)",borderRadius:4,color:"#ede8e0",fontFamily:"DM Mono",fontSize:10,padding:"3px 6px",cursor:"pointer"}}>
-                        <option>Personal</option><option>Negocio</option>
-                      </select>
-                      <div style={{fontFamily:"Syne",fontSize:12,fontWeight:700,textAlign:"right",color:(m.tot||0)>0?"#60f0a0":"#f06060"}}>
-                        {(m.tot||0)>0?"+":"-"}{fmtN(Math.abs(m.tot||0)).replace("$ ","")}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div style={{display:"flex",gap:10}}>
-                  <button onClick={()=>setLoadStep("upload")} style={{background:"#131318",border:"1px solid rgba(255,255,255,0.1)",borderRadius:6,color:"#555",fontFamily:"DM Mono",fontSize:12,padding:"10px 20px",cursor:"pointer"}}>← Volver</button>
-                  <button onClick={confirmar} style={{flex:1,background:"#c8f060",color:"#09090d",border:"none",borderRadius:8,padding:13,fontFamily:"Syne",fontSize:14,fontWeight:800,cursor:"pointer"}}>
-                    Confirmar — registrar {loadMovs.filter(m=>!m.esPagoTarjeta).length} · dejar {loadMovs.filter(m=>m.esPagoTarjeta).length} pendientes →
-                  </button>
-                </div>
-              </>
-            )}
-
-            {/* ── HECHO ── */}
-            {loadStep==="done" && (
-              <div style={{...S.card,textAlign:"center",padding:40}}>
-                <div style={{fontSize:32,marginBottom:12}}>✓</div>
-                <div style={{fontFamily:"Syne",fontSize:18,fontWeight:800,color:"#60f0a0",marginBottom:8}}>Registros importados</div>
-                {(loadType==="banco"||loadType==="tarjeta")&&<div style={{fontSize:12,color:"#555",marginBottom:16}}>Los pagos de tarjeta quedaron pendientes — cargá el estado de la tarjeta para conciliarlos</div>}
-                <div style={{display:"flex",gap:10,justifyContent:"center"}}>
-                  <button onClick={()=>{setLoadStep("upload");setFileName("");setBancoCarga("");}} style={{background:"#131318",border:"1px solid rgba(255,255,255,0.1)",borderRadius:6,color:"#888",fontFamily:"DM Mono",fontSize:12,padding:"8px 20px",cursor:"pointer"}}>Cargar otro</button>
-                  {loadType==="banco"&&<button onClick={()=>{setLoadType("tarjeta");setLoadStep("upload");}} style={{background:"rgba(200,96,240,0.15)",border:"1px solid rgba(200,96,240,0.3)",borderRadius:6,color:"#c860f0",fontFamily:"DM Mono",fontSize:12,padding:"8px 20px",cursor:"pointer"}}>💳 Cargar tarjeta</button>}
-                </div>
-              </div>
-            )}
-
-            {/* ── REGISTRO MANUAL ── */}
-            {loadType==="manual" && loadStep==="upload" && (
-              <>
-            <div style={{fontFamily:"Syne",fontSize:18,fontWeight:800,marginBottom:4}}>Nuevo registro</div>
-            <div style={{color:"#555",fontSize:12,marginBottom:16}}>Los campos * se calculan automáticamente (modo manual)</div>
+            <div style={{color:"#555",fontSize:12,marginBottom:16}}>Los campos * se calculan automáticamente</div>
             <div style={S.card}>
               <div style={S.secT}>Identificación</div>
               <div style={{...S.g5,marginBottom:12}}>
@@ -622,8 +408,6 @@ export default function FinCFO() {
             <button onClick={submit} style={{width:"100%",background:saved?"#60f0a0":"#c8f060",color:"#09090d",border:"none",borderRadius:8,padding:13,fontFamily:"Syne",fontSize:14,fontWeight:800,cursor:"pointer",transition:"background .3s"}}>
               {saved?"✓ Guardado":"Guardar registro →"}
             </button>
-              </>
-            )}
           </>
         )}
 
@@ -782,11 +566,51 @@ export default function FinCFO() {
 
             {/* ── RENTABILIDAD ── */}
             {reportTab==="rentabilidad" && (()=>{
-              const PIVOT_RENT = {"Ventas":{},"Ingresos":{"4":37670.9},"Costos":{},"Comisiones":{},"Transporte":{},"Marketing":{"1":-11700.0,"2":-46800.0,"4":-29403.0},"Personal":{},"Servicios":{"2":-1402.05},"Licencias / suscripciones":{"4":-4680.53},"Alquileres":{},"Mantenimiento":{},"Honorarios":{},"Capacitación":{},"Otros gastos":{},"Intereses":{},"Impuestos":{}};
+              const PIVOT_RENT = {
+                // Ingresos
+                "Ventas":                    {},
+                "Ingresos":                  {"4":37670.9},
+                // Gastos variables
+                "Costos":                    {},
+                "Comisiones":                {},
+                "Transporte":                {},
+                "Marketing":                 {"1":-11700.0,"2":-46800.0,"4":-29403.0},
+                // Gastos fijos
+                "Personal":                  {},
+                "Servicios":                 {"2":-1402.05},
+                "Licencias / suscripciones": {"4":-4680.53},
+                "Alquileres":                {},
+                "Mantenimiento":             {},
+                "Honorarios":                {},
+                "Capacitación":              {},
+                "Otros gastos":              {},
+                // Intereses
+                "Intereses":                 {},
+                // Impuestos
+                "Impuestos":                 {},
+              };
 
-              const GRUPOS_RENT={"Ingresos":["Ventas","Ingresos"],"Gastos variables":["Costos","Comisiones","Transporte","Marketing"],"Gastos fijos":["Personal","Servicios","Licencias / suscripciones","Alquileres","Mantenimiento","Honorarios","Capacitación","Otros gastos"],"Intereses":["Intereses"],"Impuesto a la renta":["Impuestos"]};
-              const GRUPO_RENT_COLOR={"Ingresos":"#60f0a0","Gastos variables":"#f0a060","Gastos fijos":"#f06060","Intereses":"#f06090","Impuesto a la renta":"#cc6060"};
-              const GRUPO_RENT_BG={"Ingresos":"rgba(96,240,160,0.05)","Gastos variables":"rgba(240,160,96,0.05)","Gastos fijos":"rgba(240,96,96,0.05)","Intereses":"rgba(240,96,144,0.05)","Impuesto a la renta":"rgba(200,96,96,0.05)"};
+              const GRUPOS_RENT = {
+                "Ingresos":        ["Ventas","Ingresos"],
+                "Gastos variables":["Costos","Comisiones","Transporte","Marketing"],
+                "Gastos fijos":    ["Personal","Servicios","Licencias / suscripciones","Alquileres","Mantenimiento","Honorarios","Capacitación","Otros gastos"],
+                "Intereses":       ["Intereses"],
+                "Impuesto a la renta": ["Impuestos"],
+              };
+              const GRUPO_RENT_COLOR = {
+                "Ingresos":"#60f0a0",
+                "Gastos variables":"#f0a060",
+                "Gastos fijos":"#f06060",
+                "Intereses":"#f06090",
+                "Impuesto a la renta":"#cc6060",
+              };
+              const GRUPO_RENT_BG = {
+                "Ingresos":"rgba(96,240,160,0.05)",
+                "Gastos variables":"rgba(240,160,96,0.05)",
+                "Gastos fijos":"rgba(240,96,96,0.05)",
+                "Intereses":"rgba(240,96,144,0.05)",
+                "Impuesto a la renta":"rgba(200,96,96,0.05)",
+              };
 
               const pvR = (c1,m) => PIVOT_RENT[c1]?.[m]||0;
               const rowTotR = (c1) => MESES_DISP.reduce((s,m)=>s+pvR(c1,m),0);
@@ -894,11 +718,55 @@ export default function FinCFO() {
             {/* ── FLUJO DE FONDOS ── */}
             {reportTab==="flujo" && (()=>{
               // Datos negocio por C1 y mes (reales + nuevos conceptos en 0)
-              const PIVOT_NEG = {"Ventas":{},"Ingresos":{"4":37670.9},"Costos":{},"Comisiones":{},"Transporte":{},"Marketing":{"1":-11700.0,"2":-46800.0,"4":-29403.0},"Impuestos":{},"Personal":{},"Servicios":{"2":-1402.05},"Licencias / suscripciones":{"4":-4680.53},"Alquileres":{},"Mantenimiento":{},"Honorarios":{},"Capacitación":{},"Otros gastos":{},"Inversiones":{},"Distribución de dividendos":{},"Préstamo recibido":{},"Préstamo pagado":{},"Intereses pagados":{}};
+              const PIVOT_NEG = {
+                // Cobros
+                "Ventas":          {},
+                "Ingresos":        {"4":37670.9},
+                // Gastos variables
+                "Costos":          {},
+                "Comisiones":      {},
+                "Transporte":      {},
+                "Marketing":       {"1":-11700.0,"2":-46800.0,"4":-29403.0},
+                "Impuestos":       {},
+                // Gastos fijos
+                "Personal":        {},
+                "Servicios":       {"2":-1402.05},
+                "Licencias / suscripciones": {"4":-4680.53},
+                "Alquileres":      {},
+                "Mantenimiento":   {},
+                "Honorarios":      {},
+                "Capacitación":    {},
+                "Otros gastos":    {},
+                // Inversiones
+                "Inversiones":     {},
+                // Financiamiento
+                "Distribución de dividendos": {},
+                "Préstamo recibido":          {},
+                "Préstamo pagado":            {},
+                "Intereses pagados":          {},
+              };
 
-              const GRUPOS_NEG={Cobros:["Ventas","Ingresos"],"Gastos variables":["Costos","Comisiones","Transporte","Marketing","Impuestos"],"Gastos fijos":["Personal","Servicios","Licencias / suscripciones","Alquileres","Mantenimiento","Honorarios","Capacitación","Otros gastos"],Inversiones:["Inversiones"],Financiamiento:["Distribución de dividendos","Préstamo recibido","Préstamo pagado","Intereses pagados"]};
-              const GRUPO_NEG_COLOR={Cobros:"#60f0a0","Gastos variables":"#f0a060","Gastos fijos":"#f06060",Inversiones:"#60c8f0",Financiamiento:"#c860f0"};
-              const GRUPO_NEG_BG={Cobros:"rgba(96,240,160,0.05)","Gastos variables":"rgba(240,160,96,0.05)","Gastos fijos":"rgba(240,96,96,0.05)",Inversiones:"rgba(96,200,240,0.05)",Financiamiento:"rgba(200,96,240,0.05)"};
+              const GRUPOS_NEG = {
+                Cobros:             ["Ventas","Ingresos"],
+                "Gastos variables": ["Costos","Comisiones","Transporte","Marketing","Impuestos"],
+                "Gastos fijos":     ["Personal","Servicios","Licencias / suscripciones","Alquileres","Mantenimiento","Honorarios","Capacitación","Otros gastos"],
+                Inversiones:        ["Inversiones"],
+                Financiamiento:     ["Distribución de dividendos","Préstamo recibido","Préstamo pagado","Intereses pagados"],
+              };
+              const GRUPO_NEG_COLOR = {
+                Cobros:"#60f0a0",
+                "Gastos variables":"#f0a060",
+                "Gastos fijos":"#f06060",
+                Inversiones:"#60c8f0",
+                Financiamiento:"#c860f0",
+              };
+              const GRUPO_NEG_BG = {
+                Cobros:"rgba(96,240,160,0.05)",
+                "Gastos variables":"rgba(240,160,96,0.05)",
+                "Gastos fijos":"rgba(240,96,96,0.05)",
+                Inversiones:"rgba(96,200,240,0.05)",
+                Financiamiento:"rgba(200,96,240,0.05)",
+              };
 
               const pvNeg = (c1,m) => PIVOT_NEG[c1]?.[m]||0;
               const rowTotNeg = (c1) => MESES_DISP.reduce((s,m)=>s+pvNeg(c1,m),0);
@@ -1148,15 +1016,73 @@ export default function FinCFO() {
 
             {/* ── CONCILIACIÓN BANCARIA ── */}
             {reportTab==="conciliacion" && (
-              <div style={{...S.card,textAlign:"center",padding:40}}>
-                <div style={{fontSize:28,marginBottom:12}}>🏦</div>
-                <div style={{fontFamily:"Syne",fontSize:16,fontWeight:700,color:"#ede8e0",marginBottom:8}}>Conciliación bancaria</div>
-                <div style={{fontSize:12,color:"#555",lineHeight:1.8}}>Disponible en la versión con base de datos.<br/>Cargá tus extractos bancarios para habilitarla.</div>
-              </div>
+              <>
+                <div style={{fontSize:11,color:"#555",marginBottom:14}}>Una tabla por banco · saldo inicial y final editables · control = 0 si no hay errores</div>
+                {BANCOS_CONC.map(({id,label,moneda})=>(
+                  <div key={id} style={{...S.card,padding:0,overflowX:"auto",marginBottom:16}}>
+                    <div style={{padding:"10px 16px",background:"rgba(255,255,255,0.025)",borderBottom:"1px solid rgba(255,255,255,0.07)",display:"flex",alignItems:"center",gap:10}}>
+                      <div style={{fontFamily:"Syne",fontSize:14,fontWeight:800}}>{label}</div>
+                      <span style={{fontSize:10,fontWeight:600,borderRadius:3,padding:"2px 8px",color:moneda==="USD"?"#f0c060":"#60c8f0",background:moneda==="USD"?"rgba(240,192,96,0.1)":"rgba(96,200,240,0.1)",border:`1px solid ${moneda==="USD"?"rgba(240,192,96,0.25)":"rgba(96,200,240,0.25)"}`}}>{moneda}</span>
+                      <span style={{fontSize:10,color:"#444"}}>{moneda==="UYU"?"Dif. de cambio = 0":"Dif. de cambio calculada automáticamente"}</span>
+                    </div>
+                    <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                      <thead>
+                        <tr style={{borderBottom:"1px solid rgba(255,255,255,0.08)"}}>
+                          <th style={{textAlign:"left",padding:"7px 14px",fontSize:10,color:"#555",textTransform:"uppercase",letterSpacing:0.7,minWidth:220,background:"#131318",position:"sticky",left:0,zIndex:1}}>Concepto</th>
+                          {MESES_DISP.map(m=><th key={m} style={{textAlign:"right",padding:"7px 12px",fontSize:10,color:"#555",textTransform:"uppercase",minWidth:130,whiteSpace:"nowrap"}}>{MESES_NOM[+m]}</th>)}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                          <td style={{padding:"6px 14px",fontSize:11,color:"#888",background:"#131318",position:"sticky",left:0,borderRight:"1px solid rgba(255,255,255,0.05)"}}>Saldo inicial <span style={{fontSize:9,color:"#555"}}>· editable</span></td>
+                          {MESES_DISP.map(m=>(
+                            <td key={m} style={{padding:"4px 6px"}}>
+                              <input type="number" step="0.01" value={getSI(id,m)} onChange={e=>editSI(id,m,e.target.value)} style={inpSt("#888")}/>
+                            </td>
+                          ))}
+                        </tr>
+                        <tr style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                          <td style={{padding:"7px 14px 7px 24px",fontSize:11,color:"#c8f060",background:"#131318",position:"sticky",left:0,borderRight:"1px solid rgba(255,255,255,0.05)"}}>+ Flujo finanzas personales</td>
+                          {MESES_DISP.map(m=>{const v=getFlPers(id,m);return <td key={m} style={{textAlign:"right",padding:"7px 12px",fontFamily:"Syne",fontSize:11,fontWeight:600,color:v>0?"#60f0a0":v<0?"#f06060":"#444"}}>{fmtC(v,moneda)}</td>;})}
+                        </tr>
+                        <tr style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                          <td style={{padding:"7px 14px 7px 24px",fontSize:11,color:"#60c8f0",background:"#131318",position:"sticky",left:0,borderRight:"1px solid rgba(255,255,255,0.05)"}}>+ Flujo negocio</td>
+                          {MESES_DISP.map(m=>{const v=getFlNeg(id,m);return <td key={m} style={{textAlign:"right",padding:"7px 12px",fontFamily:"Syne",fontSize:11,fontWeight:600,color:v>0?"#60f0a0":v<0?"#f06060":"#444"}}>{v!==0?fmtC(v,moneda):"—"}</td>;})}
+                        </tr>
+                        {moneda==="USD"&&(
+                          <tr style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                            <td style={{padding:"7px 14px 7px 24px",fontSize:11,color:"#666",background:"#131318",position:"sticky",left:0,borderRight:"1px solid rgba(255,255,255,0.05)"}}>+ Dif. de cambio <span style={{fontSize:9,color:"#555"}}>· calculada</span></td>
+                            {MESES_DISP.map(m=>{const v=getDC(id,m,moneda);return <td key={m} style={{textAlign:"right",padding:"7px 12px",fontFamily:"Syne",fontSize:11,fontWeight:600,color:v>0?"#60f0a0":v<0?"#f06060":"#444"}}>{fmtC(v,moneda)}</td>;})}
+                          </tr>
+                        )}
+                        <tr style={{borderBottom:"2px solid rgba(255,255,255,0.1)",background:"rgba(255,255,255,0.015)"}}>
+                          <td style={{padding:"7px 14px",fontSize:11,fontWeight:700,color:"#888",background:"rgba(255,255,255,0.015)",position:"sticky",left:0,borderRight:"1px solid rgba(255,255,255,0.05)"}}>= Saldo esperado</td>
+                          {MESES_DISP.map(m=>{const v=getSI(id,m)+getFl(id,m)+(moneda==="USD"?getDC(id,m,moneda):0);return <td key={m} style={{textAlign:"right",padding:"7px 12px",fontFamily:"Syne",fontSize:12,fontWeight:700,color:"#ede8e0"}}>{fmtC(v,moneda)}</td>;})}
+                        </tr>
+                        <tr style={{borderBottom:"1px solid rgba(255,255,255,0.08)"}}>
+                          <td style={{padding:"6px 14px",fontSize:11,color:"#60c8f0",background:"#131318",position:"sticky",left:0,borderRight:"1px solid rgba(255,255,255,0.05)"}}>Saldo final (extracto) <span style={{fontSize:9,color:"#555"}}>· editable</span></td>
+                          {MESES_DISP.map(m=>(
+                            <td key={m} style={{padding:"4px 6px"}}>
+                              <input type="number" step="0.01" value={getSF(id,m)} onChange={e=>editSF(id,m,e.target.value)} style={inpSt("#60c8f0")}/>
+                            </td>
+                          ))}
+                        </tr>
+                        <tr>
+                          <td style={{padding:"8px 14px",fontSize:11,fontWeight:800,color:"#555",background:"#0d0d10",position:"sticky",left:0,borderRight:"1px solid rgba(255,255,255,0.05)"}}>Control</td>
+                          {MESES_DISP.map(m=>{
+                            const ctrl=getSI(id,m)+getFl(id,m)+(moneda==="USD"?getDC(id,m,moneda):0)-getSF(id,m);
+                            return <td key={m} style={ctrlSt(ctrl)}>{Math.abs(ctrl)<0.1?"✓ 0":fmtC(ctrl,moneda)}</td>;
+                          })}
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
+              </>
             )}
           </>
         )}
-                {/* ── CONFIGURACIÓN ── */}
+        {/* ── CONFIGURACIÓN ── */}
         {mainTab==="config" && (
           <>
             <div style={{fontFamily:"Syne",fontSize:18,fontWeight:800,marginBottom:4}}>Configuración</div>
