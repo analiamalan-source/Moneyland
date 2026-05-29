@@ -14,7 +14,7 @@ const TX = {
 const BANCOS_LIST = ["ITAU UYU","ITAU USD","SCOTIABANK UYU","SCOTIABANK USD","BROU UYU","BROU USD","OCA","VISA SCOTIA","VISA ITAU","MASTER OCA","AMEX SCOTIA","PREX","Otro"];
 const FORMAS = ["Cobro efectivo","Cobro transferencia","Cobro crédito","Pago efectivo","Pago transferencia","Pago crédito"];
 const MESES_NOM = ["","Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
-const CAT_C = {"Ingresos":"#60f0a0","Gasto Fijo":"#f06060","Gasto Variable":"#f0a060","Cobros":"#c8f060","Pagos":"#c860f0","Necesidad":"#8888ee","Deseos":"#cc88cc","Transferencias":"#60c8f0","Inversiones":"#60c8f0","Variable":"#f0a060","Fijo":"#f06060"};
+const CAT_C = {"Ingresos":"#4CAF82","Gasto Fijo":"#f06060","Gasto Variable":"#f0a060","Cobros":"#DDB863","Pagos":"#c860f0","Necesidad":"#8888ee","Deseos":"#cc88cc","Transferencias":"#1D445C","Inversiones":"#1D445C","Variable":"#f0a060","Fijo":"#f06060"};
 const MESES_DISP = ["1","2","3","4"];
 
 const fmtN = (n) => "$ " + Math.abs(n||0).toLocaleString("es-UY",{minimumFractionDigits:0,maximumFractionDigits:0});
@@ -24,7 +24,7 @@ const addDays = (d,n) => { if(!d||!n) return d; const dt=new Date(d); dt.setDate
 
 const emptyForm = () => ({fecha:today(),bancoCobPag:"",tipo:"Personal",c1:"Ingresos",c2:"Sueldo",cat:"Ingresos",desc:"",forma:"Cobro transferencia",bancoEmisor:"SCOTIABANK UYU",plazo:"",fechaCP:today(),fechaManual:false,usd:"",tc:"",pesos:"",iva:""});
 
-export default function FinCFO() {
+export default function Moneyland() {
   const [regs, setRegs] = useState(DISP_REGS);
   const [form, setForm] = useState(emptyForm());
   const [mainTab, setMainTab] = useState("dashboard");
@@ -156,7 +156,7 @@ export default function FinCFO() {
     Inversiones:["Inversiones"],
     Transferencias:["Transferencias","Préstamo pagado","Préstamo recibido","Cobros"],
   };
-  const GRUPO_COLOR={Necesidades:"#60c8f0",Deseos:"#cc88cc",Inversiones:"#f0c060",Transferencias:"#888"};
+  const GRUPO_COLOR={Necesidades:"#1D445C",Deseos:"#cc88cc",Inversiones:"#f0c060",Transferencias:"#8C8C8C"};
   const GRUPO_BG={Necesidades:"rgba(96,200,240,0.05)",Deseos:"rgba(204,136,204,0.05)",Inversiones:"rgba(240,192,96,0.05)",Transferencias:"rgba(128,128,128,0.04)"};
   const GRUPO_LABEL={Necesidades:"Pagos por necesidades",Deseos:"Pagos por deseos",Inversiones:"Inversiones",Transferencias:"Transferencias"};
 
@@ -164,7 +164,7 @@ export default function FinCFO() {
   const grupoTot = (g) => mesesFiltrados.reduce((s,m)=>s+grupoTotMes(g,m),0);
 
   const fmtCell = (v) => { if(!v) return ""; return (v<0?"-":"")+"$ "+Math.abs(v).toLocaleString("es-UY",{minimumFractionDigits:0,maximumFractionDigits:0}); };
-  const cellSt = (v) => ({textAlign:"right",fontFamily:"Syne",fontSize:11,fontWeight:v!==0?"600":"400",color:v>0?"#60f0a0":v<0?"#f06060":"#333",padding:"5px 10px",borderRight:"1px solid rgba(255,255,255,0.04)",whiteSpace:"nowrap"});
+  const cellSt = (v) => ({textAlign:"right",fontFamily:"Lora",fontSize:11,fontWeight:v!==0?"600":"400",color:v>0?"#4CAF82":v<0?"#f06060":"#333",padding:"5px 10px",borderRight:"1px solid rgba(255,255,255,0.04)",whiteSpace:"nowrap"});
 
   // Sort pivot rows by abs total desc
   const FILAS_BASE = ["Vivienda","Servicios del hogar","Alimentación","Transporte","Salud","Educación","Cuidado personal","Mascotas","Ocio y cultura","Finanzas","Impuestos y trámites","Regalos y donaciones","Imprevistos","Otros gastos","Gasto de personal","Servicios","Transferencias","Tarjetas","Pagos","Préstamo pagado","Préstamo recibido","Cobros","Inversiones"];
@@ -183,44 +183,44 @@ export default function FinCFO() {
   const editSI = (b,m,v) => setSaldosInicialEdit(p=>({...p,[b]:{...(p[b]||{}),[m]:parseFloat(v)||0}}));
   const editSF = (b,m,v) => setSaldosFinalEdit(p=>({...p,[b]:{...(p[b]||{}),[m]:parseFloat(v)||0}}));
   const fmtC = (v,cur) => { const s=cur==="USD"?"U$S ":"$ "; return (v<0?"-":"")+s+Math.abs(v||0).toLocaleString("es-UY",{minimumFractionDigits:2,maximumFractionDigits:2}); };
-  const ctrlSt = (v) => ({fontFamily:"Syne",fontSize:11,fontWeight:700,textAlign:"right",padding:"7px 10px",color:Math.abs(v)<0.1?"#60f0a0":"#f06060",background:Math.abs(v)<0.1?"rgba(96,240,160,0.05)":"rgba(240,96,96,0.08)"});
-  const inpSt = (c) => ({width:"100%",background:"#1a1a24",border:`1px solid ${c}44`,borderRadius:4,color:c,fontFamily:"Syne",fontSize:11,fontWeight:700,padding:"5px 8px",textAlign:"right",outline:"none",boxSizing:"border-box"});
+  const ctrlSt = (v) => ({fontFamily:"Lora",fontSize:11,fontWeight:700,textAlign:"right",padding:"7px 10px",color:Math.abs(v)<0.1?"#4CAF82":"#f06060",background:Math.abs(v)<0.1?"rgba(96,240,160,0.05)":"rgba(240,96,96,0.08)"});
+  const inpSt = (c) => ({width:"100%",background:"#1A1A1A",border:`1px solid ${c}44`,borderRadius:4,color:c,fontFamily:"Lora",fontSize:11,fontWeight:700,padding:"5px 8px",textAlign:"right",outline:"none",boxSizing:"border-box"});
   const BANCOS_CONC=[{id:"ITAU UYU",label:"Itaú UYU",moneda:"UYU"},{id:"SCOTIABANK UYU",label:"Scotiabank UYU",moneda:"UYU"},{id:"ITAU USD",label:"Itaú USD",moneda:"USD"},{id:"SCOTIABANK USD",label:"Scotiabank USD",moneda:"USD"}];
 
   const periodoLabel = persDesde===persHasta ? MESES_NOM[+persDesde] : `${MESES_NOM[+persDesde]} – ${MESES_NOM[+persHasta]}`;
 
   const S = {
-    page:{minHeight:"100vh",background:"#09090d",color:"#ede8e0",fontFamily:"'DM Mono',monospace",fontSize:13},
-    bar:{display:"flex",alignItems:"center",padding:"0 20px",height:50,borderBottom:"1px solid rgba(255,255,255,0.06)",gap:10,flexShrink:0},
-    logo:{fontFamily:"Syne",fontSize:18,fontWeight:800,letterSpacing:-0.5},
-    tabs:{display:"flex",borderBottom:"1px solid rgba(255,255,255,0.06)",padding:"0 20px",flexShrink:0,overflowX:"auto"},
-    tab:a=>({padding:"10px 14px",fontSize:11,cursor:"pointer",background:"none",border:"none",borderBottom:a?"2px solid #c8f060":"2px solid transparent",color:a?"#c8f060":"#555",fontFamily:"DM Mono",whiteSpace:"nowrap"}),
+    page:{minHeight:"100vh",background:"#0A0A0A",color:"#F8F4E8",fontFamily:"'Roboto',sans-serif",fontSize:13},
+    bar:{display:"flex",alignItems:"center",padding:"0 20px",height:50,borderBottom:"1px solid rgba(221,184,99,0.12)",gap:10,flexShrink:0},
+    logo:{fontFamily:"Lora",fontSize:18,fontWeight:800,letterSpacing:-0.5},
+    tabs:{display:"flex",borderBottom:"1px solid rgba(221,184,99,0.12)",padding:"0 20px",flexShrink:0,overflowX:"auto"},
+    tab:a=>({padding:"10px 14px",fontSize:11,cursor:"pointer",background:"none",border:"none",borderBottom:a?"2px solid #c8f060":"2px solid transparent",color:a?"#DDB863":"#8C8C8C",fontFamily:"Roboto",whiteSpace:"nowrap"}),
     body:{padding:20,maxWidth:1000,margin:"0 auto"},
-    card:{background:"#131318",border:"1px solid rgba(255,255,255,0.06)",borderRadius:8,padding:16,marginBottom:12},
-    secT:{fontFamily:"Syne",fontSize:11,fontWeight:700,color:"#555",textTransform:"uppercase",letterSpacing:0.8,marginBottom:12},
-    lbl:{display:"block",fontSize:10,color:"#555",textTransform:"uppercase",letterSpacing:0.7,marginBottom:4},
-    inp:{width:"100%",background:"#1c1c26",border:"1px solid rgba(255,255,255,0.08)",borderRadius:5,padding:"8px 10px",color:"#ede8e0",fontFamily:"DM Mono",fontSize:12,outline:"none",boxSizing:"border-box"},
-    sel:{width:"100%",background:"#1c1c26",border:"1px solid rgba(255,255,255,0.08)",borderRadius:5,padding:"8px 10px",color:"#ede8e0",fontFamily:"DM Mono",fontSize:12,outline:"none",cursor:"pointer",boxSizing:"border-box"},
-    calc:{width:"100%",background:"#0e0e16",border:"1px solid rgba(255,255,255,0.04)",borderRadius:5,padding:"8px 10px",color:"#c8f060",fontFamily:"Syne",fontSize:13,fontWeight:700,boxSizing:"border-box"},
+    card:{background:"#141414",border:"1px solid rgba(221,184,99,0.12)",borderRadius:8,padding:16,marginBottom:12},
+    secT:{fontFamily:"Lora",fontSize:11,fontWeight:700,color:"#8C8C8C",textTransform:"uppercase",letterSpacing:0.8,marginBottom:12},
+    lbl:{display:"block",fontSize:10,color:"#8C8C8C",textTransform:"uppercase",letterSpacing:0.7,marginBottom:4},
+    inp:{width:"100%",background:"#1E1E1E",border:"1px solid rgba(221,184,99,0.15)",borderRadius:5,padding:"8px 10px",color:"#F8F4E8",fontFamily:"Roboto",fontSize:12,outline:"none",boxSizing:"border-box"},
+    sel:{width:"100%",background:"#1E1E1E",border:"1px solid rgba(221,184,99,0.15)",borderRadius:5,padding:"8px 10px",color:"#F8F4E8",fontFamily:"Roboto",fontSize:12,outline:"none",cursor:"pointer",boxSizing:"border-box"},
+    calc:{width:"100%",background:"#111111",border:"1px solid rgba(255,255,255,0.04)",borderRadius:5,padding:"8px 10px",color:"#DDB863",fontFamily:"Lora",fontSize:13,fontWeight:700,boxSizing:"border-box"},
     g2:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12},
     g3:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12},
     g4:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:12},
     g5:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr 1fr",gap:12},
-    badge:(c)=>({display:"inline-block",fontSize:10,padding:"2px 7px",borderRadius:3,background:(CAT_C[c]||"#888")+"20",color:CAT_C[c]||"#888",border:`1px solid ${CAT_C[c]||"#888"}33`}),
+    badge:(c)=>({display:"inline-block",fontSize:10,padding:"2px 7px",borderRadius:3,background:(CAT_C[c]||"#8C8C8C")+"20",color:CAT_C[c]||"#8C8C8C",border:`1px solid ${CAT_C[c]||"#8C8C8C"}33`}),
     pill:(c)=>({fontSize:9,padding:"2px 6px",borderRadius:3,background:c+"20",color:c,display:"inline-block"}),
   };
 
-  const selStyle = {background:"#1c1c26",border:"1px solid rgba(255,255,255,0.1)",borderRadius:5,color:"#ede8e0",fontFamily:"DM Mono",fontSize:11,padding:"5px 8px",cursor:"pointer"};
+  const selStyle = {background:"#1E1E1E",border:"1px solid rgba(221,184,99,0.18)",borderRadius:5,color:"#F8F4E8",fontFamily:"Roboto",fontSize:11,padding:"5px 8px",cursor:"pointer"};
 
   return (
     <div style={S.page}>
-      <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet"/>
+      <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&family=Lora:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet"/>
 
       {/* TOPBAR */}
       <div style={S.bar}>
-        <div style={S.logo}>Fin<span style={{color:"#c8f060"}}>CFO</span></div>
-        <div style={{fontSize:10,color:"#444",background:"#1c1c26",border:"1px solid rgba(255,255,255,0.07)",borderRadius:4,padding:"2px 8px",letterSpacing:1}}>RIVERO · MALAN · 2026 · UYU</div>
-        <div style={{marginLeft:"auto",fontSize:11,color:"#555"}}>671 registros · Ene–Abr 2026</div>
+        <div style={S.logo}>Money<span style={{color:"#DDB863"}}>land</span></div>
+        <div style={{fontSize:10,color:"#4A4A4A",background:"#1E1E1E",border:"1px solid rgba(255,255,255,0.07)",borderRadius:4,padding:"2px 8px",letterSpacing:1}}>RIVERO · MALAN · 2026 · UYU</div>
+        <div style={{marginLeft:"auto",fontSize:11,color:"#8C8C8C"}}>671 registros · Ene–Abr 2026</div>
       </div>
 
       {/* MAIN TABS */}
@@ -238,22 +238,22 @@ export default function FinCFO() {
             <div style={{display:"flex",gap:6,marginBottom:14,alignItems:"center"}}>
               {["todos","Personal","Negocio"].map(f=>(
                 <button key={f} onClick={()=>setDashFiltro(f)}
-                  style={{background:dashFiltro===f?"rgba(200,240,96,0.12)":"#131318",border:`1px solid ${dashFiltro===f?"rgba(200,240,96,0.4)":"rgba(255,255,255,0.06)"}`,color:dashFiltro===f?"#c8f060":"#555",borderRadius:5,padding:"5px 14px",fontFamily:"DM Mono",fontSize:11,cursor:"pointer"}}>
+                  style={{background:dashFiltro===f?"rgba(221,184,99,0.14)":"#141414",border:`1px solid ${dashFiltro===f?"rgba(221,184,99,0.5)":"rgba(221,184,99,0.12)"}`,color:dashFiltro===f?"#DDB863":"#8C8C8C",borderRadius:5,padding:"5px 14px",fontFamily:"Roboto",fontSize:11,cursor:"pointer"}}>
                   {f==="todos"?"Todo":f}
                 </button>
               ))}
             </div>
             <div style={{...S.g4,marginBottom:12}}>
               {[
-                {label:"Ingresos",val:fmtN(totalIng),color:"#60f0a0",sub:"Ene–Abr 2026"},
+                {label:"Ingresos",val:fmtN(totalIng),color:"#4CAF82",sub:"Ene–Abr 2026"},
                 {label:"Egresos",val:fmtN(totalEgr),color:"#f06060",sub:"Ene–Abr 2026"},
-                {label:"Resultado neto",val:fmtN(totalIng-totalEgr),color:(totalIng-totalEgr)>=0?"#c8f060":"#f06060",sub:"Ene–Abr 2026"},
-                {label:"Registros",val:"671",color:"#60c8f0",sub:"16 negocio · 655 personal"},
+                {label:"Resultado neto",val:fmtN(totalIng-totalEgr),color:(totalIng-totalEgr)>=0?"#DDB863":"#f06060",sub:"Ene–Abr 2026"},
+                {label:"Registros",val:"671",color:"#1D445C",sub:"16 negocio · 655 personal"},
               ].map(k=>(
                 <div key={k.label} style={S.card}>
                   <div style={{...S.lbl,marginBottom:6}}>{k.label}</div>
-                  <div style={{fontFamily:"Syne",fontSize:20,fontWeight:800,color:k.color,marginBottom:3}}>{k.val}</div>
-                  <div style={{fontSize:10,color:"#444"}}>{k.sub}</div>
+                  <div style={{fontFamily:"Lora",fontSize:20,fontWeight:800,color:k.color,marginBottom:3}}>{k.val}</div>
+                  <div style={{fontSize:10,color:"#4A4A4A"}}>{k.sub}</div>
                 </div>
               ))}
             </div>
@@ -266,17 +266,17 @@ export default function FinCFO() {
                     return (
                       <div key={m} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center"}}>
                         <div style={{width:"100%",display:"flex",gap:2,alignItems:"flex-end",height:72}}>
-                          <div style={{flex:1,height:Math.max(Math.round((v.ing/maxBar)*72),2),background:"#60f0a0",borderRadius:"3px 3px 0 0",opacity:.8}} title={fmtN(v.ing)}/>
+                          <div style={{flex:1,height:Math.max(Math.round((v.ing/maxBar)*72),2),background:"#4CAF82",borderRadius:"3px 3px 0 0",opacity:.8}} title={fmtN(v.ing)}/>
                           <div style={{flex:1,height:Math.max(Math.round((v.egr/maxBar)*72),2),background:"#f06060",borderRadius:"3px 3px 0 0",opacity:.7}} title={fmtN(v.egr)}/>
                         </div>
-                        <div style={{fontSize:9,color:"#444",marginTop:4}}>{MESES_NOM[+m]}</div>
+                        <div style={{fontSize:9,color:"#4A4A4A",marginTop:4}}>{MESES_NOM[+m]}</div>
                       </div>
                     );
                   })}
                 </div>
                 <div style={{display:"flex",gap:14,marginTop:10}}>
-                  {[["#60f0a0","Ingresos"],["#f06060","Egresos"]].map(([c,l])=>(
-                    <div key={l} style={{display:"flex",alignItems:"center",gap:5,fontSize:10,color:"#555"}}>
+                  {[["#4CAF82","Ingresos"],["#f06060","Egresos"]].map(([c,l])=>(
+                    <div key={l} style={{display:"flex",alignItems:"center",gap:5,fontSize:10,color:"#8C8C8C"}}>
                       <div style={{width:8,height:8,background:c,borderRadius:2}}/>{l}
                     </div>
                   ))}
@@ -288,9 +288,9 @@ export default function FinCFO() {
                   <div key={cat} style={{marginBottom:8}}>
                     <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
                       <span style={{fontSize:11,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"60%"}}>{cat}</span>
-                      <span style={{fontFamily:"Syne",fontSize:11,fontWeight:700,color:"#f06060"}}>{fmtN(val)}</span>
+                      <span style={{fontFamily:"Lora",fontSize:11,fontWeight:700,color:"#f06060"}}>{fmtN(val)}</span>
                     </div>
-                    <div style={{height:3,background:"#1c1c26",borderRadius:2}}>
+                    <div style={{height:3,background:"#1E1E1E",borderRadius:2}}>
                       <div style={{height:3,width:`${(val/Object.values(AGG.top_gastos)[0])*100}%`,background:"#f06060",borderRadius:2,opacity:.5}}/>
                     </div>
                   </div>
@@ -301,13 +301,13 @@ export default function FinCFO() {
               <div style={S.secT}>Últimos movimientos</div>
               {AGG.recent.map((r,i)=>(
                 <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 0",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
-                  <div style={{width:6,height:6,borderRadius:"50%",background:(r.tot||0)>0?"#60f0a0":"#f06060",flexShrink:0}}/>
+                  <div style={{width:6,height:6,borderRadius:"50%",background:(r.tot||0)>0?"#4CAF82":"#f06060",flexShrink:0}}/>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.c1} · {r.c2||r.d}</div>
-                    <div style={{fontSize:10,color:"#444"}}>{r.b} · {fmtD(r.f)}</div>
+                    <div style={{fontSize:10,color:"#4A4A4A"}}>{r.b} · {fmtD(r.f)}</div>
                   </div>
                   <span style={S.badge(r.cat)}>{r.cat}</span>
-                  <div style={{fontFamily:"Syne",fontSize:13,fontWeight:700,color:(r.tot||0)>0?"#60f0a0":"#f06060",minWidth:80,textAlign:"right"}}>
+                  <div style={{fontFamily:"Lora",fontSize:13,fontWeight:700,color:(r.tot||0)>0?"#4CAF82":"#f06060",minWidth:80,textAlign:"right"}}>
                     {(r.tot||0)>0?"+":"-"}{fmtN(r.tot).replace("$ ","")}
                   </div>
                 </div>
@@ -319,8 +319,8 @@ export default function FinCFO() {
         {/* ── FORMULARIO ── */}
         {mainTab==="form" && (
           <>
-            <div style={{fontFamily:"Syne",fontSize:18,fontWeight:800,marginBottom:4}}>Nuevo registro</div>
-            <div style={{color:"#555",fontSize:12,marginBottom:16}}>Los campos * se calculan automáticamente</div>
+            <div style={{fontFamily:"Lora",fontSize:18,fontWeight:800,marginBottom:4}}>Nuevo registro</div>
+            <div style={{color:"#8C8C8C",fontSize:12,marginBottom:16}}>Los campos * se calculan automáticamente</div>
             <div style={S.card}>
               <div style={S.secT}>Identificación</div>
               <div style={{...S.g5,marginBottom:12}}>
@@ -373,16 +373,16 @@ export default function FinCFO() {
                   <label style={S.lbl}>Fecha cobro/pago</label>
                   <div style={{display:"flex",gap:6,marginBottom:6}}>
                     <button onClick={()=>setForm(p=>({...p,fechaManual:false}))}
-                      style={{background:!form.fechaManual?"rgba(200,240,96,0.15)":"#1c1c26",border:`1px solid ${!form.fechaManual?"rgba(200,240,96,0.4)":"rgba(255,255,255,0.08)"}`,borderRadius:4,color:!form.fechaManual?"#c8f060":"#555",fontFamily:"DM Mono",fontSize:10,padding:"4px 10px",cursor:"pointer"}}>
+                      style={{background:!form.fechaManual?"rgba(221,184,99,0.15)":"#1E1E1E",border:`1px solid ${!form.fechaManual?"rgba(221,184,99,0.5)":"rgba(221,184,99,0.15)"}`,borderRadius:4,color:!form.fechaManual?"#DDB863":"#8C8C8C",fontFamily:"Roboto",fontSize:10,padding:"4px 10px",cursor:"pointer"}}>
                       ● Auto
                     </button>
                     <button onClick={()=>setForm(p=>({...p,fechaManual:true,fechaCP:fechaCPCalc||p.fecha}))}
-                      style={{background:form.fechaManual?"rgba(200,240,96,0.15)":"#1c1c26",border:`1px solid ${form.fechaManual?"rgba(200,240,96,0.4)":"rgba(255,255,255,0.08)"}`,borderRadius:4,color:form.fechaManual?"#c8f060":"#555",fontFamily:"DM Mono",fontSize:10,padding:"4px 10px",cursor:"pointer"}}>
+                      style={{background:form.fechaManual?"rgba(221,184,99,0.15)":"#1E1E1E",border:`1px solid ${form.fechaManual?"rgba(221,184,99,0.5)":"rgba(221,184,99,0.15)"}`,borderRadius:4,color:form.fechaManual?"#DDB863":"#8C8C8C",fontFamily:"Roboto",fontSize:10,padding:"4px 10px",cursor:"pointer"}}>
                       ✎ Manual
                     </button>
                   </div>
                   {form.fechaManual ? (
-                    <input key="manual" type="date" style={{...S.inp,color:"#c8f060"}}
+                    <input key="manual" type="date" style={{...S.inp,color:"#DDB863"}}
                       defaultValue={fechaCPCalc||form.fecha}
                       onChange={e=>setForm(p=>({...p,fechaCP:e.target.value}))}/>
                   ) : (
@@ -401,11 +401,11 @@ export default function FinCFO() {
                 </div>
                 <div><label style={S.lbl}>IVA ($)</label><input type="number" style={S.inp} value={form.iva} placeholder="0.00" step="0.01" onChange={e=>setF("iva",e.target.value)}/></div>
                 <div><label style={S.lbl}>Total * (UYU)</label>
-                  <div style={{...S.calc,color:["Ingresos","Cobros"].includes(catAuto)?"#60f0a0":"#f06060"}}>{fmtN(totalCalc)}</div>
+                  <div style={{...S.calc,color:["Ingresos","Cobros"].includes(catAuto)?"#4CAF82":"#f06060"}}>{fmtN(totalCalc)}</div>
                 </div>
               </div>
             </div>
-            <button onClick={submit} style={{width:"100%",background:saved?"#60f0a0":"#c8f060",color:"#09090d",border:"none",borderRadius:8,padding:13,fontFamily:"Syne",fontSize:14,fontWeight:800,cursor:"pointer",transition:"background .3s"}}>
+            <button onClick={submit} style={{width:"100%",background:saved?"#4CAF82":"#DDB863",color:"#0A0A0A",border:"none",borderRadius:8,padding:13,fontFamily:"Lora",fontSize:14,fontWeight:800,cursor:"pointer",transition:"background .3s"}}>
               {saved?"✓ Guardado":"Guardar registro →"}
             </button>
           </>
@@ -452,7 +452,7 @@ export default function FinCFO() {
                 <input value={searchQ} onChange={e=>setSearchQ(e.target.value)} placeholder="Buscar..." style={{...S.inp,width:160,padding:"5px 10px"}}/>
                 {["todos","Negocio","Personal"].map(t=>(
                   <button key={t} onClick={()=>setFilterTipo(t)}
-                    style={{background:filterTipo===t?"rgba(200,240,96,0.1)":"#131318",border:`1px solid ${filterTipo===t?"rgba(200,240,96,0.35)":"rgba(255,255,255,0.06)"}`,color:filterTipo===t?"#c8f060":"#555",borderRadius:4,padding:"4px 10px",fontFamily:"DM Mono",fontSize:10,cursor:"pointer"}}>
+                    style={{background:filterTipo===t?"rgba(221,184,99,0.12)":"#141414",border:`1px solid ${filterTipo===t?"rgba(221,184,99,0.45)":"rgba(221,184,99,0.12)"}`,color:filterTipo===t?"#DDB863":"#8C8C8C",borderRadius:4,padding:"4px 10px",fontFamily:"Roboto",fontSize:10,cursor:"pointer"}}>
                     {t}
                   </button>
                 ))}
@@ -460,42 +460,42 @@ export default function FinCFO() {
                 {/* Selector de columnas */}
                 <div style={{position:"relative",marginLeft:4}} ref={colDropRef}>
                   <button onClick={()=>setColDropOpen(o=>!o)}
-                    style={{background:"#131318",border:"1px solid rgba(255,255,255,0.1)",borderRadius:5,color:"#888",fontFamily:"DM Mono",fontSize:10,padding:"5px 10px",cursor:"pointer",display:"flex",alignItems:"center",gap:5}}>
+                    style={{background:"#141414",border:"1px solid rgba(221,184,99,0.18)",borderRadius:5,color:"#8C8C8C",fontFamily:"Roboto",fontSize:10,padding:"5px 10px",cursor:"pointer",display:"flex",alignItems:"center",gap:5}}>
                     ⊞ Columnas ({vc.length}) <span style={{fontSize:8,opacity:0.6}}>{colDropOpen?"▲":"▼"}</span>
                   </button>
                   {colDropOpen&&(
-                    <div style={{position:"absolute",top:"calc(100% + 6px)",left:0,background:"#1c1c26",border:"1px solid rgba(255,255,255,0.15)",borderRadius:6,zIndex:999,minWidth:200,padding:"6px 0",boxShadow:"0 12px 32px rgba(0,0,0,0.7)"}}>
+                    <div style={{position:"absolute",top:"calc(100% + 6px)",left:0,background:"#1E1E1E",border:"1px solid rgba(221,184,99,0.22)",borderRadius:6,zIndex:999,minWidth:200,padding:"6px 0",boxShadow:"0 12px 32px rgba(0,0,0,0.7)"}}>
                       {ALL_COLS.map(col=>{
                         const on=vc.includes(col.id);
                         return (
                           <div key={col.id} onClick={()=>toggleCol(col.id)}
-                            style={{display:"flex",alignItems:"center",gap:8,padding:"6px 12px",cursor:"pointer",fontSize:11,color:on?"#c8f060":"#888"}}
-                            onMouseEnter={e=>e.currentTarget.style.background="rgba(200,240,96,0.07)"}
+                            style={{display:"flex",alignItems:"center",gap:8,padding:"6px 12px",cursor:"pointer",fontSize:11,color:on?"#DDB863":"#8C8C8C"}}
+                            onMouseEnter={e=>e.currentTarget.style.background="rgba(221,184,99,0.1)"}
                             onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                            <span style={{width:12,height:12,borderRadius:2,border:`1px solid ${on?"#c8f060":"rgba(255,255,255,0.2)"}`,background:on?"#c8f060":"transparent",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:8,color:"#0d0d10",flexShrink:0}}>{on?"✓":""}</span>
+                            <span style={{width:12,height:12,borderRadius:2,border:`1px solid ${on?"#DDB863":"rgba(255,255,255,0.2)"}`,background:on?"#DDB863":"transparent",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:8,color:"#0d0d10",flexShrink:0}}>{on?"✓":""}</span>
                             {col.label}
                           </div>
                         );
                       })}
-                      <div style={{borderTop:"1px solid rgba(255,255,255,0.06)",padding:"6px 12px",display:"flex",gap:6}}>
-                        <button onClick={()=>setVisibleCols(ALL_COLS.map(c=>c.id))} style={{flex:1,background:"rgba(200,240,96,0.08)",border:"1px solid rgba(200,240,96,0.2)",borderRadius:4,color:"#c8f060",fontFamily:"DM Mono",fontSize:10,padding:"4px",cursor:"pointer"}}>Todas</button>
-                        <button onClick={()=>setVisibleCols(["fecha","tipo","banco","categoria","concepto","descripcion","subtotal","total"])} style={{flex:1,background:"#1a1a24",border:"1px solid rgba(255,255,255,0.08)",borderRadius:4,color:"#555",fontFamily:"DM Mono",fontSize:10,padding:"4px",cursor:"pointer"}}>Reset</button>
-                        <button onClick={()=>setColDropOpen(false)} style={{flex:1,background:"rgba(200,240,96,0.12)",border:"1px solid rgba(200,240,96,0.35)",borderRadius:4,color:"#c8f060",fontFamily:"DM Mono",fontSize:10,padding:"4px",cursor:"pointer",fontWeight:700}}>Aplicar →</button>
+                      <div style={{borderTop:"1px solid rgba(221,184,99,0.12)",padding:"6px 12px",display:"flex",gap:6}}>
+                        <button onClick={()=>setVisibleCols(ALL_COLS.map(c=>c.id))} style={{flex:1,background:"rgba(221,184,99,0.1)",border:"1px solid rgba(221,184,99,0.3)",borderRadius:4,color:"#DDB863",fontFamily:"Roboto",fontSize:10,padding:"4px",cursor:"pointer"}}>Todas</button>
+                        <button onClick={()=>setVisibleCols(["fecha","tipo","banco","categoria","concepto","descripcion","subtotal","total"])} style={{flex:1,background:"#1A1A1A",border:"1px solid rgba(221,184,99,0.15)",borderRadius:4,color:"#8C8C8C",fontFamily:"Roboto",fontSize:10,padding:"4px",cursor:"pointer"}}>Reset</button>
+                        <button onClick={()=>setColDropOpen(false)} style={{flex:1,background:"rgba(221,184,99,0.14)",border:"1px solid rgba(221,184,99,0.45)",borderRadius:4,color:"#DDB863",fontFamily:"Roboto",fontSize:10,padding:"4px",cursor:"pointer",fontWeight:700}}>Aplicar →</button>
                       </div>
                     </div>
                   )}
                 </div>
 
-                <span style={{marginLeft:"auto",fontSize:11,color:"#555"}}>{filteredRegs.length} registros</span>
+                <span style={{marginLeft:"auto",fontSize:11,color:"#8C8C8C"}}>{filteredRegs.length} registros</span>
               </div>
 
               {/* Tabla con scroll horizontal */}
               <div style={{...S.card,padding:0,overflowX:"auto"}}>
                 <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:400}}>
                   <thead>
-                    <tr style={{borderBottom:"1px solid rgba(255,255,255,0.08)"}}>
+                    <tr style={{borderBottom:"1px solid rgba(221,184,99,0.15)"}}>
                       {ALL_COLS.filter(c=>vc.includes(c.id)).map(c=>(
-                        <th key={c.id} style={{textAlign:c.id==="total"?"right":"left",padding:"7px 10px",fontSize:10,color:"#555",textTransform:"uppercase",letterSpacing:0.5,whiteSpace:"nowrap",background:"#131318",position:c.id==="fecha"?"sticky":undefined,left:c.id==="fecha"?0:undefined,zIndex:c.id==="fecha"?1:undefined}}>
+                        <th key={c.id} style={{textAlign:c.id==="total"?"right":"left",padding:"7px 10px",fontSize:10,color:"#8C8C8C",textTransform:"uppercase",letterSpacing:0.5,whiteSpace:"nowrap",background:"#141414",position:c.id==="fecha"?"sticky":undefined,left:c.id==="fecha"?0:undefined,zIndex:c.id==="fecha"?1:undefined}}>
                           {c.label}
                         </th>
                       ))}
@@ -506,17 +506,17 @@ export default function FinCFO() {
                       const isPos=(r.tot||0)>0;
                       return (
                         <tr key={r.id} style={{borderBottom:"1px solid rgba(255,255,255,0.03)"}}
-                          onMouseEnter={e=>{e.currentTarget.style.background="#1c1c26"; const ic=e.currentTarget.querySelector('.edit-ic'); if(ic)ic.style.opacity="1";}}
+                          onMouseEnter={e=>{e.currentTarget.style.background="#1E1E1E"; const ic=e.currentTarget.querySelector('.edit-ic'); if(ic)ic.style.opacity="1";}}
                           onMouseLeave={e=>{e.currentTarget.style.background="transparent"; const ic=e.currentTarget.querySelector('.edit-ic'); if(ic)ic.style.opacity="0";}}>
-                          {vc.includes("fecha")&&<td style={{padding:"7px 10px",fontSize:11,color:"#555",whiteSpace:"nowrap",background:"#131318",position:"sticky",left:0}}>{fmtD(r.f)}</td>}
-                          {vc.includes("tipo")&&<td style={{padding:"7px 10px"}}><span style={S.pill(r.t==="Negocio"?"#60c8f0":"#c8f060")}>{r.t}</span></td>}
-                          {vc.includes("banco")&&<td style={{padding:"7px 10px",fontSize:11,color:"#666",whiteSpace:"nowrap",maxWidth:120,overflow:"hidden",textOverflow:"ellipsis"}}>{r.b||"—"}</td>}
+                          {vc.includes("fecha")&&<td style={{padding:"7px 10px",fontSize:11,color:"#8C8C8C",whiteSpace:"nowrap",background:"#141414",position:"sticky",left:0}}>{fmtD(r.f)}</td>}
+                          {vc.includes("tipo")&&<td style={{padding:"7px 10px"}}><span style={S.pill(r.t==="Negocio"?"#1D445C":"#DDB863")}>{r.t}</span></td>}
+                          {vc.includes("banco")&&<td style={{padding:"7px 10px",fontSize:11,color:"#4A4A4A",whiteSpace:"nowrap",maxWidth:120,overflow:"hidden",textOverflow:"ellipsis"}}>{r.b||"—"}</td>}
                           {vc.includes("categoria")&&<td style={{padding:"7px 10px"}}><span style={S.badge(r.cat)}>{(r.cat||"").slice(0,10)}</span></td>}
                           {vc.includes("concepto")&&<td style={{padding:"7px 10px",fontSize:12,whiteSpace:"nowrap",maxWidth:160,overflow:"hidden",textOverflow:"ellipsis"}}>{r.c1}{r.c2?` · ${r.c2}`:""}</td>}
-                          {vc.includes("descripcion")&&<td style={{padding:"7px 10px",fontSize:11,color:"#666",whiteSpace:"nowrap",maxWidth:140,overflow:"hidden",textOverflow:"ellipsis"}}>{r.d||"—"}</td>}
-                          {vc.includes("forma")&&<td style={{padding:"7px 10px",fontSize:11,color:"#666",whiteSpace:"nowrap"}}>{r.fm||"—"}</td>}
-                          {vc.includes("bancoEmisor")&&<td style={{padding:"7px 10px",fontSize:11,color:"#666",whiteSpace:"nowrap"}}>{r.be||"—"}</td>}
-                          {vc.includes("plazo")&&<td style={{padding:"7px 10px",fontSize:11,color:"#666",textAlign:"right"}}>{r.plazo||"—"}</td>}
+                          {vc.includes("descripcion")&&<td style={{padding:"7px 10px",fontSize:11,color:"#4A4A4A",whiteSpace:"nowrap",maxWidth:140,overflow:"hidden",textOverflow:"ellipsis"}}>{r.d||"—"}</td>}
+                          {vc.includes("forma")&&<td style={{padding:"7px 10px",fontSize:11,color:"#4A4A4A",whiteSpace:"nowrap"}}>{r.fm||"—"}</td>}
+                          {vc.includes("bancoEmisor")&&<td style={{padding:"7px 10px",fontSize:11,color:"#4A4A4A",whiteSpace:"nowrap"}}>{r.be||"—"}</td>}
+                          {vc.includes("plazo")&&<td style={{padding:"7px 10px",fontSize:11,color:"#4A4A4A",textAlign:"right"}}>{r.plazo||"—"}</td>}
                           {vc.includes("fechaCP")&&<td style={{padding:"4px 6px",whiteSpace:"nowrap"}}>
                             {editingId===r.id ? (
                               <div style={{display:"flex",gap:4,alignItems:"center"}}>
@@ -525,23 +525,23 @@ export default function FinCFO() {
                                   value={editFechaCP}
                                   onChange={e=>setEditFechaCP(e.target.value)}
                                   autoFocus
-                                  style={{background:"#1c1c26",border:"1px solid #c8f060",borderRadius:4,color:"#c8f060",fontFamily:"DM Mono",fontSize:11,padding:"3px 6px",outline:"none",width:130}}
+                                  style={{background:"#1E1E1E",border:"1px solid #c8f060",borderRadius:4,color:"#DDB863",fontFamily:"Roboto",fontSize:11,padding:"3px 6px",outline:"none",width:130}}
                                 />
-                                <button onClick={()=>saveEdit(r.id)} style={{background:"#c8f060",border:"none",borderRadius:3,color:"#09090d",fontFamily:"DM Mono",fontSize:10,padding:"3px 7px",cursor:"pointer",fontWeight:700}}>✓</button>
-                                <button onClick={()=>setEditingId(null)} style={{background:"none",border:"1px solid rgba(255,255,255,0.1)",borderRadius:3,color:"#555",fontFamily:"DM Mono",fontSize:10,padding:"3px 6px",cursor:"pointer"}}>✕</button>
+                                <button onClick={()=>saveEdit(r.id)} style={{background:"#DDB863",border:"none",borderRadius:3,color:"#0A0A0A",fontFamily:"Roboto",fontSize:10,padding:"3px 7px",cursor:"pointer",fontWeight:700}}>✓</button>
+                                <button onClick={()=>setEditingId(null)} style={{background:"none",border:"1px solid rgba(221,184,99,0.18)",borderRadius:3,color:"#8C8C8C",fontFamily:"Roboto",fontSize:10,padding:"3px 6px",cursor:"pointer"}}>✕</button>
                               </div>
                             ) : (
                               <div style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer"}} onClick={()=>startEdit(r)}>
-                                <span style={{fontSize:11,color:"#60c8f0"}}>{r.fechaCP?fmtD(r.fechaCP):"—"}</span>
-                                <span className="edit-ic" style={{fontSize:9,color:"#c8f060",opacity:0,transition:"opacity 0.1s"}}>✎</span>
+                                <span style={{fontSize:11,color:"#1D445C"}}>{r.fechaCP?fmtD(r.fechaCP):"—"}</span>
+                                <span className="edit-ic" style={{fontSize:9,color:"#DDB863",opacity:0,transition:"opacity 0.1s"}}>✎</span>
                               </div>
                             )}
                           </td>}
-                          {vc.includes("moneda")&&<td style={{padding:"7px 10px",fontSize:11,color:"#666"}}>{r.usd?"USD":"UYU"}</td>}
-                          {vc.includes("tc")&&<td style={{padding:"7px 10px",fontSize:11,color:"#666",textAlign:"right"}}>{r.tc||"—"}</td>}
-                          {vc.includes("subtotal")&&<td style={{padding:"7px 10px",fontFamily:"Syne",fontSize:11,fontWeight:600,textAlign:"right",color:isPos?"#60f0a0":"#f06060",whiteSpace:"nowrap"}}>{r.p!=null?(isPos?"+":"-")+fmtN(r.p).replace("$ ",""):"—"}</td>}
+                          {vc.includes("moneda")&&<td style={{padding:"7px 10px",fontSize:11,color:"#4A4A4A"}}>{r.usd?"USD":"UYU"}</td>}
+                          {vc.includes("tc")&&<td style={{padding:"7px 10px",fontSize:11,color:"#4A4A4A",textAlign:"right"}}>{r.tc||"—"}</td>}
+                          {vc.includes("subtotal")&&<td style={{padding:"7px 10px",fontFamily:"Lora",fontSize:11,fontWeight:600,textAlign:"right",color:isPos?"#4CAF82":"#f06060",whiteSpace:"nowrap"}}>{r.p!=null?(isPos?"+":"-")+fmtN(r.p).replace("$ ",""):"—"}</td>}
                           {vc.includes("iva")&&<td style={{padding:"7px 10px",fontSize:11,color:"#f0a060",textAlign:"right"}}>{r.iva?fmtN(r.iva).replace("$ ",""):"—"}</td>}
-                          {vc.includes("total")&&<td style={{padding:"7px 10px",fontFamily:"Syne",fontSize:12,fontWeight:700,textAlign:"right",color:isPos?"#60f0a0":"#f06060",whiteSpace:"nowrap"}}>{isPos?"+":"-"}{fmtN(r.tot).replace("$ ","")}</td>}
+                          {vc.includes("total")&&<td style={{padding:"7px 10px",fontFamily:"Lora",fontSize:12,fontWeight:700,textAlign:"right",color:isPos?"#4CAF82":"#f06060",whiteSpace:"nowrap"}}>{isPos?"+":"-"}{fmtN(r.tot).replace("$ ","")}</td>}
                         </tr>
                       );
                     })}
@@ -558,7 +558,7 @@ export default function FinCFO() {
             <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
               {[["rentabilidad","Rentabilidad negocio"],["flujo","Flujo de fondos"],["personal","Finanzas personales"],["conciliacion","Conciliación bancaria"]].map(([k,l])=>(
                 <button key={k} onClick={()=>setReportTab(k)}
-                  style={{background:reportTab===k?"rgba(200,240,96,0.1)":"#131318",border:`1px solid ${reportTab===k?"rgba(200,240,96,0.35)":"rgba(255,255,255,0.06)"}`,color:reportTab===k?"#c8f060":"#555",borderRadius:5,padding:"7px 14px",fontFamily:"DM Mono",fontSize:11,cursor:"pointer"}}>
+                  style={{background:reportTab===k?"rgba(221,184,99,0.12)":"#141414",border:`1px solid ${reportTab===k?"rgba(221,184,99,0.45)":"rgba(221,184,99,0.12)"}`,color:reportTab===k?"#DDB863":"#8C8C8C",borderRadius:5,padding:"7px 14px",fontFamily:"Roboto",fontSize:11,cursor:"pointer"}}>
                   {l}
                 </button>
               ))}
@@ -598,7 +598,7 @@ export default function FinCFO() {
                 "Impuesto a la renta": ["Impuestos"],
               };
               const GRUPO_RENT_COLOR = {
-                "Ingresos":"#60f0a0",
+                "Ingresos":"#4CAF82",
                 "Gastos variables":"#f0a060",
                 "Gastos fijos":"#f06060",
                 "Intereses":"#f06090",
@@ -631,19 +631,19 @@ export default function FinCFO() {
 
               return (
                 <>
-                  <div style={{fontSize:11,color:"#555",marginBottom:14}}>Movimientos NEGOCIO · por fecha de transacción · sin IVA</div>
+                  <div style={{fontSize:11,color:"#8C8C8C",marginBottom:14}}>Movimientos NEGOCIO · por fecha de transacción · sin IVA</div>
 
                   {/* KPIs */}
                   <div style={{...S.g4,marginBottom:14}}>
                     {[
-                      {label:"Ingresos",val:fmtN(ingresos),color:"#60f0a0"},
+                      {label:"Ingresos",val:fmtN(ingresos),color:"#4CAF82"},
                       {label:"Gastos totales",val:fmtN(Math.abs(gastos)),color:"#f06060"},
-                      {label:`Margen bruto`,val:`${margen}%`,color:"#60c8f0"},
-                      {label:"Resultado neto",val:(resFinal>=0?"+":"-")+fmtN(Math.abs(resFinal)),color:resFinal>=0?"#c8f060":"#f06060"},
+                      {label:`Margen bruto`,val:`${margen}%`,color:"#1D445C"},
+                      {label:"Resultado neto",val:(resFinal>=0?"+":"-")+fmtN(Math.abs(resFinal)),color:resFinal>=0?"#DDB863":"#f06060"},
                     ].map(k=>(
                       <div key={k.label} style={S.card}>
                         <div style={{...S.lbl,marginBottom:6}}>{k.label}</div>
-                        <div style={{fontFamily:"Syne",fontSize:18,fontWeight:800,color:k.color}}>{k.val}</div>
+                        <div style={{fontFamily:"Lora",fontSize:18,fontWeight:800,color:k.color}}>{k.val}</div>
                       </div>
                     ))}
                   </div>
@@ -652,10 +652,10 @@ export default function FinCFO() {
                   <div style={{...S.card,padding:0,overflowX:"auto"}}>
                     <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:400}}>
                       <thead>
-                        <tr style={{borderBottom:"1px solid rgba(255,255,255,0.1)"}}>
-                          <th style={{textAlign:"left",padding:"8px 12px",fontSize:10,color:"#555",textTransform:"uppercase",letterSpacing:0.7,background:"#131318",position:"sticky",left:0,zIndex:1,minWidth:200}}>Concepto</th>
-                          {MESES_DISP.map(m=><th key={m} style={{textAlign:"right",padding:"8px 10px",fontSize:10,color:"#555",textTransform:"uppercase",minWidth:110,whiteSpace:"nowrap"}}>{MESES_NOM[+m]}</th>)}
-                          <th style={{textAlign:"right",padding:"8px 10px",fontSize:10,color:"#888",textTransform:"uppercase",minWidth:110,fontWeight:700,borderLeft:"1px solid rgba(255,255,255,0.08)"}}>Total</th>
+                        <tr style={{borderBottom:"1px solid rgba(221,184,99,0.18)"}}>
+                          <th style={{textAlign:"left",padding:"8px 12px",fontSize:10,color:"#8C8C8C",textTransform:"uppercase",letterSpacing:0.7,background:"#141414",position:"sticky",left:0,zIndex:1,minWidth:200}}>Concepto</th>
+                          {MESES_DISP.map(m=><th key={m} style={{textAlign:"right",padding:"8px 10px",fontSize:10,color:"#8C8C8C",textTransform:"uppercase",minWidth:110,whiteSpace:"nowrap"}}>{MESES_NOM[+m]}</th>)}
+                          <th style={{textAlign:"right",padding:"8px 10px",fontSize:10,color:"#8C8C8C",textTransform:"uppercase",minWidth:110,fontWeight:700,borderLeft:"1px solid rgba(221,184,99,0.15)"}}>Total</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -666,7 +666,7 @@ export default function FinCFO() {
                           const filasOrd=grupo==="Ingresos"?filas:[...filas].sort((a,b)=>Math.abs(rowTotR(b))-Math.abs(rowTotR(a)));
                           return [
                             // Header grupo
-                            <tr key={`hdr-${grupo}`} style={{background:bg,borderTop:"1px solid rgba(255,255,255,0.08)"}}>
+                            <tr key={`hdr-${grupo}`} style={{background:bg,borderTop:"1px solid rgba(221,184,99,0.15)"}}>
                               <td colSpan={MESES_DISP.length+2} style={{padding:"6px 12px",fontSize:10,fontWeight:700,color,textTransform:"uppercase",letterSpacing:1,background:bg,position:"sticky",left:0}}>
                                 {grupo}
                               </td>
@@ -679,34 +679,34 @@ export default function FinCFO() {
                                 <tr key={c1} style={{borderBottom:"1px solid rgba(255,255,255,0.03)",background:i%2===0?"transparent":"rgba(255,255,255,0.01)"}}
                                   onMouseEnter={e=>e.currentTarget.style.background="rgba(200,240,96,0.04)"}
                                   onMouseLeave={e=>e.currentTarget.style.background=i%2===0?"transparent":"rgba(255,255,255,0.01)"}>
-                                  <td style={{padding:"5px 12px 5px 20px",fontSize:12,color:hasData?"#ede8e0":"#333",background:"#131318",position:"sticky",left:0,borderRight:"1px solid rgba(255,255,255,0.06)"}}>{c1}</td>
+                                  <td style={{padding:"5px 12px 5px 20px",fontSize:12,color:hasData?"#F8F4E8":"#333",background:"#141414",position:"sticky",left:0,borderRight:"1px solid rgba(221,184,99,0.12)"}}>{c1}</td>
                                   {MESES_DISP.map(m=>{const v=pvR(c1,m);return <td key={m} style={cellSt(v)}>{fmtCell(v)}</td>;})}
-                                  <td style={{...cellSt(rt),borderLeft:"1px solid rgba(255,255,255,0.08)",background:"rgba(255,255,255,0.02)",fontWeight:700}}>{fmtCell(rt)}</td>
+                                  <td style={{...cellSt(rt),borderLeft:"1px solid rgba(221,184,99,0.15)",background:"rgba(255,255,255,0.02)",fontWeight:700}}>{fmtCell(rt)}</td>
                                 </tr>
                               );
                             }),
                             // Subtotal grupo
-                            <tr key={`sub-${grupo}`} style={{borderTop:"1px solid rgba(255,255,255,0.08)",borderBottom:"1px solid rgba(255,255,255,0.04)",background:bg}}>
-                              <td style={{padding:"6px 12px",fontSize:11,fontWeight:700,color,background:bg,position:"sticky",left:0,borderRight:"1px solid rgba(255,255,255,0.06)"}}>Total {grupo}</td>
-                              {MESES_DISP.map(m=>{const v=grupoTotRMes(grupo,m);return <td key={m} style={{...cellSt(v),fontFamily:"Syne",fontWeight:700,color:v!==0?color:"#333"}}>{fmtCell(v)}</td>;})}
-                              <td style={{...cellSt(gTot),fontFamily:"Syne",fontWeight:800,borderLeft:"1px solid rgba(255,255,255,0.08)",background:bg,color:gTot!==0?color:"#333"}}>{fmtCell(gTot)}</td>
+                            <tr key={`sub-${grupo}`} style={{borderTop:"1px solid rgba(221,184,99,0.15)",borderBottom:"1px solid rgba(255,255,255,0.04)",background:bg}}>
+                              <td style={{padding:"6px 12px",fontSize:11,fontWeight:700,color,background:bg,position:"sticky",left:0,borderRight:"1px solid rgba(221,184,99,0.12)"}}>Total {grupo}</td>
+                              {MESES_DISP.map(m=>{const v=grupoTotRMes(grupo,m);return <td key={m} style={{...cellSt(v),fontFamily:"Lora",fontWeight:700,color:v!==0?color:"#333"}}>{fmtCell(v)}</td>;})}
+                              <td style={{...cellSt(gTot),fontFamily:"Lora",fontWeight:800,borderLeft:"1px solid rgba(221,184,99,0.15)",background:bg,color:gTot!==0?color:"#333"}}>{fmtCell(gTot)}</td>
                             </tr>,
                             // Subtotal resultado antes de impuesto (después de Intereses)
                             grupo==="Intereses" ? (
-                              <tr key="res-antes" style={{borderTop:"2px solid rgba(255,255,255,0.12)",borderBottom:"1px solid rgba(255,255,255,0.08)",background:"rgba(255,255,255,0.02)"}}>
-                                <td style={{padding:"8px 12px",fontSize:12,fontWeight:800,color:"#c8f060",background:"rgba(255,255,255,0.02)",position:"sticky",left:0,borderRight:"1px solid rgba(255,255,255,0.06)"}}>Resultado antes de impuesto</td>
-                                {MESES_DISP.map(m=>{const v=resAntesMes(m);return <td key={m} style={{...cellSt(v),fontFamily:"Syne",fontWeight:800,fontSize:12,color:v>=0?"#c8f060":"#f06060"}}>{fmtCell(v)}</td>;})}
-                                <td style={{...cellSt(resAntes),fontFamily:"Syne",fontWeight:800,fontSize:12,borderLeft:"1px solid rgba(255,255,255,0.08)",background:"rgba(255,255,255,0.03)",color:resAntes>=0?"#c8f060":"#f06060"}}>{fmtCell(resAntes)}</td>
+                              <tr key="res-antes" style={{borderTop:"2px solid rgba(221,184,99,0.2)",borderBottom:"1px solid rgba(221,184,99,0.15)",background:"rgba(255,255,255,0.02)"}}>
+                                <td style={{padding:"8px 12px",fontSize:12,fontWeight:800,color:"#DDB863",background:"rgba(255,255,255,0.02)",position:"sticky",left:0,borderRight:"1px solid rgba(221,184,99,0.12)"}}>Resultado antes de impuesto</td>
+                                {MESES_DISP.map(m=>{const v=resAntesMes(m);return <td key={m} style={{...cellSt(v),fontFamily:"Lora",fontWeight:800,fontSize:12,color:v>=0?"#DDB863":"#f06060"}}>{fmtCell(v)}</td>;})}
+                                <td style={{...cellSt(resAntes),fontFamily:"Lora",fontWeight:800,fontSize:12,borderLeft:"1px solid rgba(221,184,99,0.15)",background:"rgba(255,255,255,0.03)",color:resAntes>=0?"#DDB863":"#f06060"}}>{fmtCell(resAntes)}</td>
                               </tr>
                             ) : null,
                           ];
                         })}
                       </tbody>
                       <tfoot>
-                        <tr style={{borderTop:"2px solid rgba(255,255,255,0.15)",background:"#0e0e16"}}>
-                          <td style={{padding:"10px 12px",fontSize:12,fontWeight:800,color:"#c8f060",position:"sticky",left:0,background:"#0e0e16",borderRight:"1px solid rgba(255,255,255,0.06)"}}>RESULTADO NETO</td>
-                          {MESES_DISP.map(m=>{const v=resFinalMes(m);return <td key={m} style={{...cellSt(v),fontFamily:"Syne",fontWeight:800,fontSize:13,color:v>=0?"#c8f060":"#f06060"}}>{fmtCell(v)}</td>;})}
-                          <td style={{...cellSt(resFinal),fontFamily:"Syne",fontWeight:800,fontSize:13,borderLeft:"1px solid rgba(255,255,255,0.08)",background:"rgba(255,255,255,0.04)",color:resFinal>=0?"#c8f060":"#f06060"}}>{fmtCell(resFinal)}</td>
+                        <tr style={{borderTop:"2px solid rgba(221,184,99,0.22)",background:"#111111"}}>
+                          <td style={{padding:"10px 12px",fontSize:12,fontWeight:800,color:"#DDB863",position:"sticky",left:0,background:"#111111",borderRight:"1px solid rgba(221,184,99,0.12)"}}>RESULTADO NETO</td>
+                          {MESES_DISP.map(m=>{const v=resFinalMes(m);return <td key={m} style={{...cellSt(v),fontFamily:"Lora",fontWeight:800,fontSize:13,color:v>=0?"#DDB863":"#f06060"}}>{fmtCell(v)}</td>;})}
+                          <td style={{...cellSt(resFinal),fontFamily:"Lora",fontWeight:800,fontSize:13,borderLeft:"1px solid rgba(221,184,99,0.15)",background:"rgba(255,255,255,0.04)",color:resFinal>=0?"#DDB863":"#f06060"}}>{fmtCell(resFinal)}</td>
                         </tr>
                       </tfoot>
                     </table>
@@ -754,10 +754,10 @@ export default function FinCFO() {
                 Financiamiento:     ["Distribución de dividendos","Préstamo recibido","Préstamo pagado","Intereses pagados"],
               };
               const GRUPO_NEG_COLOR = {
-                Cobros:"#60f0a0",
+                Cobros:"#4CAF82",
                 "Gastos variables":"#f0a060",
                 "Gastos fijos":"#f06060",
-                Inversiones:"#60c8f0",
+                Inversiones:"#1D445C",
                 Financiamiento:"#c860f0",
               };
               const GRUPO_NEG_BG = {
@@ -782,18 +782,18 @@ export default function FinCFO() {
 
               return (
                 <>
-                  <div style={{fontSize:11,color:"#555",marginBottom:14}}>Movimientos NEGOCIO · por mes · sin IVA</div>
+                  <div style={{fontSize:11,color:"#8C8C8C",marginBottom:14}}>Movimientos NEGOCIO · por mes · sin IVA</div>
 
                   {/* KPIs */}
                   <div style={{...S.g3,marginBottom:14}}>
                     {[
-                      {label:"Cobros",val:fmtN(cobros),color:"#60f0a0"},
+                      {label:"Cobros",val:fmtN(cobros),color:"#4CAF82"},
                       {label:"Gastos totales",val:fmtN(Math.abs(gastos)),color:"#f06060"},
-                      {label:"Flujo neto",val:(flujoNeto>=0?"+":"-")+fmtN(Math.abs(flujoNeto)),color:flujoNeto>=0?"#c8f060":"#f06060"},
+                      {label:"Flujo neto",val:(flujoNeto>=0?"+":"-")+fmtN(Math.abs(flujoNeto)),color:flujoNeto>=0?"#DDB863":"#f06060"},
                     ].map(k=>(
                       <div key={k.label} style={S.card}>
                         <div style={{...S.lbl,marginBottom:6}}>{k.label}</div>
-                        <div style={{fontFamily:"Syne",fontSize:20,fontWeight:800,color:k.color}}>{k.val}</div>
+                        <div style={{fontFamily:"Lora",fontSize:20,fontWeight:800,color:k.color}}>{k.val}</div>
                       </div>
                     ))}
                   </div>
@@ -802,10 +802,10 @@ export default function FinCFO() {
                   <div style={{...S.card,padding:0,overflowX:"auto"}}>
                     <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:400}}>
                       <thead>
-                        <tr style={{borderBottom:"1px solid rgba(255,255,255,0.1)"}}>
-                          <th style={{textAlign:"left",padding:"8px 12px",fontSize:10,color:"#555",textTransform:"uppercase",letterSpacing:0.7,background:"#131318",position:"sticky",left:0,zIndex:1,minWidth:200}}>Concepto</th>
-                          {MESES_DISP.map(m=><th key={m} style={{textAlign:"right",padding:"8px 10px",fontSize:10,color:"#555",textTransform:"uppercase",minWidth:110,whiteSpace:"nowrap"}}>{MESES_NOM[+m]}</th>)}
-                          <th style={{textAlign:"right",padding:"8px 10px",fontSize:10,color:"#888",textTransform:"uppercase",minWidth:110,fontWeight:700,borderLeft:"1px solid rgba(255,255,255,0.08)"}}>Total</th>
+                        <tr style={{borderBottom:"1px solid rgba(221,184,99,0.18)"}}>
+                          <th style={{textAlign:"left",padding:"8px 12px",fontSize:10,color:"#8C8C8C",textTransform:"uppercase",letterSpacing:0.7,background:"#141414",position:"sticky",left:0,zIndex:1,minWidth:200}}>Concepto</th>
+                          {MESES_DISP.map(m=><th key={m} style={{textAlign:"right",padding:"8px 10px",fontSize:10,color:"#8C8C8C",textTransform:"uppercase",minWidth:110,whiteSpace:"nowrap"}}>{MESES_NOM[+m]}</th>)}
+                          <th style={{textAlign:"right",padding:"8px 10px",fontSize:10,color:"#8C8C8C",textTransform:"uppercase",minWidth:110,fontWeight:700,borderLeft:"1px solid rgba(221,184,99,0.15)"}}>Total</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -817,7 +817,7 @@ export default function FinCFO() {
                           const filasOrd = grupo==="Cobros" ? filas : [...filas].sort((a,b)=>Math.abs(rowTotNeg(b))-Math.abs(rowTotNeg(a)));
                           return [
                             // Header grupo
-                            <tr key={`hdr-${grupo}`} style={{background:bg,borderTop:"1px solid rgba(255,255,255,0.08)"}}>
+                            <tr key={`hdr-${grupo}`} style={{background:bg,borderTop:"1px solid rgba(221,184,99,0.15)"}}>
                               <td colSpan={MESES_DISP.length+2} style={{padding:"6px 12px",fontSize:10,fontWeight:700,color,textTransform:"uppercase",letterSpacing:1,background:bg,position:"sticky",left:0}}>
                                 {grupo}
                               </td>
@@ -830,26 +830,26 @@ export default function FinCFO() {
                                 <tr key={c1} style={{borderBottom:"1px solid rgba(255,255,255,0.03)",background:i%2===0?"transparent":"rgba(255,255,255,0.01)"}}
                                   onMouseEnter={e=>e.currentTarget.style.background="rgba(200,240,96,0.04)"}
                                   onMouseLeave={e=>e.currentTarget.style.background=i%2===0?"transparent":"rgba(255,255,255,0.01)"}>
-                                  <td style={{padding:"5px 12px 5px 20px",fontSize:12,color:hasData?"#ede8e0":"#333",background:"#131318",position:"sticky",left:0,borderRight:"1px solid rgba(255,255,255,0.06)"}}>{c1}</td>
+                                  <td style={{padding:"5px 12px 5px 20px",fontSize:12,color:hasData?"#F8F4E8":"#333",background:"#141414",position:"sticky",left:0,borderRight:"1px solid rgba(221,184,99,0.12)"}}>{c1}</td>
                                   {MESES_DISP.map(m=>{const v=pvNeg(c1,m);return <td key={m} style={cellSt(v)}>{fmtCell(v)}</td>;})}
-                                  <td style={{...cellSt(rt),borderLeft:"1px solid rgba(255,255,255,0.08)",background:"rgba(255,255,255,0.02)",fontWeight:700}}>{fmtCell(rt)}</td>
+                                  <td style={{...cellSt(rt),borderLeft:"1px solid rgba(221,184,99,0.15)",background:"rgba(255,255,255,0.02)",fontWeight:700}}>{fmtCell(rt)}</td>
                                 </tr>
                               );
                             }),
                             // Subtotal grupo
-                            <tr key={`sub-${grupo}`} style={{borderTop:"1px solid rgba(255,255,255,0.08)",borderBottom:"1px solid rgba(255,255,255,0.04)",background:bg}}>
-                              <td style={{padding:"6px 12px",fontSize:11,fontWeight:700,color,background:bg,position:"sticky",left:0,borderRight:"1px solid rgba(255,255,255,0.06)"}}>Total {grupo}</td>
-                              {MESES_DISP.map(m=>{const v=grupoTotNegMes(grupo,m);return <td key={m} style={{...cellSt(v),fontFamily:"Syne",fontWeight:700,color:v!==0?color:"#333"}}>{fmtCell(v)}</td>;})}
-                              <td style={{...cellSt(gTot),fontFamily:"Syne",fontWeight:800,borderLeft:"1px solid rgba(255,255,255,0.08)",background:bg,color:gTot!==0?color:"#333"}}>{fmtCell(gTot)}</td>
+                            <tr key={`sub-${grupo}`} style={{borderTop:"1px solid rgba(221,184,99,0.15)",borderBottom:"1px solid rgba(255,255,255,0.04)",background:bg}}>
+                              <td style={{padding:"6px 12px",fontSize:11,fontWeight:700,color,background:bg,position:"sticky",left:0,borderRight:"1px solid rgba(221,184,99,0.12)"}}>Total {grupo}</td>
+                              {MESES_DISP.map(m=>{const v=grupoTotNegMes(grupo,m);return <td key={m} style={{...cellSt(v),fontFamily:"Lora",fontWeight:700,color:v!==0?color:"#333"}}>{fmtCell(v)}</td>;})}
+                              <td style={{...cellSt(gTot),fontFamily:"Lora",fontWeight:800,borderLeft:"1px solid rgba(221,184,99,0.15)",background:bg,color:gTot!==0?color:"#333"}}>{fmtCell(gTot)}</td>
                             </tr>
                           ];
                         })}
                       </tbody>
                       <tfoot>
-                        <tr style={{borderTop:"2px solid rgba(255,255,255,0.15)",background:"#0e0e16"}}>
-                          <td style={{padding:"8px 12px",fontSize:11,fontWeight:700,color:"#888",position:"sticky",left:0,background:"#0e0e16",borderRight:"1px solid rgba(255,255,255,0.06)"}}>FLUJO NETO</td>
-                          {MESES_DISP.map(m=>{const v=colTotNeg(m);return <td key={m} style={{...cellSt(v),fontFamily:"Syne",fontWeight:800,fontSize:12}}>{fmtCell(v)}</td>;})}
-                          <td style={{...cellSt(grandTotNeg),fontFamily:"Syne",fontWeight:800,fontSize:12,borderLeft:"1px solid rgba(255,255,255,0.08)",background:"rgba(255,255,255,0.04)"}}>{fmtCell(grandTotNeg)}</td>
+                        <tr style={{borderTop:"2px solid rgba(221,184,99,0.22)",background:"#111111"}}>
+                          <td style={{padding:"8px 12px",fontSize:11,fontWeight:700,color:"#8C8C8C",position:"sticky",left:0,background:"#111111",borderRight:"1px solid rgba(221,184,99,0.12)"}}>FLUJO NETO</td>
+                          {MESES_DISP.map(m=>{const v=colTotNeg(m);return <td key={m} style={{...cellSt(v),fontFamily:"Lora",fontWeight:800,fontSize:12}}>{fmtCell(v)}</td>;})}
+                          <td style={{...cellSt(grandTotNeg),fontFamily:"Lora",fontWeight:800,fontSize:12,borderLeft:"1px solid rgba(221,184,99,0.15)",background:"rgba(255,255,255,0.04)"}}>{fmtCell(grandTotNeg)}</td>
                         </tr>
                       </tfoot>
                     </table>
@@ -861,60 +861,60 @@ export default function FinCFO() {
             {/* ── FINANZAS PERSONALES ── */}
             {reportTab==="personal" && (
               <>
-                <div style={{fontSize:11,color:"#555",marginBottom:14}}>Movimientos PERSONAL · neto por categoría y mes · con IVA</div>
+                <div style={{fontSize:11,color:"#8C8C8C",marginBottom:14}}>Movimientos PERSONAL · neto por categoría y mes · con IVA</div>
 
                 {/* Filtros */}
                 <div style={{...S.card,marginBottom:14,padding:"14px 16px",overflow:"visible"}}>
                   <div style={{display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
-                    <div style={{fontSize:10,color:"#555",textTransform:"uppercase",letterSpacing:0.8}}>Período</div>
+                    <div style={{fontSize:10,color:"#8C8C8C",textTransform:"uppercase",letterSpacing:0.8}}>Período</div>
                     <div style={{display:"flex",alignItems:"center",gap:8}}>
-                      <label style={{fontSize:11,color:"#666"}}>Desde</label>
+                      <label style={{fontSize:11,color:"#4A4A4A"}}>Desde</label>
                       <select value={persDesde} onChange={e=>{setPersDesde(e.target.value);if(+e.target.value>+persHasta)setPersHasta(e.target.value);}} style={selStyle}>
                         {MESES_DISP.map(m=><option key={m} value={m}>{MESES_NOM[+m]}</option>)}
                       </select>
                     </div>
                     <div style={{display:"flex",alignItems:"center",gap:8}}>
-                      <label style={{fontSize:11,color:"#666"}}>Hasta</label>
+                      <label style={{fontSize:11,color:"#4A4A4A"}}>Hasta</label>
                       <select value={persHasta} onChange={e=>{setPersHasta(e.target.value);if(+e.target.value<+persDesde)setPersDesde(e.target.value);}} style={selStyle}>
                         {MESES_DISP.map(m=><option key={m} value={m}>{MESES_NOM[+m]}</option>)}
                       </select>
                     </div>
-                    <div style={{width:1,height:20,background:"rgba(255,255,255,0.08)"}}/>
-                    <div style={{fontSize:10,color:"#555",textTransform:"uppercase",letterSpacing:0.8}}>Banco</div>
+                    <div style={{width:1,height:20,background:"rgba(221,184,99,0.15)"}}/>
+                    <div style={{fontSize:10,color:"#8C8C8C",textTransform:"uppercase",letterSpacing:0.8}}>Banco</div>
                     <div style={{position:"relative"}} ref={bancoDropRef}>
                       <button onClick={()=>setBancoDropOpen(o=>!o)}
-                        style={{background:"#1c1c26",border:`1px solid ${persBancos.length>0?"rgba(200,240,96,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:5,color:persBancos.length>0?"#c8f060":"#666",fontFamily:"DM Mono",fontSize:11,padding:"5px 10px",cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
+                        style={{background:"#1E1E1E",border:`1px solid ${persBancos.length>0?"rgba(221,184,99,0.5)":"rgba(221,184,99,0.18)"}`,borderRadius:5,color:persBancos.length>0?"#DDB863":"#4A4A4A",fontFamily:"Roboto",fontSize:11,padding:"5px 10px",cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
                         {persBancos.length===0?"Todos los bancos":persBancos.length===1?persBancos[0]:`${persBancos.length} bancos`}
                         <span style={{fontSize:9,opacity:0.6}}>{bancoDropOpen?"▲":"▼"}</span>
                       </button>
                       {bancoDropOpen&&(
-                        <div style={{position:"absolute",top:"calc(100% + 6px)",left:0,background:"#1c1c26",border:"1px solid rgba(255,255,255,0.15)",borderRadius:6,zIndex:999,minWidth:220,padding:"6px 0",boxShadow:"0 12px 32px rgba(0,0,0,0.7)"}}>
+                        <div style={{position:"absolute",top:"calc(100% + 6px)",left:0,background:"#1E1E1E",border:"1px solid rgba(221,184,99,0.22)",borderRadius:6,zIndex:999,minWidth:220,padding:"6px 0",boxShadow:"0 12px 32px rgba(0,0,0,0.7)"}}>
                           <div onClick={()=>{setPersBancos([]);setBancoDropOpen(false);}}
-                            style={{display:"flex",alignItems:"center",gap:8,padding:"7px 12px",cursor:"pointer",fontSize:11,color:persBancos.length===0?"#c8f060":"#888",borderBottom:"1px solid rgba(255,255,255,0.06)"}}
-                            onMouseEnter={e=>e.currentTarget.style.background="rgba(200,240,96,0.07)"}
+                            style={{display:"flex",alignItems:"center",gap:8,padding:"7px 12px",cursor:"pointer",fontSize:11,color:persBancos.length===0?"#DDB863":"#8C8C8C",borderBottom:"1px solid rgba(221,184,99,0.12)"}}
+                            onMouseEnter={e=>e.currentTarget.style.background="rgba(221,184,99,0.1)"}
                             onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                            <span style={{width:12,height:12,borderRadius:2,border:`1px solid ${persBancos.length===0?"#c8f060":"rgba(255,255,255,0.2)"}`,background:persBancos.length===0?"#c8f060":"transparent",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:8,color:"#0d0d10",flexShrink:0}}>{persBancos.length===0?"✓":""}</span>
+                            <span style={{width:12,height:12,borderRadius:2,border:`1px solid ${persBancos.length===0?"#DDB863":"rgba(255,255,255,0.2)"}`,background:persBancos.length===0?"#DDB863":"transparent",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:8,color:"#0d0d10",flexShrink:0}}>{persBancos.length===0?"✓":""}</span>
                             Todos los bancos
                           </div>
                           {bancosPersList.map(b=>{
                             const chk=persBancos.includes(b);
                             return (
                               <div key={b} onClick={()=>setPersBancos(p=>chk?p.filter(x=>x!==b):[...p,b])}
-                                style={{display:"flex",alignItems:"center",gap:8,padding:"7px 12px",cursor:"pointer",fontSize:11,color:chk?"#c8f060":"#888"}}
-                                onMouseEnter={e=>e.currentTarget.style.background="rgba(200,240,96,0.07)"}
+                                style={{display:"flex",alignItems:"center",gap:8,padding:"7px 12px",cursor:"pointer",fontSize:11,color:chk?"#DDB863":"#8C8C8C"}}
+                                onMouseEnter={e=>e.currentTarget.style.background="rgba(221,184,99,0.1)"}
                                 onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                                <span style={{width:12,height:12,borderRadius:2,border:`1px solid ${chk?"#c8f060":"rgba(255,255,255,0.2)"}`,background:chk?"#c8f060":"transparent",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:8,color:"#0d0d10",flexShrink:0}}>{chk?"✓":""}</span>
+                                <span style={{width:12,height:12,borderRadius:2,border:`1px solid ${chk?"#DDB863":"rgba(255,255,255,0.2)"}`,background:chk?"#DDB863":"transparent",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:8,color:"#0d0d10",flexShrink:0}}>{chk?"✓":""}</span>
                                 {b}
                               </div>
                             );
                           })}
-                          <div style={{borderTop:"1px solid rgba(255,255,255,0.06)",padding:"6px 12px"}}>
-                            <button onClick={()=>setBancoDropOpen(false)} style={{width:"100%",background:"rgba(200,240,96,0.1)",border:"1px solid rgba(200,240,96,0.25)",borderRadius:4,color:"#c8f060",fontFamily:"DM Mono",fontSize:11,padding:"5px",cursor:"pointer"}}>Aplicar →</button>
+                          <div style={{borderTop:"1px solid rgba(221,184,99,0.12)",padding:"6px 12px"}}>
+                            <button onClick={()=>setBancoDropOpen(false)} style={{width:"100%",background:"rgba(221,184,99,0.12)",border:"1px solid rgba(221,184,99,0.35)",borderRadius:4,color:"#DDB863",fontFamily:"Roboto",fontSize:11,padding:"5px",cursor:"pointer"}}>Aplicar →</button>
                           </div>
                         </div>
                       )}
                     </div>
-                    <div style={{marginLeft:"auto",fontSize:11,color:"#c8f060",fontFamily:"Syne",fontWeight:700}}>
+                    <div style={{marginLeft:"auto",fontSize:11,color:"#DDB863",fontFamily:"Lora",fontWeight:700}}>
                       {periodoLabel}{persBancos.length>0?` · ${persBancos.length===1?persBancos[0]:persBancos.length+" bancos"}`:""}
                     </div>
                   </div>
@@ -926,21 +926,21 @@ export default function FinCFO() {
                     const ing=Math.abs(persIng)||1;
                     const pct=(v)=>ing>0?(Math.abs(v)/ing*100).toFixed(1)+"%":"—";
                     return [
-                      {label:"Cobros",val:fmtN(persIng),color:"#60f0a0",sub:periodoLabel},
-                      {label:"Necesidades",val:fmtN(Math.abs(persNec)),color:"#60c8f0",pct:pct(persNec)},
+                      {label:"Cobros",val:fmtN(persIng),color:"#4CAF82",sub:periodoLabel},
+                      {label:"Necesidades",val:fmtN(Math.abs(persNec)),color:"#1D445C",pct:pct(persNec)},
                       {label:"Deseos",val:fmtN(Math.abs(persDes)),color:"#cc88cc",pct:pct(persDes)},
                       {label:"Inversiones",val:fmtN(Math.abs(persInv)),color:"#f0c060",pct:pct(persInv)},
-                      {label:"Resultado neto",val:(grandTot>=0?"+":"-")+fmtN(Math.abs(grandTot)),color:grandTot>=0?"#c8f060":"#f06060",sub:periodoLabel},
+                      {label:"Resultado neto",val:(grandTot>=0?"+":"-")+fmtN(Math.abs(grandTot)),color:grandTot>=0?"#DDB863":"#f06060",sub:periodoLabel},
                     ].map(k=>(
                       <div key={k.label} style={S.card}>
                         <div style={{...S.lbl,marginBottom:4}}>{k.label}</div>
-                        <div style={{fontFamily:"Syne",fontSize:16,fontWeight:800,color:k.color,marginBottom:3}}>{k.val}</div>
+                        <div style={{fontFamily:"Lora",fontSize:16,fontWeight:800,color:k.color,marginBottom:3}}>{k.val}</div>
                         {k.pct?(
                           <div style={{display:"flex",alignItems:"baseline",gap:4}}>
-                            <span style={{fontFamily:"Syne",fontSize:14,fontWeight:700,color:k.color}}>{k.pct}</span>
-                            <span style={{fontSize:9,color:"#444"}}>de ingresos</span>
+                            <span style={{fontFamily:"Lora",fontSize:14,fontWeight:700,color:k.color}}>{k.pct}</span>
+                            <span style={{fontSize:9,color:"#4A4A4A"}}>de ingresos</span>
                           </div>
-                        ):<div style={{fontSize:10,color:"#555"}}>{k.sub}</div>}
+                        ):<div style={{fontSize:10,color:"#8C8C8C"}}>{k.sub}</div>}
                       </div>
                     ));
                   })()}
@@ -950,10 +950,10 @@ export default function FinCFO() {
                 <div style={{...S.card,padding:0,overflowX:"auto"}}>
                   <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:400}}>
                     <thead>
-                      <tr style={{borderBottom:"1px solid rgba(255,255,255,0.1)"}}>
-                        <th style={{textAlign:"left",padding:"8px 12px",fontSize:10,color:"#555",textTransform:"uppercase",letterSpacing:0.7,background:"#131318",position:"sticky",left:0,zIndex:1,minWidth:180}}>Concepto</th>
-                        {mesesFiltrados.map(m=><th key={m} style={{textAlign:"right",padding:"8px 10px",fontSize:10,color:"#555",textTransform:"uppercase",minWidth:110,whiteSpace:"nowrap"}}>{MESES_NOM[+m]}</th>)}
-                        <th style={{textAlign:"right",padding:"8px 10px",fontSize:10,color:"#888",textTransform:"uppercase",minWidth:110,fontWeight:700,borderLeft:"1px solid rgba(255,255,255,0.08)"}}>Total</th>
+                      <tr style={{borderBottom:"1px solid rgba(221,184,99,0.18)"}}>
+                        <th style={{textAlign:"left",padding:"8px 12px",fontSize:10,color:"#8C8C8C",textTransform:"uppercase",letterSpacing:0.7,background:"#141414",position:"sticky",left:0,zIndex:1,minWidth:180}}>Concepto</th>
+                        {mesesFiltrados.map(m=><th key={m} style={{textAlign:"right",padding:"8px 10px",fontSize:10,color:"#8C8C8C",textTransform:"uppercase",minWidth:110,whiteSpace:"nowrap"}}>{MESES_NOM[+m]}</th>)}
+                        <th style={{textAlign:"right",padding:"8px 10px",fontSize:10,color:"#8C8C8C",textTransform:"uppercase",minWidth:110,fontWeight:700,borderLeft:"1px solid rgba(221,184,99,0.15)"}}>Total</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -962,9 +962,9 @@ export default function FinCFO() {
                         const rt=rowTot("Ingresos");
                         return (
                           <tr style={{borderBottom:"2px solid rgba(96,240,160,0.2)",background:"rgba(96,240,160,0.04)"}}>
-                            <td style={{padding:"7px 12px",fontSize:12,fontWeight:700,color:"#60f0a0",background:"rgba(96,240,160,0.04)",position:"sticky",left:0,borderRight:"1px solid rgba(255,255,255,0.06)"}}>Cobros por ingresos</td>
+                            <td style={{padding:"7px 12px",fontSize:12,fontWeight:700,color:"#4CAF82",background:"rgba(96,240,160,0.04)",position:"sticky",left:0,borderRight:"1px solid rgba(221,184,99,0.12)"}}>Cobros por ingresos</td>
                             {mesesFiltrados.map(m=>{const v=pvGet("Ingresos",m);return <td key={m} style={cellSt(v)}>{fmtCell(v)}</td>;})}
-                            <td style={{...cellSt(rt),borderLeft:"1px solid rgba(255,255,255,0.08)",fontWeight:800}}>{fmtCell(rt)}</td>
+                            <td style={{...cellSt(rt),borderLeft:"1px solid rgba(221,184,99,0.15)",fontWeight:800}}>{fmtCell(rt)}</td>
                           </tr>
                         );
                       })()}
@@ -976,7 +976,7 @@ export default function FinCFO() {
                         const color=GRUPO_COLOR[grupo];
                         const bg=GRUPO_BG[grupo];
                         return [
-                          <tr key={`hdr-${grupo}`} style={{background:bg,borderTop:"1px solid rgba(255,255,255,0.08)"}}>
+                          <tr key={`hdr-${grupo}`} style={{background:bg,borderTop:"1px solid rgba(221,184,99,0.15)"}}>
                             <td colSpan={mesesFiltrados.length+2} style={{padding:"6px 12px",fontSize:10,fontWeight:700,color,textTransform:"uppercase",letterSpacing:1,background:bg,position:"sticky",left:0}}>
                               {GRUPO_LABEL[grupo]||grupo}
                             </td>
@@ -988,25 +988,25 @@ export default function FinCFO() {
                               <tr key={fila} style={{borderBottom:"1px solid rgba(255,255,255,0.03)",background:i%2===0?"transparent":"rgba(255,255,255,0.01)"}}
                                 onMouseEnter={e=>e.currentTarget.style.background="rgba(200,240,96,0.04)"}
                                 onMouseLeave={e=>e.currentTarget.style.background=i%2===0?"transparent":"rgba(255,255,255,0.01)"}>
-                                <td style={{padding:"5px 12px 5px 20px",fontSize:12,color:hasData?"#ede8e0":"#333",background:"#131318",position:"sticky",left:0,borderRight:"1px solid rgba(255,255,255,0.06)"}}>{fila}</td>
+                                <td style={{padding:"5px 12px 5px 20px",fontSize:12,color:hasData?"#F8F4E8":"#333",background:"#141414",position:"sticky",left:0,borderRight:"1px solid rgba(221,184,99,0.12)"}}>{fila}</td>
                                 {mesesFiltrados.map(m=>{const v=pvGet(fila,m);return <td key={m} style={{...cellSt(v),fontSize:11}}>{fmtCell(v)}</td>;})}
-                                <td style={{...cellSt(rt),borderLeft:"1px solid rgba(255,255,255,0.08)",background:"rgba(255,255,255,0.02)",fontWeight:700,fontSize:11}}>{fmtCell(rt)}</td>
+                                <td style={{...cellSt(rt),borderLeft:"1px solid rgba(221,184,99,0.15)",background:"rgba(255,255,255,0.02)",fontWeight:700,fontSize:11}}>{fmtCell(rt)}</td>
                               </tr>
                             );
                           }),
-                          <tr key={`sub-${grupo}`} style={{borderTop:"1px solid rgba(255,255,255,0.08)",borderBottom:"1px solid rgba(255,255,255,0.04)",background:bg}}>
-                            <td style={{padding:"6px 12px",fontSize:11,fontWeight:700,color,background:bg,position:"sticky",left:0,borderRight:"1px solid rgba(255,255,255,0.06)"}}>Total {GRUPO_LABEL[grupo]||grupo}</td>
-                            {mesesFiltrados.map(m=>{const v=gTotM(m);return <td key={m} style={{...cellSt(v),fontFamily:"Syne",fontWeight:700,color:v!==0?color:"#333"}}>{fmtCell(v)}</td>;})}
-                            <td style={{...cellSt(gTot),fontFamily:"Syne",fontWeight:800,borderLeft:"1px solid rgba(255,255,255,0.08)",background:bg,color:gTot!==0?color:"#333"}}>{fmtCell(gTot)}</td>
+                          <tr key={`sub-${grupo}`} style={{borderTop:"1px solid rgba(221,184,99,0.15)",borderBottom:"1px solid rgba(255,255,255,0.04)",background:bg}}>
+                            <td style={{padding:"6px 12px",fontSize:11,fontWeight:700,color,background:bg,position:"sticky",left:0,borderRight:"1px solid rgba(221,184,99,0.12)"}}>Total {GRUPO_LABEL[grupo]||grupo}</td>
+                            {mesesFiltrados.map(m=>{const v=gTotM(m);return <td key={m} style={{...cellSt(v),fontFamily:"Lora",fontWeight:700,color:v!==0?color:"#333"}}>{fmtCell(v)}</td>;})}
+                            <td style={{...cellSt(gTot),fontFamily:"Lora",fontWeight:800,borderLeft:"1px solid rgba(221,184,99,0.15)",background:bg,color:gTot!==0?color:"#333"}}>{fmtCell(gTot)}</td>
                           </tr>
                         ];
                       })}
                     </tbody>
                     <tfoot>
-                      <tr style={{borderTop:"2px solid rgba(255,255,255,0.15)",background:"#0e0e16"}}>
-                        <td style={{padding:"8px 12px",fontSize:11,fontWeight:700,color:"#888",position:"sticky",left:0,background:"#0e0e16",borderRight:"1px solid rgba(255,255,255,0.06)"}}>NETO</td>
-                        {mesesFiltrados.map(m=>{const v=colTot(m);return <td key={m} style={{...cellSt(v),fontFamily:"Syne",fontWeight:800,fontSize:12}}>{fmtCell(v)}</td>;})}
-                        <td style={{...cellSt(grandTot),fontFamily:"Syne",fontWeight:800,fontSize:12,borderLeft:"1px solid rgba(255,255,255,0.08)",background:"rgba(255,255,255,0.04)"}}>{fmtCell(grandTot)}</td>
+                      <tr style={{borderTop:"2px solid rgba(221,184,99,0.22)",background:"#111111"}}>
+                        <td style={{padding:"8px 12px",fontSize:11,fontWeight:700,color:"#8C8C8C",position:"sticky",left:0,background:"#111111",borderRight:"1px solid rgba(221,184,99,0.12)"}}>NETO</td>
+                        {mesesFiltrados.map(m=>{const v=colTot(m);return <td key={m} style={{...cellSt(v),fontFamily:"Lora",fontWeight:800,fontSize:12}}>{fmtCell(v)}</td>;})}
+                        <td style={{...cellSt(grandTot),fontFamily:"Lora",fontWeight:800,fontSize:12,borderLeft:"1px solid rgba(221,184,99,0.15)",background:"rgba(255,255,255,0.04)"}}>{fmtCell(grandTot)}</td>
                       </tr>
                     </tfoot>
                   </table>
@@ -1017,58 +1017,58 @@ export default function FinCFO() {
             {/* ── CONCILIACIÓN BANCARIA ── */}
             {reportTab==="conciliacion" && (
               <>
-                <div style={{fontSize:11,color:"#555",marginBottom:14}}>Una tabla por banco · saldo inicial y final editables · control = 0 si no hay errores</div>
+                <div style={{fontSize:11,color:"#8C8C8C",marginBottom:14}}>Una tabla por banco · saldo inicial y final editables · control = 0 si no hay errores</div>
                 {BANCOS_CONC.map(({id,label,moneda})=>(
                   <div key={id} style={{...S.card,padding:0,overflowX:"auto",marginBottom:16}}>
                     <div style={{padding:"10px 16px",background:"rgba(255,255,255,0.025)",borderBottom:"1px solid rgba(255,255,255,0.07)",display:"flex",alignItems:"center",gap:10}}>
-                      <div style={{fontFamily:"Syne",fontSize:14,fontWeight:800}}>{label}</div>
-                      <span style={{fontSize:10,fontWeight:600,borderRadius:3,padding:"2px 8px",color:moneda==="USD"?"#f0c060":"#60c8f0",background:moneda==="USD"?"rgba(240,192,96,0.1)":"rgba(96,200,240,0.1)",border:`1px solid ${moneda==="USD"?"rgba(240,192,96,0.25)":"rgba(96,200,240,0.25)"}`}}>{moneda}</span>
-                      <span style={{fontSize:10,color:"#444"}}>{moneda==="UYU"?"Dif. de cambio = 0":"Dif. de cambio calculada automáticamente"}</span>
+                      <div style={{fontFamily:"Lora",fontSize:14,fontWeight:800}}>{label}</div>
+                      <span style={{fontSize:10,fontWeight:600,borderRadius:3,padding:"2px 8px",color:moneda==="USD"?"#f0c060":"#1D445C",background:moneda==="USD"?"rgba(240,192,96,0.1)":"rgba(96,200,240,0.1)",border:`1px solid ${moneda==="USD"?"rgba(240,192,96,0.25)":"rgba(96,200,240,0.25)"}`}}>{moneda}</span>
+                      <span style={{fontSize:10,color:"#4A4A4A"}}>{moneda==="UYU"?"Dif. de cambio = 0":"Dif. de cambio calculada automáticamente"}</span>
                     </div>
                     <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
                       <thead>
-                        <tr style={{borderBottom:"1px solid rgba(255,255,255,0.08)"}}>
-                          <th style={{textAlign:"left",padding:"7px 14px",fontSize:10,color:"#555",textTransform:"uppercase",letterSpacing:0.7,minWidth:220,background:"#131318",position:"sticky",left:0,zIndex:1}}>Concepto</th>
-                          {MESES_DISP.map(m=><th key={m} style={{textAlign:"right",padding:"7px 12px",fontSize:10,color:"#555",textTransform:"uppercase",minWidth:130,whiteSpace:"nowrap"}}>{MESES_NOM[+m]}</th>)}
+                        <tr style={{borderBottom:"1px solid rgba(221,184,99,0.15)"}}>
+                          <th style={{textAlign:"left",padding:"7px 14px",fontSize:10,color:"#8C8C8C",textTransform:"uppercase",letterSpacing:0.7,minWidth:220,background:"#141414",position:"sticky",left:0,zIndex:1}}>Concepto</th>
+                          {MESES_DISP.map(m=><th key={m} style={{textAlign:"right",padding:"7px 12px",fontSize:10,color:"#8C8C8C",textTransform:"uppercase",minWidth:130,whiteSpace:"nowrap"}}>{MESES_NOM[+m]}</th>)}
                         </tr>
                       </thead>
                       <tbody>
                         <tr style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
-                          <td style={{padding:"6px 14px",fontSize:11,color:"#888",background:"#131318",position:"sticky",left:0,borderRight:"1px solid rgba(255,255,255,0.05)"}}>Saldo inicial <span style={{fontSize:9,color:"#555"}}>· editable</span></td>
+                          <td style={{padding:"6px 14px",fontSize:11,color:"#8C8C8C",background:"#141414",position:"sticky",left:0,borderRight:"1px solid rgba(255,255,255,0.05)"}}>Saldo inicial <span style={{fontSize:9,color:"#8C8C8C"}}>· editable</span></td>
                           {MESES_DISP.map(m=>(
                             <td key={m} style={{padding:"4px 6px"}}>
-                              <input type="number" step="0.01" value={getSI(id,m)} onChange={e=>editSI(id,m,e.target.value)} style={inpSt("#888")}/>
+                              <input type="number" step="0.01" value={getSI(id,m)} onChange={e=>editSI(id,m,e.target.value)} style={inpSt("#8C8C8C")}/>
                             </td>
                           ))}
                         </tr>
                         <tr style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
-                          <td style={{padding:"7px 14px 7px 24px",fontSize:11,color:"#c8f060",background:"#131318",position:"sticky",left:0,borderRight:"1px solid rgba(255,255,255,0.05)"}}>+ Flujo finanzas personales</td>
-                          {MESES_DISP.map(m=>{const v=getFlPers(id,m);return <td key={m} style={{textAlign:"right",padding:"7px 12px",fontFamily:"Syne",fontSize:11,fontWeight:600,color:v>0?"#60f0a0":v<0?"#f06060":"#444"}}>{fmtC(v,moneda)}</td>;})}
+                          <td style={{padding:"7px 14px 7px 24px",fontSize:11,color:"#DDB863",background:"#141414",position:"sticky",left:0,borderRight:"1px solid rgba(255,255,255,0.05)"}}>+ Flujo finanzas personales</td>
+                          {MESES_DISP.map(m=>{const v=getFlPers(id,m);return <td key={m} style={{textAlign:"right",padding:"7px 12px",fontFamily:"Lora",fontSize:11,fontWeight:600,color:v>0?"#4CAF82":v<0?"#f06060":"#4A4A4A"}}>{fmtC(v,moneda)}</td>;})}
                         </tr>
                         <tr style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
-                          <td style={{padding:"7px 14px 7px 24px",fontSize:11,color:"#60c8f0",background:"#131318",position:"sticky",left:0,borderRight:"1px solid rgba(255,255,255,0.05)"}}>+ Flujo negocio</td>
-                          {MESES_DISP.map(m=>{const v=getFlNeg(id,m);return <td key={m} style={{textAlign:"right",padding:"7px 12px",fontFamily:"Syne",fontSize:11,fontWeight:600,color:v>0?"#60f0a0":v<0?"#f06060":"#444"}}>{v!==0?fmtC(v,moneda):"—"}</td>;})}
+                          <td style={{padding:"7px 14px 7px 24px",fontSize:11,color:"#1D445C",background:"#141414",position:"sticky",left:0,borderRight:"1px solid rgba(255,255,255,0.05)"}}>+ Flujo negocio</td>
+                          {MESES_DISP.map(m=>{const v=getFlNeg(id,m);return <td key={m} style={{textAlign:"right",padding:"7px 12px",fontFamily:"Lora",fontSize:11,fontWeight:600,color:v>0?"#4CAF82":v<0?"#f06060":"#4A4A4A"}}>{v!==0?fmtC(v,moneda):"—"}</td>;})}
                         </tr>
                         {moneda==="USD"&&(
                           <tr style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
-                            <td style={{padding:"7px 14px 7px 24px",fontSize:11,color:"#666",background:"#131318",position:"sticky",left:0,borderRight:"1px solid rgba(255,255,255,0.05)"}}>+ Dif. de cambio <span style={{fontSize:9,color:"#555"}}>· calculada</span></td>
-                            {MESES_DISP.map(m=>{const v=getDC(id,m,moneda);return <td key={m} style={{textAlign:"right",padding:"7px 12px",fontFamily:"Syne",fontSize:11,fontWeight:600,color:v>0?"#60f0a0":v<0?"#f06060":"#444"}}>{fmtC(v,moneda)}</td>;})}
+                            <td style={{padding:"7px 14px 7px 24px",fontSize:11,color:"#4A4A4A",background:"#141414",position:"sticky",left:0,borderRight:"1px solid rgba(255,255,255,0.05)"}}>+ Dif. de cambio <span style={{fontSize:9,color:"#8C8C8C"}}>· calculada</span></td>
+                            {MESES_DISP.map(m=>{const v=getDC(id,m,moneda);return <td key={m} style={{textAlign:"right",padding:"7px 12px",fontFamily:"Lora",fontSize:11,fontWeight:600,color:v>0?"#4CAF82":v<0?"#f06060":"#4A4A4A"}}>{fmtC(v,moneda)}</td>;})}
                           </tr>
                         )}
-                        <tr style={{borderBottom:"2px solid rgba(255,255,255,0.1)",background:"rgba(255,255,255,0.015)"}}>
-                          <td style={{padding:"7px 14px",fontSize:11,fontWeight:700,color:"#888",background:"rgba(255,255,255,0.015)",position:"sticky",left:0,borderRight:"1px solid rgba(255,255,255,0.05)"}}>= Saldo esperado</td>
-                          {MESES_DISP.map(m=>{const v=getSI(id,m)+getFl(id,m)+(moneda==="USD"?getDC(id,m,moneda):0);return <td key={m} style={{textAlign:"right",padding:"7px 12px",fontFamily:"Syne",fontSize:12,fontWeight:700,color:"#ede8e0"}}>{fmtC(v,moneda)}</td>;})}
+                        <tr style={{borderBottom:"2px solid rgba(221,184,99,0.18)",background:"rgba(255,255,255,0.015)"}}>
+                          <td style={{padding:"7px 14px",fontSize:11,fontWeight:700,color:"#8C8C8C",background:"rgba(255,255,255,0.015)",position:"sticky",left:0,borderRight:"1px solid rgba(255,255,255,0.05)"}}>= Saldo esperado</td>
+                          {MESES_DISP.map(m=>{const v=getSI(id,m)+getFl(id,m)+(moneda==="USD"?getDC(id,m,moneda):0);return <td key={m} style={{textAlign:"right",padding:"7px 12px",fontFamily:"Lora",fontSize:12,fontWeight:700,color:"#F8F4E8"}}>{fmtC(v,moneda)}</td>;})}
                         </tr>
-                        <tr style={{borderBottom:"1px solid rgba(255,255,255,0.08)"}}>
-                          <td style={{padding:"6px 14px",fontSize:11,color:"#60c8f0",background:"#131318",position:"sticky",left:0,borderRight:"1px solid rgba(255,255,255,0.05)"}}>Saldo final (extracto) <span style={{fontSize:9,color:"#555"}}>· editable</span></td>
+                        <tr style={{borderBottom:"1px solid rgba(221,184,99,0.15)"}}>
+                          <td style={{padding:"6px 14px",fontSize:11,color:"#1D445C",background:"#141414",position:"sticky",left:0,borderRight:"1px solid rgba(255,255,255,0.05)"}}>Saldo final (extracto) <span style={{fontSize:9,color:"#8C8C8C"}}>· editable</span></td>
                           {MESES_DISP.map(m=>(
                             <td key={m} style={{padding:"4px 6px"}}>
-                              <input type="number" step="0.01" value={getSF(id,m)} onChange={e=>editSF(id,m,e.target.value)} style={inpSt("#60c8f0")}/>
+                              <input type="number" step="0.01" value={getSF(id,m)} onChange={e=>editSF(id,m,e.target.value)} style={inpSt("#1D445C")}/>
                             </td>
                           ))}
                         </tr>
                         <tr>
-                          <td style={{padding:"8px 14px",fontSize:11,fontWeight:800,color:"#555",background:"#0d0d10",position:"sticky",left:0,borderRight:"1px solid rgba(255,255,255,0.05)"}}>Control</td>
+                          <td style={{padding:"8px 14px",fontSize:11,fontWeight:800,color:"#8C8C8C",background:"#0d0d10",position:"sticky",left:0,borderRight:"1px solid rgba(255,255,255,0.05)"}}>Control</td>
                           {MESES_DISP.map(m=>{
                             const ctrl=getSI(id,m)+getFl(id,m)+(moneda==="USD"?getDC(id,m,moneda):0)-getSF(id,m);
                             return <td key={m} style={ctrlSt(ctrl)}>{Math.abs(ctrl)<0.1?"✓ 0":fmtC(ctrl,moneda)}</td>;
@@ -1085,14 +1085,14 @@ export default function FinCFO() {
         {/* ── CONFIGURACIÓN ── */}
         {mainTab==="config" && (
           <>
-            <div style={{fontFamily:"Syne",fontSize:18,fontWeight:800,marginBottom:4}}>Configuración</div>
-            <div style={{color:"#555",fontSize:12,marginBottom:16}}>Gestioná tus bancos y tarjetas. Solo los activos aparecen en el formulario.</div>
+            <div style={{fontFamily:"Lora",fontSize:18,fontWeight:800,marginBottom:4}}>Configuración</div>
+            <div style={{color:"#8C8C8C",fontSize:12,marginBottom:16}}>Gestioná tus bancos y tarjetas. Solo los activos aparecen en el formulario.</div>
 
             {/* Sub-tabs */}
             <div style={{display:"flex",gap:6,marginBottom:16}}>
               {[["bancos","🏦 Bancos y cuentas"],["tarjetas","💳 Tarjetas"]].map(([k,l])=>(
                 <button key={k} onClick={()=>setConfigTab(k)}
-                  style={{background:configTab===k?"rgba(200,240,96,0.1)":"#131318",border:`1px solid ${configTab===k?"rgba(200,240,96,0.35)":"rgba(255,255,255,0.06)"}`,color:configTab===k?"#c8f060":"#555",borderRadius:5,padding:"7px 16px",fontFamily:"DM Mono",fontSize:11,cursor:"pointer"}}>
+                  style={{background:configTab===k?"rgba(221,184,99,0.12)":"#141414",border:`1px solid ${configTab===k?"rgba(221,184,99,0.45)":"rgba(221,184,99,0.12)"}`,color:configTab===k?"#DDB863":"#8C8C8C",borderRadius:5,padding:"7px 16px",fontFamily:"Roboto",fontSize:11,cursor:"pointer"}}>
                   {l}
                 </button>
               ))}
@@ -1103,12 +1103,12 @@ export default function FinCFO() {
               <>
                 {/* Tabla de bancos */}
                 <div style={{...S.card,padding:0,marginBottom:16}}>
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 80px 100px 80px 80px",gap:4,padding:"8px 14px",fontSize:10,color:"#444",textTransform:"uppercase",letterSpacing:0.5,borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 80px 100px 80px 80px",gap:4,padding:"8px 14px",fontSize:10,color:"#4A4A4A",textTransform:"uppercase",letterSpacing:0.5,borderBottom:"1px solid rgba(221,184,99,0.12)"}}>
                     <div>Nombre</div><div>Moneda</div><div>Tipo</div><div style={{textAlign:"center"}}>Activo</div><div></div>
                   </div>
                   {config.bancos.map(b=>(
                     <div key={b.id} style={{display:"grid",gridTemplateColumns:"1fr 80px 100px 80px 80px",gap:4,padding:"10px 14px",alignItems:"center",borderBottom:"1px solid rgba(255,255,255,0.04)"}}
-                      onMouseEnter={e=>e.currentTarget.style.background="#1c1c26"}
+                      onMouseEnter={e=>e.currentTarget.style.background="#1E1E1E"}
                       onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                       {editingConfig?.id===b.id && editingConfig?.table==="bancos" ? (
                         <>
@@ -1127,24 +1127,24 @@ export default function FinCFO() {
                           </div>
                           <div style={{display:"flex",gap:4}}>
                             <button onClick={()=>{setConfig(p=>({...p,bancos:p.bancos.map(x=>x.id===b.id?{...editingConfig}:x)}));setEditingConfig(null);}}
-                              style={{background:"#c8f060",border:"none",borderRadius:3,color:"#09090d",fontFamily:"DM Mono",fontSize:10,padding:"3px 8px",cursor:"pointer",fontWeight:700}}>✓</button>
+                              style={{background:"#DDB863",border:"none",borderRadius:3,color:"#0A0A0A",fontFamily:"Roboto",fontSize:10,padding:"3px 8px",cursor:"pointer",fontWeight:700}}>✓</button>
                             <button onClick={()=>setEditingConfig(null)}
-                              style={{background:"none",border:"1px solid rgba(255,255,255,0.1)",borderRadius:3,color:"#555",fontFamily:"DM Mono",fontSize:10,padding:"3px 6px",cursor:"pointer"}}>✕</button>
+                              style={{background:"none",border:"1px solid rgba(221,184,99,0.18)",borderRadius:3,color:"#8C8C8C",fontFamily:"Roboto",fontSize:10,padding:"3px 6px",cursor:"pointer"}}>✕</button>
                           </div>
                         </>
                       ) : (
                         <>
-                          <div style={{fontSize:12,fontWeight:b.activo?600:400,color:b.activo?"#ede8e0":"#555"}}>{b.nombre}</div>
-                          <div><span style={{fontSize:10,padding:"2px 7px",borderRadius:3,background:b.moneda==="USD"?"rgba(240,192,96,0.15)":"rgba(96,200,240,0.15)",color:b.moneda==="USD"?"#f0c060":"#60c8f0"}}>{b.moneda}</span></div>
-                          <div style={{fontSize:11,color:"#666"}}>{b.tipo}</div>
+                          <div style={{fontSize:12,fontWeight:b.activo?600:400,color:b.activo?"#F8F4E8":"#8C8C8C"}}>{b.nombre}</div>
+                          <div><span style={{fontSize:10,padding:"2px 7px",borderRadius:3,background:b.moneda==="USD"?"rgba(240,192,96,0.15)":"rgba(96,200,240,0.15)",color:b.moneda==="USD"?"#f0c060":"#1D445C"}}>{b.moneda}</span></div>
+                          <div style={{fontSize:11,color:"#4A4A4A"}}>{b.tipo}</div>
                           <div style={{textAlign:"center"}}>
-                            <span style={{fontSize:10,padding:"2px 8px",borderRadius:10,background:b.activo?"rgba(96,240,160,0.15)":"rgba(255,255,255,0.05)",color:b.activo?"#60f0a0":"#444"}}>{b.activo?"Activo":"Inactivo"}</span>
+                            <span style={{fontSize:10,padding:"2px 8px",borderRadius:10,background:b.activo?"rgba(96,240,160,0.15)":"rgba(255,255,255,0.05)",color:b.activo?"#4CAF82":"#4A4A4A"}}>{b.activo?"Activo":"Inactivo"}</span>
                           </div>
                           <div style={{display:"flex",gap:4,justifyContent:"flex-end"}}>
                             <button onClick={()=>setEditingConfig({...b,table:"bancos"})}
-                              style={{background:"none",border:"1px solid rgba(255,255,255,0.08)",borderRadius:3,color:"#888",fontFamily:"DM Mono",fontSize:10,padding:"3px 8px",cursor:"pointer"}}>✎</button>
+                              style={{background:"none",border:"1px solid rgba(221,184,99,0.15)",borderRadius:3,color:"#8C8C8C",fontFamily:"Roboto",fontSize:10,padding:"3px 8px",cursor:"pointer"}}>✎</button>
                             <button onClick={()=>setConfig(p=>({...p,bancos:p.bancos.map(x=>x.id===b.id?{...x,activo:!x.activo}:x)}))}
-                              style={{background:"none",border:`1px solid ${b.activo?"rgba(240,96,96,0.3)":"rgba(96,240,160,0.3)"}`,borderRadius:3,color:b.activo?"#f06060":"#60f0a0",fontFamily:"DM Mono",fontSize:10,padding:"3px 8px",cursor:"pointer"}}>
+                              style={{background:"none",border:`1px solid ${b.activo?"rgba(240,96,96,0.3)":"rgba(96,240,160,0.3)"}`,borderRadius:3,color:b.activo?"#f06060":"#4CAF82",fontFamily:"Roboto",fontSize:10,padding:"3px 8px",cursor:"pointer"}}>
                               {b.activo?"Desactivar":"Activar"}
                             </button>
                           </div>
@@ -1179,7 +1179,7 @@ export default function FinCFO() {
                       if(!newBanco.nombre.trim()) return;
                       setConfig(p=>({...p,bancos:[...p.bancos,{...newBanco,id:Date.now(),activo:true}]}));
                       setNewBanco({nombre:"",moneda:"UYU",tipo:"Ambos",activo:true});
-                    }} style={{background:"#c8f060",border:"none",borderRadius:6,color:"#09090d",fontFamily:"Syne",fontSize:12,fontWeight:700,padding:"9px 16px",cursor:"pointer",whiteSpace:"nowrap"}}>
+                    }} style={{background:"#DDB863",border:"none",borderRadius:6,color:"#0A0A0A",fontFamily:"Lora",fontSize:12,fontWeight:700,padding:"9px 16px",cursor:"pointer",whiteSpace:"nowrap"}}>
                       + Agregar
                     </button>
                   </div>
@@ -1191,12 +1191,12 @@ export default function FinCFO() {
             {configTab==="tarjetas" && (
               <>
                 <div style={{...S.card,padding:0,marginBottom:16}}>
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 120px 80px 80px 80px 100px",gap:4,padding:"8px 14px",fontSize:10,color:"#444",textTransform:"uppercase",letterSpacing:0.5,borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 120px 80px 80px 80px 100px",gap:4,padding:"8px 14px",fontSize:10,color:"#4A4A4A",textTransform:"uppercase",letterSpacing:0.5,borderBottom:"1px solid rgba(221,184,99,0.12)"}}>
                     <div>Nombre</div><div>Banco emisor</div><div>Tipo</div><div>Moneda</div><div style={{textAlign:"center"}}>Activo</div><div></div>
                   </div>
                   {config.tarjetas.map(t=>(
                     <div key={t.id} style={{display:"grid",gridTemplateColumns:"1fr 120px 80px 80px 80px 100px",gap:4,padding:"10px 14px",alignItems:"center",borderBottom:"1px solid rgba(255,255,255,0.04)"}}
-                      onMouseEnter={e=>e.currentTarget.style.background="#1c1c26"}
+                      onMouseEnter={e=>e.currentTarget.style.background="#1E1E1E"}
                       onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                       {editingConfig?.id===t.id && editingConfig?.table==="tarjetas" ? (
                         <>
@@ -1215,25 +1215,25 @@ export default function FinCFO() {
                           </div>
                           <div style={{display:"flex",gap:4}}>
                             <button onClick={()=>{setConfig(p=>({...p,tarjetas:p.tarjetas.map(x=>x.id===t.id?{...editingConfig}:x)}));setEditingConfig(null);}}
-                              style={{background:"#c8f060",border:"none",borderRadius:3,color:"#09090d",fontFamily:"DM Mono",fontSize:10,padding:"3px 8px",cursor:"pointer",fontWeight:700}}>✓</button>
+                              style={{background:"#DDB863",border:"none",borderRadius:3,color:"#0A0A0A",fontFamily:"Roboto",fontSize:10,padding:"3px 8px",cursor:"pointer",fontWeight:700}}>✓</button>
                             <button onClick={()=>setEditingConfig(null)}
-                              style={{background:"none",border:"1px solid rgba(255,255,255,0.1)",borderRadius:3,color:"#555",fontFamily:"DM Mono",fontSize:10,padding:"3px 6px",cursor:"pointer"}}>✕</button>
+                              style={{background:"none",border:"1px solid rgba(221,184,99,0.18)",borderRadius:3,color:"#8C8C8C",fontFamily:"Roboto",fontSize:10,padding:"3px 6px",cursor:"pointer"}}>✕</button>
                           </div>
                         </>
                       ) : (
                         <>
-                          <div style={{fontSize:12,fontWeight:t.activo?600:400,color:t.activo?"#ede8e0":"#555"}}>{t.nombre}</div>
-                          <div style={{fontSize:11,color:"#666",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.banco}</div>
-                          <div><span style={{fontSize:10,padding:"2px 7px",borderRadius:3,background:t.tipoCarta==="crédito"?"rgba(200,96,240,0.15)":"rgba(96,200,240,0.15)",color:t.tipoCarta==="crédito"?"#c860f0":"#60c8f0"}}>{t.tipoCarta}</span></div>
-                          <div><span style={{fontSize:10,padding:"2px 7px",borderRadius:3,background:t.moneda==="USD"?"rgba(240,192,96,0.15)":"rgba(96,200,240,0.15)",color:t.moneda==="USD"?"#f0c060":"#60c8f0"}}>{t.moneda}</span></div>
+                          <div style={{fontSize:12,fontWeight:t.activo?600:400,color:t.activo?"#F8F4E8":"#8C8C8C"}}>{t.nombre}</div>
+                          <div style={{fontSize:11,color:"#4A4A4A",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.banco}</div>
+                          <div><span style={{fontSize:10,padding:"2px 7px",borderRadius:3,background:t.tipoCarta==="crédito"?"rgba(200,96,240,0.15)":"rgba(96,200,240,0.15)",color:t.tipoCarta==="crédito"?"#c860f0":"#1D445C"}}>{t.tipoCarta}</span></div>
+                          <div><span style={{fontSize:10,padding:"2px 7px",borderRadius:3,background:t.moneda==="USD"?"rgba(240,192,96,0.15)":"rgba(96,200,240,0.15)",color:t.moneda==="USD"?"#f0c060":"#1D445C"}}>{t.moneda}</span></div>
                           <div style={{textAlign:"center"}}>
-                            <span style={{fontSize:10,padding:"2px 8px",borderRadius:10,background:t.activo?"rgba(96,240,160,0.15)":"rgba(255,255,255,0.05)",color:t.activo?"#60f0a0":"#444"}}>{t.activo?"Activo":"Inactivo"}</span>
+                            <span style={{fontSize:10,padding:"2px 8px",borderRadius:10,background:t.activo?"rgba(96,240,160,0.15)":"rgba(255,255,255,0.05)",color:t.activo?"#4CAF82":"#4A4A4A"}}>{t.activo?"Activo":"Inactivo"}</span>
                           </div>
                           <div style={{display:"flex",gap:4,justifyContent:"flex-end"}}>
                             <button onClick={()=>setEditingConfig({...t,table:"tarjetas"})}
-                              style={{background:"none",border:"1px solid rgba(255,255,255,0.08)",borderRadius:3,color:"#888",fontFamily:"DM Mono",fontSize:10,padding:"3px 8px",cursor:"pointer"}}>✎</button>
+                              style={{background:"none",border:"1px solid rgba(221,184,99,0.15)",borderRadius:3,color:"#8C8C8C",fontFamily:"Roboto",fontSize:10,padding:"3px 8px",cursor:"pointer"}}>✎</button>
                             <button onClick={()=>setConfig(p=>({...p,tarjetas:p.tarjetas.map(x=>x.id===t.id?{...x,activo:!x.activo}:x)}))}
-                              style={{background:"none",border:`1px solid ${t.activo?"rgba(240,96,96,0.3)":"rgba(96,240,160,0.3)"}`,borderRadius:3,color:t.activo?"#f06060":"#60f0a0",fontFamily:"DM Mono",fontSize:10,padding:"3px 8px",cursor:"pointer"}}>
+                              style={{background:"none",border:`1px solid ${t.activo?"rgba(240,96,96,0.3)":"rgba(96,240,160,0.3)"}`,borderRadius:3,color:t.activo?"#f06060":"#4CAF82",fontFamily:"Roboto",fontSize:10,padding:"3px 8px",cursor:"pointer"}}>
                               {t.activo?"Desactivar":"Activar"}
                             </button>
                           </div>
@@ -1275,7 +1275,7 @@ export default function FinCFO() {
                       if(!newTarjeta.nombre.trim()||!newTarjeta.banco) return;
                       setConfig(p=>({...p,tarjetas:[...p.tarjetas,{...newTarjeta,id:Date.now(),activo:true}]}));
                       setNewTarjeta({nombre:"",banco:"",moneda:"UYU",tipoCarta:"crédito",tipo:"Personal",activo:true});
-                    }} style={{background:"#c8f060",border:"none",borderRadius:6,color:"#09090d",fontFamily:"Syne",fontSize:12,fontWeight:700,padding:"9px 16px",cursor:"pointer",whiteSpace:"nowrap"}}>
+                    }} style={{background:"#DDB863",border:"none",borderRadius:6,color:"#0A0A0A",fontFamily:"Lora",fontSize:12,fontWeight:700,padding:"9px 16px",cursor:"pointer",whiteSpace:"nowrap"}}>
                       + Agregar
                     </button>
                   </div>
