@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 // ── SUPABASE ─────────────────────────────────────────────────────────────────
 const SUPABASE_URL = "https://ayyglgljvlrhgcllevup.supabase.co";
-const SUPABASE_KEY = "sb_publishable_nG07KA7lKp4sIqW-ojNhbw_IO3IT8jO";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5eWdsZ2xqdmxyaGdjbGxldnVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxNjI4OTcsImV4cCI6MjA5NTczODg5N30.yDFT4fM9fjemIFbF-qFCDSR6kShO_A-uuwywB0Z1Rxs";
 
 const sb = {
   from: (table) => ({
