@@ -1,4 +1,64 @@
 import { useState, useMemo, useRef, useEffect } from "react";
+// ── SUPABASE ─────────────────────────────────────────────────────────────────
+const SUPABASE_URL = "https://ayyglgljvlrhgcllevup.supabase.co";
+const SUPABASE_KEY = "sb_publishable_nG07KA7lKp4sIqW-ojNhbw_IO3IT8jO";
+
+const sb = {
+  from: (table) => ({
+    select: async (cols="*") => {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=${cols}`, {
+        headers: {"apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`}
+      });
+      return r.json();
+    },
+    insert: async (data) => {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+        method: "POST",
+        headers: {"apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", "Prefer": "return=representation"},
+        body: JSON.stringify(data)
+      });
+      return r.json();
+    },
+    delete: async (id) => {
+      await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
+        method: "DELETE",
+        headers: {"apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`}
+      });
+    },
+  }),
+  auth: {
+    signUp: async (email, password) => {
+      const r = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
+        method: "POST",
+        headers: {"apikey": SUPABASE_KEY, "Content-Type": "application/json"},
+        body: JSON.stringify({email, password})
+      });
+      return r.json();
+    },
+    signIn: async (email, password) => {
+      const r = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+        method: "POST",
+        headers: {"apikey": SUPABASE_KEY, "Content-Type": "application/json"},
+        body: JSON.stringify({email, password})
+      });
+      return r.json();
+    },
+    signOut: async (token) => {
+      await fetch(`${SUPABASE_URL}/auth/v1/logout`, {
+        method: "POST",
+        headers: {"apikey": SUPABASE_KEY, "Authorization": `Bearer ${token}`}
+      });
+    },
+    getUser: async (token) => {
+      const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+        headers: {"apikey": SUPABASE_KEY, "Authorization": `Bearer ${token}`}
+      });
+      return r.json();
+    }
+  }
+};
+
+
 
 // ── DATOS AGREGADOS (Rivero·Malan 2026) ──────────────────────────────────────
 const AGG = {"pivot_pers":{"Ocio y cultura":{"1":-173870.17,"2":-8247.7,"3":-7145.0,"4":-7753.77},"Salud":{"1":-29785.46,"2":-9910.72,"3":-20510.21,"4":-47388.03},"Vivienda":{"1":-65798.74,"2":-5353.44,"3":-70192.89,"4":-7930.56},"Otros gastos":{"1":-10228.03,"2":-13386.12,"3":-26356.51,"4":-4903.72},"Cuidado personal":{"1":-37821.65,"2":-17104.56,"3":-22544.74,"4":-21001.54},"Transferencias":{"1":22285.0,"2":0.0},"Alimentación":{"1":-36276.92,"2":-28274.62,"3":-25097.13,"4":-19186.89},"Tarjetas":{"1":-209391.76,"2":-99540.54},"Servicios del hogar":{"1":-31467.96,"2":-55427.55,"3":-26363.26,"4":-22907.19},"Gasto de personal":{"1":-38274.0,"2":-23310.0,"3":-32957.0,"4":-34175.0},"Ingresos":{"1":597453.0,"2":203822.0,"3":547295.0,"4":476695.2},"Transporte":{"1":-31673.77,"2":-3326.85,"3":-24379.36,"4":-10523.03},"Regalos y donaciones":{"1":-8715.0,"2":-2115.0,"3":-10413.35,"4":-2084.0},"Educación":{"1":-600.0,"2":-70658.6,"3":-79147.0,"4":-80437.46},"Finanzas":{"1":-3441.8,"2":-843.75,"3":-3077.08,"4":-843.75},"Inversiones":{"3":-7800.0,"4":-4130.0},"Servicios":{"3":-12475.41,"4":-878.0},"Impuestos y trámites":{"3":-3281.79,"4":-29112.08},"Pagos":{"3":-31231.22,"4":-72889.67},"Mascotas":{"3":-945.0}},"kpi_mes":{"Deseos":{"1":-378701.36,"2":-104162.8,"3":-123771.7,"4":-27744.26},"Necesidades":{"1":-298643.9,"2":-233336.65,"3":-272345.25,"4":-334270.43},"Transferencias":{"1":22285.0,"2":0.0},"Ingresos":{"1":597453.0,"2":203822.0,"3":547295.0,"4":476695.2},"Inversiones":{"3":-7800.0,"4":-4130.0}},"pivot_neg":{"Marketing":{"1":-11700.0,"2":-46800.0,"4":-29403.0},"Servicios":{"2":-1402.05},"Ingresos":{"4":37670.9},"Licencias / suscripciones":{"4":-4680.53}},"flujo_banco":{"ITAU USD":{"1":-34910.46,"2":-47970.0,"3":-15514.2,"4":95399.1},"SCOTIABANK UYU":{"1":-30510.7,"2":67277.07,"3":-836.06,"4":39831.78},"SCOTIABANK USD":{"1":-12278.22,"2":-24960.39},"ITAU UYU":{"1":8392.12,"2":-176226.18,"3":159728.31,"4":-21093.0}},"monthly":{"1":{"ing":1110864.54,"egr":1180171.8},"2":{"ing":345161.21,"egr":527040.71},"3":{"ing":601196.91,"egr":457818.86},"4":{"ing":573496.32,"egr":459358.44}},"top_gastos":{"Tarjetas":308932.3,"Educación":234038.67,"Vivienda":149306.84,"Servicios del hogar":136187.06,"Gasto de personal":128716.0,"Alimentación":112010.87,"Salud":107593.42,"Ocio y cultura":196869.17,"Cuidado personal":98472.49},"recent":[{"f":"2026-04-30","t":"Personal","c1":"Ingresos","c2":"Sueldo","cat":"Ingresos","b":"ITAU UYU","d":"ANMA ABRIL","tot":113902.0},{"f":"2026-04-30","t":"Personal","c1":"Gasto de personal","c2":"Servicio doméstico / Niñera","cat":"Deseos","b":"SCOTIABANK UYU","d":"MIDI/TRN/ABRIL","tot":-23823.0},{"f":"2026-04-29","t":"Personal","c1":"Cuidado personal","c2":"Peluquería / Uñas / Estética","cat":"Deseos","b":"ITAU UYU","d":"Uñas","tot":-1990.0},{"f":"2026-04-28","t":"Negocio","c1":"Ingresos","c2":"Mentorías","cat":"Ingresos","b":"ITAU UYU","d":"Johanna RUMBO","tot":10000.0},{"f":"2026-04-27","t":"Personal","c1":"Pagos","c2":"Pago tarjetas","cat":"Necesidad","b":"SCOTIABANK UYU","d":"INTERNET0 PAGOTARD","tot":-36841.91},{"f":"2026-04-27","t":"Negocio","c1":"Ingresos","c2":"Mentorías","cat":"Ingresos","b":"ITAU USD","d":"METODO RUMBO","tot":27670.9},{"f":"2026-04-20","t":"Personal","c1":"Ingresos","c2":"Otros","cat":"Ingresos","b":"ITAU USD","d":"Renta del campo","tot":95518.2},{"f":"2026-04-20","t":"Negocio","c1":"Marketing","c2":"Publicidad en redes sociales","cat":"Fijo","b":"ITAU USD","d":"","tot":-23820.0}]};
@@ -70,6 +130,93 @@ export default function Moneyland() {
   const [editingId, setEditingId] = useState(null);
   const [editFechaCP, setEditFechaCP] = useState("");
   const [saved, setSaved] = useState(false);
+  const [session, setSession] = useState(null);
+  const [authMode, setAuthMode] = useState("login"); // login | register
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPass, setAuthPass] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
+  const [dbLoading, setDbLoading] = useState(false);
+
+  // Load session from localStorage on mount
+  useEffect(()=>{
+    const saved = localStorage.getItem("ml_session");
+    if(saved) { try { setSession(JSON.parse(saved)); } catch(e){} }
+  },[]);
+
+  // Load data from Supabase when session changes
+  useEffect(()=>{
+    if(!session?.access_token) return;
+    loadFromDB();
+  },[session]);
+
+  const loadFromDB = async () => {
+    if(!session?.access_token) return;
+    setDbLoading(true);
+    try {
+      const headers = {"apikey": SUPABASE_KEY, "Authorization": `Bearer ${session.access_token}`};
+      const [regsRes, bancosRes, tarjetasRes] = await Promise.all([
+        fetch(`${SUPABASE_URL}/rest/v1/registros?select=*&order=fecha.desc`, {headers}),
+        fetch(`${SUPABASE_URL}/rest/v1/bancos?select=*`, {headers}),
+        fetch(`${SUPABASE_URL}/rest/v1/tarjetas?select=*`, {headers}),
+      ]);
+      const regsData = await regsRes.json();
+      const bancosData = await bancosRes.json();
+      const tarjetasData = await tarjetasRes.json();
+      if(Array.isArray(regsData)) setRegs(regsData.map(r=>({...r, f:r.fecha, m:r.mes, b:r.banco_cob_pag, t:r.tipo, c1:r.concepto1, c2:r.concepto2, cat:r.categoria, d:r.descripcion, fm:r.forma, be:r.banco_emisor, p:r.pesos, tot:r.total})));
+      if(Array.isArray(bancosData) && bancosData.length>0) setConfig(prev=>({...prev, bancos:bancosData}));
+      if(Array.isArray(tarjetasData) && tarjetasData.length>0) setConfig(prev=>({...prev, tarjetas:tarjetasData}));
+    } catch(e){ console.error(e); }
+    setDbLoading(false);
+  };
+
+  const handleLogin = async () => {
+    setAuthLoading(true); setAuthError("");
+    const data = await sb.auth.signIn(authEmail, authPass);
+    if(data.access_token) {
+      setSession(data);
+      localStorage.setItem("ml_session", JSON.stringify(data));
+    } else {
+      setAuthError("Email o contraseña incorrectos");
+    }
+    setAuthLoading(false);
+  };
+
+  const handleRegister = async () => {
+    setAuthLoading(true); setAuthError("");
+    const data = await sb.auth.signUp(authEmail, authPass);
+    if(data.id || data.user?.id) {
+      setAuthError("¡Registro exitoso! Revisá tu email para confirmar la cuenta.");
+    } else {
+      setAuthError(data.msg || data.error_description || "Error al registrarse");
+    }
+    setAuthLoading(false);
+  };
+
+  const handleLogout = async () => {
+    if(session?.access_token) await sb.auth.signOut(session.access_token);
+    setSession(null);
+    localStorage.removeItem("ml_session");
+    setRegs(DISP_REGS);
+  };
+
+  const saveRegToDB = async (reg) => {
+    if(!session?.access_token) return;
+    await fetch(`${SUPABASE_URL}/rest/v1/registros`, {
+      method: "POST",
+      headers: {"apikey": SUPABASE_KEY, "Authorization": `Bearer ${session.access_token}`, "Content-Type": "application/json", "Prefer": "return=minimal"},
+      body: JSON.stringify({
+        user_id: session.user?.id,
+        fecha: reg.f, mes: reg.m, ano: reg.a,
+        banco_cob_pag: reg.b, tipo: reg.t,
+        concepto1: reg.c1, concepto2: reg.c2,
+        categoria: reg.cat, descripcion: reg.d,
+        forma: reg.fm, banco_emisor: reg.be,
+        plazo: reg.plazo, pesos: reg.p,
+        iva: reg.iva, total: reg.tot
+      })
+    });
+  };
   const bancoDropRef = useRef(null);
 
   useEffect(()=>{
@@ -220,7 +367,11 @@ export default function Moneyland() {
       <div style={S.bar}>
         <div style={S.logo}>Money<span style={{color:"#DDB863"}}>land</span></div>
         <div style={{fontSize:10,color:"#4A4A4A",background:"#1E1E1E",border:"1px solid rgba(255,255,255,0.07)",borderRadius:4,padding:"2px 8px",letterSpacing:1}}>RIVERO · MALAN · 2026 · UYU</div>
-        <div style={{marginLeft:"auto",fontSize:11,color:"#8C8C8C"}}>671 registros · Ene–Abr 2026</div>
+        <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:12}}>
+          {dbLoading&&<div style={{fontSize:10,color:"#DDB863"}}>Sincronizando...</div>}
+          {session?.user?.email&&<div style={{fontSize:11,color:"#8C8C8C"}}>{session.user.email}</div>}
+          <button onClick={handleLogout} style={{background:"none",border:"1px solid rgba(221,184,99,0.2)",borderRadius:4,color:"#8C8C8C",fontFamily:"Roboto",fontSize:11,padding:"3px 10px",cursor:"pointer"}}>Salir</button>
+        </div>
       </div>
 
       {/* MAIN TABS */}
