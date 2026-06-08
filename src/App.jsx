@@ -359,6 +359,51 @@ export default function Moneyland() {
 
   const selStyle = {background:"#1E1E1E",border:"1px solid rgba(221,184,99,0.18)",borderRadius:5,color:"#F8F4E8",fontFamily:"Roboto",fontSize:11,padding:"5px 8px",cursor:"pointer"};
 
+  // ── PANTALLA DE LOGIN ──────────────────────────────────────────────────────
+  if(!session?.access_token) {
+    return (
+      <div style={{minHeight:"100vh",background:"#0A0A0A",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Roboto',sans-serif"}}>
+        <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&family=Lora:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet"/>
+        <div style={{background:"#141414",border:"1px solid rgba(221,184,99,0.2)",borderRadius:12,padding:40,width:"100%",maxWidth:400,margin:"0 20px"}}>
+          <div style={{textAlign:"center",marginBottom:32}}>
+            <div style={{fontFamily:"Lora",fontSize:28,fontWeight:700,color:"#F8F4E8",marginBottom:4}}>
+              Money<span style={{color:"#DDB863"}}>land</span>
+            </div>
+            <div style={{fontSize:12,color:"#8C8C8C"}}>Tu CFO digital</div>
+          </div>
+          <div style={{display:"flex",gap:8,marginBottom:24}}>
+            {["login","register"].map(m=>(
+              <button key={m} onClick={()=>{setAuthMode(m);setAuthError("");}}
+                style={{flex:1,padding:"8px",borderRadius:6,border:`1px solid ${authMode===m?"rgba(221,184,99,0.5)":"rgba(221,184,99,0.15)"}`,background:authMode===m?"rgba(221,184,99,0.12)":"transparent",color:authMode===m?"#DDB863":"#8C8C8C",fontFamily:"Roboto",fontSize:12,cursor:"pointer"}}>
+                {m==="login"?"Iniciar sesión":"Registrarse"}
+              </button>
+            ))}
+          </div>
+          <div style={{marginBottom:16}}>
+            <label style={{display:"block",fontSize:10,color:"#8C8C8C",textTransform:"uppercase",letterSpacing:0.7,marginBottom:4}}>Email</label>
+            <input type="email" value={authEmail} onChange={e=>setAuthEmail(e.target.value)}
+              placeholder="tu@email.com"
+              onKeyDown={e=>e.key==="Enter"&&(authMode==="login"?handleLogin():handleRegister())}
+              style={{width:"100%",background:"#1E1E1E",border:"1px solid rgba(221,184,99,0.2)",borderRadius:6,padding:"10px 12px",color:"#F8F4E8",fontFamily:"Roboto",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+          </div>
+          <div style={{marginBottom:24}}>
+            <label style={{display:"block",fontSize:10,color:"#8C8C8C",textTransform:"uppercase",letterSpacing:0.7,marginBottom:4}}>Contraseña</label>
+            <input type="password" value={authPass} onChange={e=>setAuthPass(e.target.value)}
+              placeholder="••••••••"
+              onKeyDown={e=>e.key==="Enter"&&(authMode==="login"?handleLogin():handleRegister())}
+              style={{width:"100%",background:"#1E1E1E",border:"1px solid rgba(221,184,99,0.2)",borderRadius:6,padding:"10px 12px",color:"#F8F4E8",fontFamily:"Roboto",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+          </div>
+          {authError&&<div style={{fontSize:12,marginBottom:16,padding:"8px 12px",borderRadius:6,background:authError.includes("exitoso")?"rgba(76,175,130,0.1)":"rgba(240,96,96,0.1)",color:authError.includes("exitoso")?"#4CAF82":"#f06060"}}>{authError}</div>}
+          <button onClick={authMode==="login"?handleLogin:handleRegister}
+            disabled={authLoading||!authEmail||!authPass}
+            style={{width:"100%",background:"#DDB863",color:"#0A0A0A",border:"none",borderRadius:8,padding:"12px",fontFamily:"Lora",fontSize:14,fontWeight:700,cursor:"pointer",opacity:authLoading||!authEmail||!authPass?0.6:1}}>
+            {authLoading?"Cargando...":(authMode==="login"?"Entrar →":"Crear cuenta →")}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={S.page}>
       <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&family=Lora:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet"/>
