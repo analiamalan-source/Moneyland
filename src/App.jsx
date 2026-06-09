@@ -130,6 +130,16 @@ export default function Moneyland() {
   const [editingId, setEditingId] = useState(null);
   const [editFechaCP, setEditFechaCP] = useState("");
   const [saved, setSaved] = useState(false);
+  const [loadType, setLoadType] = useState("manual");
+  const [loadStep, setLoadStep] = useState("upload");
+  const [loadMovs, setLoadMovs] = useState([]);
+  const [loadError, setLoadError] = useState("");
+  const [bancoCarga, setBancoCarga] = useState("");
+  const [periodoMes, setPeriodoMes] = useState("5");
+  const [periodoAno, setPeriodoAno] = useState("2026");
+  const [fileName, setFileName] = useState("");
+  const fileRef = useRef(null);
+  const fileRef2 = useRef(null);
   const [session, setSession] = useState(null);
   const [authMode, setAuthMode] = useState("login"); // login | register
   const [authEmail, setAuthEmail] = useState("");
@@ -359,6 +369,50 @@ export default function Moneyland() {
 
   const selStyle = {background:"#1E1E1E",border:"1px solid rgba(221,184,99,0.18)",borderRadius:5,color:"#F8F4E8",fontFamily:"Roboto",fontSize:11,padding:"5px 8px",cursor:"pointer"};
 
+  const downloadTemplate = () => {
+    const csv = ["Fecha,Banco cobra/paga,Tipo,Concepto 1,Concepto 2,Descripcion,Forma cobro/pago,Banco emisor,Plazo dias,USD,TC,Pesos,IVA","2026-05-01,Itaú UYU,Personal,Alimentación,Supermercado,Devoto,Pago transferencia,Itaú UYU,0,,,1500,"].join("\n");
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv],{type:"text/csv"})); a.download = "FinCFO_plantilla.csv"; a.click();
+  };
+
+  const procesarConIA = async (texto, tipo) => {
+    setLoadStep("processing");
+    const prompt = tipo==="banco"
+      ? `Analizá este extracto bancario uruguayo. Para cada movimiento: fecha (YYYY-MM-DD), descripcion, monto (positivo=ingreso negativo=gasto), moneda (UYU/USD), tipo (Personal/Negocio), concepto1 (de: Ingresos,Ventas,Vivienda,Servicios del hogar,Alimentación,Transporte,Salud,Educación,Cuidado personal,Mascotas,Ocio y cultura,Finanzas,Impuestos y trámites,Regalos y donaciones,Imprevistos,Otros gastos,Gasto de personal,Transferencias,Tarjetas,Pagos,Inversiones,Marketing,Servicios,Personal,Honorarios,Impuestos), concepto2, esPagoTarjeta (true si paga OCA/Visa/Master), confianza (alta/media/baja). Banco: ${bancoCarga} Período: ${MESES_NOM[+periodoMes]} ${periodoAno}. Solo JSON: {"movimientos":[{"fecha":"","descripcion":"","monto":0,"moneda":"UYU","tipo":"Personal","concepto1":"","concepto2":"","esPagoTarjeta":false,"confianza":"alta"}]}`
+      : `Analizá este estado de tarjeta uruguaya. Para cada gasto: fecha (YYYY-MM-DD), descripcion, monto (positivo=gasto), moneda, tipo (Personal/Negocio), concepto1, concepto2, confianza. Ignorá pagos al banco. Tarjeta: ${bancoCarga} Período: ${MESES_NOM[+periodoMes]} ${periodoAno}. Solo JSON: {"movimientos":[{"fecha":"","descripcion":"","monto":0,"moneda":"UYU","tipo":"Personal","concepto1":"","concepto2":"","confianza":"alta"}],"totalTarjeta":0}`;
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:`${prompt}\n\nArchivo:\n${texto.slice(0,4000)}`}]})});
+      const data = await res.json();
+      const parsed = JSON.parse((data.content?.[0]?.text||"{}").replace(/```json|```/g,"").trim());
+      const movs = (parsed.movimientos||[]).map((m,i)=>({id:i+1,f:m.fecha,m:String(new Date(m.fecha||"2026-01-01").getMonth()+1),b:bancoCarga,t:m.tipo||"Personal",c1:m.concepto1,c2:m.concepto2||"",cat:TX[m.tipo||"Personal"]?.[m.concepto1]?.cat||"",d:m.descripcion,fm:tipo==="banco"?"Pago transferencia":"Pago crédito",be:bancoCarga,plazo:"0",p:Math.abs(m.monto||0)*(m.monto<0?-1:1),iva:null,tot:m.monto||0,moneda:m.moneda||"UYU",esPagoTarjeta:m.esPagoTarjeta||false,confianza:m.confianza||"alta",pendiente:m.esPagoTarjeta||false}));
+      setLoadMovs(movs); setLoadStep("review");
+    } catch(e) { setLoadError("Error al procesar. Verificá el archivo."); setLoadStep("upload"); }
+  };
+
+  const handleFile = async (file, tipo) => {
+    setFileName(file.name); setLoadError("");
+    const text = await file.text();
+    if(tipo==="masiva"){
+      const lines = text.split("\n").filter(l=>l.trim());
+      const hdr = lines[0].split(",");
+      const movs = [];
+      for(let i=1;i<lines.length;i++){
+        const cols = lines[i].split(",");
+        if(cols.length<3) continue;
+        const get=(n)=>{const idx=hdr.findIndex(h=>h.toLowerCase().includes(n.toLowerCase()));return idx>=0?(cols[idx]||"").trim():"";};
+        const f=get("fecha"),c1=get("concepto 1");
+        if(!f||!c1) continue;
+        const p=parseFloat(get("pesos"))||0,iv=parseFloat(get("iva"))||null;
+        movs.push({id:i,f,m:String(new Date(f).getMonth()+1),b:get("banco"),t:get("tipo")||"Personal",c1,c2:get("concepto 2"),cat:TX[get("tipo")||"Personal"]?.[c1]?.cat||"",d:get("descripcion"),fm:get("forma"),be:get("banco emisor"),plazo:get("plazo"),p,iva:iv,tot:p+(iv||0),pendiente:false,confianza:"alta"});
+      }
+      setLoadMovs(movs); setLoadStep("review");
+    } else await procesarConIA(text, tipo);
+  };
+
+  const confirmar = () => {
+    setRegs(prev=>[...loadMovs.filter(m=>!m.pendiente).map(m=>({...m,id:Date.now()+m.id})),...prev]);
+    setLoadStep("done"); setLoadMovs([]);
+  };
+
   // ── PANTALLA DE LOGIN ──────────────────────────────────────────────────────
   if(!session?.access_token) {
     return (
@@ -512,11 +566,146 @@ export default function Moneyland() {
           </>
         )}
 
-        {/* ── FORMULARIO ── */}
+        {/* ── + NUEVO ── */}
         {mainTab==="form" && (
           <>
-            <div style={{fontFamily:"Lora",fontSize:18,fontWeight:800,marginBottom:4}}>Nuevo registro</div>
-            <div style={{color:"#8C8C8C",fontSize:12,marginBottom:16}}>Los campos * se calculan automáticamente</div>
+            <div style={{fontFamily:"Lora",fontSize:18,fontWeight:800,marginBottom:16}}>Nuevo registro</div>
+
+            {/* Selector de modo */}
+            <div style={{...S.g4,marginBottom:20}}>
+              {[{k:"manual",i:"✏️",t:"Manual",d:"Un registro"},{k:"masiva",i:"📊",t:"Carga masiva",d:"Subí un CSV"},{k:"banco",i:"🏦",t:"Extracto banco",d:"IA categoriza"},{k:"tarjeta",i:"💳",t:"Tarjeta crédito",d:"IA categoriza"}].map(o=>(
+                <div key={o.k} onClick={()=>{setLoadType(o.k);setLoadStep("upload");setLoadMovs([]);setLoadError("");setFileName("");}}
+                  style={{...S.card,cursor:"pointer",border:`1px solid ${loadType===o.k?"rgba(221,184,99,0.4)":"rgba(221,184,99,0.12)"}`,background:loadType===o.k?"rgba(221,184,99,0.08)":"#141414",marginBottom:0,transition:"all .1s"}}>
+                  <div style={{fontSize:22,marginBottom:6}}>{o.i}</div>
+                  <div style={{fontFamily:"Lora",fontSize:12,fontWeight:700,color:loadType===o.k?"#DDB863":"#F8F4E8",marginBottom:3}}>{o.t}</div>
+                  <div style={{fontSize:10,color:"#8C8C8C"}}>{o.d}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* CARGA MASIVA */}
+            {loadType==="masiva"&&loadStep==="upload"&&(
+              <div style={S.card}>
+                <div style={S.secT}>Carga masiva</div>
+                <p style={{fontSize:12,color:"#8C8C8C",marginBottom:16}}>Descargá la plantilla, completala y subila. Ideal para carga inicial histórica.</p>
+                <button onClick={downloadTemplate} style={{background:"rgba(221,184,99,0.1)",border:"1px solid rgba(221,184,99,0.3)",borderRadius:6,color:"#DDB863",fontFamily:"Lora",fontSize:13,fontWeight:700,padding:"10px 20px",cursor:"pointer",marginBottom:20,display:"block"}}>⬇ Descargar plantilla CSV</button>
+                <div style={{border:"1.5px dashed rgba(221,184,99,0.2)",borderRadius:8,padding:32,textAlign:"center",cursor:"pointer"}}
+                  onClick={()=>fileRef.current?.click()}
+                  onMouseEnter={e=>e.currentTarget.style.borderColor="rgba(221,184,99,0.5)"}
+                  onMouseLeave={e=>e.currentTarget.style.borderColor="rgba(221,184,99,0.2)"}>
+                  <div style={{fontSize:28,marginBottom:8}}>📂</div>
+                  <div style={{fontSize:13,color:"#8C8C8C"}}>{fileName||"Subir CSV completado"}</div>
+                  <input ref={fileRef} type="file" accept=".csv,.txt" style={{display:"none"}} onChange={e=>handleFile(e.target.files[0],"masiva")}/>
+                </div>
+                {loadError&&<div style={{color:"#f06060",fontSize:12,marginTop:10}}>{loadError}</div>}
+              </div>
+            )}
+
+            {/* BANCO / TARJETA — UPLOAD */}
+            {(loadType==="banco"||loadType==="tarjeta")&&loadStep==="upload"&&(
+              <div style={S.card}>
+                <div style={S.secT}>{loadType==="banco"?"Estado de cuenta bancario":"Estado de cuenta de tarjeta"}</div>
+                <div style={{...S.g3,marginBottom:16}}>
+                  <div>
+                    <label style={S.lbl}>{loadType==="banco"?"Banco":"Tarjeta"}</label>
+                    <select value={bancoCarga} onChange={e=>setBancoCarga(e.target.value)} style={S.sel}>
+                      <option value="">— seleccionar —</option>
+                      {(loadType==="banco"?bancosActivos:tarjetasActivas).map(b=><option key={b}>{b}</option>)}
+                    </select>
+                    {!bancoCarga&&<div style={{fontSize:10,color:"#f06060",marginTop:4}}>Crealo primero en ⚙ Config</div>}
+                  </div>
+                  <div><label style={S.lbl}>Mes</label>
+                    <select value={periodoMes} onChange={e=>setPeriodoMes(e.target.value)} style={S.sel}>
+                      {["1","2","3","4","5","6","7","8","9","10","11","12"].map(m=><option key={m} value={m}>{MESES_NOM[+m]}</option>)}
+                    </select>
+                  </div>
+                  <div><label style={S.lbl}>Año</label><input type="number" value={periodoAno} onChange={e=>setPeriodoAno(e.target.value)} style={S.inp}/></div>
+                </div>
+                <div style={{border:"1.5px dashed rgba(221,184,99,0.2)",borderRadius:8,padding:32,textAlign:"center",cursor:bancoCarga?"pointer":"not-allowed",opacity:bancoCarga?1:0.5}}
+                  onClick={()=>bancoCarga&&fileRef2.current?.click()}
+                  onMouseEnter={e=>bancoCarga&&(e.currentTarget.style.borderColor="rgba(221,184,99,0.5)")}
+                  onMouseLeave={e=>e.currentTarget.style.borderColor="rgba(221,184,99,0.2)"}>
+                  <div style={{fontSize:28,marginBottom:8}}>{loadType==="banco"?"🏦":"💳"}</div>
+                  <div style={{fontSize:13,color:"#8C8C8C"}}>{fileName||`Subir ${loadType==="banco"?"extracto bancario":"estado de tarjeta"} — PDF · Excel · CSV`}</div>
+                  <input ref={fileRef2} type="file" accept=".csv,.txt,.pdf,.xls,.xlsx" style={{display:"none"}} onChange={e=>handleFile(e.target.files[0],loadType)}/>
+                </div>
+                {loadError&&<div style={{color:"#f06060",fontSize:12,marginTop:10}}>{loadError}</div>}
+              </div>
+            )}
+
+            {/* PROCESANDO */}
+            {loadStep==="processing"&&(
+              <div style={{...S.card,textAlign:"center",padding:48}}>
+                <div style={{fontFamily:"Lora",fontSize:16,fontWeight:700,marginBottom:8}}>Procesando con IA...</div>
+                <div style={{fontSize:12,color:"#8C8C8C",marginBottom:28}}>Leyendo y categorizando movimientos</div>
+                <div style={{display:"flex",justifyContent:"center",gap:6}}>{[0,1,2].map(i=><div key={i} style={{width:8,height:8,borderRadius:"50%",background:"#DDB863",animation:`bounce 1.2s ${i*0.2}s ease-in-out infinite`}}/>)}</div>
+                <style>{`@keyframes bounce{0%,80%,100%{transform:translateY(0);opacity:.3}40%{transform:translateY(-8px);opacity:1}}`}</style>
+              </div>
+            )}
+
+            {/* REVISIÓN */}
+            {loadStep==="review"&&(
+              <>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:14}}>
+                  {[{l:"Detectados",v:loadMovs.length,c:"#F8F4E8"},{l:"Alta confianza",v:loadMovs.filter(m=>m.confianza==="alta"||!m.confianza).length,c:"#4CAF82"},{l:"A revisar",v:loadMovs.filter(m=>m.confianza&&m.confianza!=="alta").length,c:"#f0a060"},{l:"💳 Pagos tarjeta",v:loadMovs.filter(m=>m.esPagoTarjeta).length,c:"#c860f0"}].map(k=>(
+                    <div key={k.l} style={S.card}><div style={{...S.lbl,marginBottom:4}}>{k.l}</div><div style={{fontFamily:"Lora",fontSize:20,fontWeight:800,color:k.c}}>{k.v}</div></div>
+                  ))}
+                </div>
+                <div style={{...S.card,padding:0,marginBottom:12}}>
+                  <div style={{padding:"10px 14px",borderBottom:"1px solid rgba(221,184,99,0.12)"}}>
+                    <div style={{fontFamily:"Lora",fontSize:13,fontWeight:700,marginBottom:4}}>Revisá y ajustá si es necesario</div>
+                    {loadMovs.some(m=>m.esPagoTarjeta)&&<div style={{fontSize:11,color:"#c860f0"}}>💳 Los pagos de tarjeta quedarán pendientes de conciliación</div>}
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"80px 1fr 140px 100px 80px",gap:4,padding:"6px 10px",fontSize:10,color:"#4A4A4A",textTransform:"uppercase"}}><div>Fecha</div><div>Descripción</div><div>Concepto 1</div><div>Tipo</div><div style={{textAlign:"right"}}>Monto</div></div>
+                  {loadMovs.map(m=>(
+                    <div key={m.id} style={{display:"grid",gridTemplateColumns:"80px 1fr 140px 100px 80px",gap:4,padding:"7px 10px",borderTop:"1px solid rgba(255,255,255,0.03)",background:m.esPagoTarjeta?"rgba(200,96,240,0.05)":m.confianza==="baja"?"rgba(240,160,96,0.05)":"transparent",alignItems:"center"}}>
+                      <div style={{fontSize:11,color:"#8C8C8C"}}>{m.f}</div>
+                      <div><div style={{fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.d}</div>
+                        <div style={{display:"flex",gap:4,marginTop:2}}>
+                          {m.esPagoTarjeta&&<span style={{fontSize:9,padding:"1px 6px",borderRadius:3,background:"rgba(200,96,240,0.2)",color:"#c860f0"}}>💳 pendiente</span>}
+                          {m.confianza==="baja"&&<span style={{fontSize:9,padding:"1px 6px",borderRadius:3,background:"rgba(240,160,96,0.2)",color:"#f0a060"}}>⚠ revisar</span>}
+                        </div>
+                      </div>
+                      <select value={m.c1||""} onChange={e=>setLoadMovs(p=>p.map(x=>x.id===m.id?{...x,c1:e.target.value}:x))}
+                        style={{background:"#1E1E1E",border:`1px solid ${m.confianza==="baja"?"rgba(240,160,96,0.4)":"rgba(221,184,99,0.15)"}`,borderRadius:4,color:m.confianza==="baja"?"#f0a060":"#F8F4E8",fontFamily:"Roboto",fontSize:10,padding:"3px 6px",cursor:"pointer"}}>
+                        {Object.keys(TX[m.t||"Personal"]||TX.Personal).map(c=><option key={c}>{c}</option>)}
+                      </select>
+                      <select value={m.t||"Personal"} onChange={e=>setLoadMovs(p=>p.map(x=>x.id===m.id?{...x,t:e.target.value}:x))}
+                        style={{background:"#1E1E1E",border:"1px solid rgba(221,184,99,0.15)",borderRadius:4,color:"#F8F4E8",fontFamily:"Roboto",fontSize:10,padding:"3px 6px",cursor:"pointer"}}>
+                        <option>Personal</option><option>Negocio</option>
+                      </select>
+                      <div style={{fontFamily:"Lora",fontSize:12,fontWeight:700,textAlign:"right",color:(m.tot||0)>0?"#4CAF82":"#f06060"}}>
+                        {(m.tot||0)>0?"+":"-"}{"$ "+Math.abs(m.tot||0).toLocaleString("es-UY",{minimumFractionDigits:0,maximumFractionDigits:0})}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{display:"flex",gap:10}}>
+                  <button onClick={()=>setLoadStep("upload")} style={{background:"#141414",border:"1px solid rgba(221,184,99,0.2)",borderRadius:6,color:"#8C8C8C",fontFamily:"Roboto",fontSize:12,padding:"10px 20px",cursor:"pointer"}}>← Volver</button>
+                  <button onClick={confirmar} style={{flex:1,background:"#DDB863",color:"#0A0A0A",border:"none",borderRadius:8,padding:13,fontFamily:"Lora",fontSize:14,fontWeight:800,cursor:"pointer"}}>
+                    Confirmar — registrar {loadMovs.filter(m=>!m.esPagoTarjeta).length} · dejar {loadMovs.filter(m=>m.esPagoTarjeta).length} pendientes →
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* HECHO */}
+            {loadStep==="done"&&(
+              <div style={{...S.card,textAlign:"center",padding:40}}>
+                <div style={{fontSize:32,marginBottom:12}}>✓</div>
+                <div style={{fontFamily:"Lora",fontSize:18,fontWeight:800,color:"#4CAF82",marginBottom:8}}>Registros importados</div>
+                {(loadType==="banco"||loadType==="tarjeta")&&<div style={{fontSize:12,color:"#8C8C8C",marginBottom:16}}>Los pagos de tarjeta quedaron pendientes de conciliación</div>}
+                <div style={{display:"flex",gap:10,justifyContent:"center"}}>
+                  <button onClick={()=>{setLoadStep("upload");setFileName("");setBancoCarga("");}} style={{background:"#141414",border:"1px solid rgba(221,184,99,0.2)",borderRadius:6,color:"#8C8C8C",fontFamily:"Roboto",fontSize:12,padding:"8px 20px",cursor:"pointer"}}>Cargar otro</button>
+                  {loadType==="banco"&&<button onClick={()=>{setLoadType("tarjeta");setLoadStep("upload");}} style={{background:"rgba(200,96,240,0.15)",border:"1px solid rgba(200,96,240,0.3)",borderRadius:6,color:"#c860f0",fontFamily:"Roboto",fontSize:12,padding:"8px 20px",cursor:"pointer"}}>💳 Cargar tarjeta</button>}
+                </div>
+              </div>
+            )}
+
+            {/* MANUAL */}
+            {loadType==="manual"&&(
+              <>
+                <div style={{color:"#8C8C8C",fontSize:12,marginBottom:16}}>Los campos * se calculan automáticamente</div>
             <div style={S.card}>
               <div style={S.secT}>Identificación</div>
               <div style={{...S.g5,marginBottom:12}}>
@@ -604,6 +793,8 @@ export default function Moneyland() {
             <button onClick={submit} style={{width:"100%",background:saved?"#4CAF82":"#DDB863",color:"#0A0A0A",border:"none",borderRadius:8,padding:13,fontFamily:"Lora",fontSize:14,fontWeight:800,cursor:"pointer",transition:"background .3s"}}>
               {saved?"✓ Guardado":"Guardar registro →"}
             </button>
+            </>
+            )}
           </>
         )}
 
