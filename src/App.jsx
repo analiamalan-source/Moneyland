@@ -376,11 +376,12 @@ export default function Moneyland() {
 
   const procesarConIA = async (texto, tipo) => {
     setLoadStep("processing");
-    const prompt = tipo==="banco"
-      ? `Analizá este extracto bancario uruguayo. Para cada movimiento: fecha (YYYY-MM-DD), descripcion, monto (positivo=ingreso negativo=gasto), moneda (UYU/USD), tipo (Personal/Negocio), concepto1 (de: Ingresos,Ventas,Vivienda,Servicios del hogar,Alimentación,Transporte,Salud,Educación,Cuidado personal,Mascotas,Ocio y cultura,Finanzas,Impuestos y trámites,Regalos y donaciones,Imprevistos,Otros gastos,Gasto de personal,Transferencias,Tarjetas,Pagos,Inversiones,Marketing,Servicios,Personal,Honorarios,Impuestos), concepto2, esPagoTarjeta (true si paga OCA/Visa/Master), confianza (alta/media/baja). Banco: ${bancoCarga} Período: ${MESES_NOM[+periodoMes]} ${periodoAno}. Solo JSON: {"movimientos":[{"fecha":"","descripcion":"","monto":0,"moneda":"UYU","tipo":"Personal","concepto1":"","concepto2":"","esPagoTarjeta":false,"confianza":"alta"}]}`
-      : `Analizá este estado de tarjeta uruguaya. Para cada gasto: fecha (YYYY-MM-DD), descripcion, monto (positivo=gasto), moneda, tipo (Personal/Negocio), concepto1, concepto2, confianza. Ignorá pagos al banco. Tarjeta: ${bancoCarga} Período: ${MESES_NOM[+periodoMes]} ${periodoAno}. Solo JSON: {"movimientos":[{"fecha":"","descripcion":"","monto":0,"moneda":"UYU","tipo":"Personal","concepto1":"","concepto2":"","confianza":"alta"}],"totalTarjeta":0}`;
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:`${prompt}\n\nArchivo:\n${texto.slice(0,4000)}`}]})});
+      const res = await fetch("/api/categorizar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ texto, tipo, banco: bancoCarga, mesNombre: MESES_NOM[+periodoMes], ano: periodoAno }),
+      });
       const data = await res.json();
       const parsed = JSON.parse((data.content?.[0]?.text||"{}").replace(/```json|```/g,"").trim());
       const movs = (parsed.movimientos||[]).map((m,i)=>({id:i+1,f:m.fecha,m:String(new Date(m.fecha||"2026-01-01").getMonth()+1),b:bancoCarga,t:m.tipo||"Personal",c1:m.concepto1,c2:m.concepto2||"",cat:TX[m.tipo||"Personal"]?.[m.concepto1]?.cat||"",d:m.descripcion,fm:tipo==="banco"?"Pago transferencia":"Pago crédito",be:bancoCarga,plazo:"0",p:Math.abs(m.monto||0)*(m.monto<0?-1:1),iva:null,tot:m.monto||0,moneda:m.moneda||"UYU",esPagoTarjeta:m.esPagoTarjeta||false,confianza:m.confianza||"alta",pendiente:m.esPagoTarjeta||false}));
