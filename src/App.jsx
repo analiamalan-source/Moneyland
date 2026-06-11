@@ -418,8 +418,10 @@ export default function Moneyland() {
     } else await procesarConIA(text, tipo);
   };
 
-  const confirmar = () => {
-    setRegs(prev=>[...loadMovs.filter(m=>!m.pendiente).map(m=>({...m,id:Date.now()+m.id})),...prev]);
+  const confirmar = async () => {
+    const toSave = loadMovs.filter(m=>!m.pendiente).map(m=>({...m, a: m.f ? String(new Date(m.f).getFullYear()) : ""}));
+    await Promise.all(toSave.map(m=>saveRegToDB(m)));
+    setRegs(prev=>[...toSave.map(m=>({...m,id:Date.now()+m.id})),...prev]);
     setLoadStep("done"); setLoadMovs([]);
   };
 
