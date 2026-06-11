@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from "react";
+import * as XLSX from "xlsx";
 // ── SUPABASE ─────────────────────────────────────────────────────────────────
 const SUPABASE_URL = "https://ayyglgljvlrhgcllevup.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5eWdsZ2xqdmxyaGdjbGxldnVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxNjI4OTcsImV4cCI6MjA5NTczODg5N30.yDFT4fM9fjemIFbF-qFCDSR6kShO_A-uuwywB0Z1Rxs";
@@ -391,7 +392,15 @@ export default function Moneyland() {
 
   const handleFile = async (file, tipo) => {
     setFileName(file.name); setLoadError("");
-    const text = await file.text();
+    let text;
+    if(/\.xlsx?$/i.test(file.name)){
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, {type:"array"});
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      text = XLSX.utils.sheet_to_csv(sheet);
+    } else {
+      text = await file.text();
+    }
     if(tipo==="masiva"){
       const lines = text.split("\n").filter(l=>l.trim());
       const hdr = lines[0].split(",");
