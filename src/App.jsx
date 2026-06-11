@@ -108,7 +108,6 @@ export default function Moneyland() {
   const [newBanco, setNewBanco] = useState({nombre:"",moneda:"UYU",tipo:"Ambos",activo:true});
   const [newTarjeta, setNewTarjeta] = useState({nombre:"",banco:"",moneda:"UYU",tipoCarta:"crédito",tipo:"Personal",activo:true});
   const [reportTab, setReportTab] = useState("rentabilidad");
-  const [filterMes, setFilterMes] = useState("todos");
   const [filterTipo, setFilterTipo] = useState("todos");
   const [searchQ, setSearchQ] = useState("");
   const [colDropOpen, setColDropOpen] = useState(false);
@@ -263,9 +262,10 @@ export default function Moneyland() {
     });
   }
 
-  function submit(){
+  async function submit(){
     const mes=form.fecha?String(new Date(form.fecha).getMonth()+1):"";
-    const reg={id:Date.now(),f:form.fecha,m:mes,a:form.fecha?String(new Date(form.fecha).getFullYear()):"",b:form.bancoCobPag,t:form.tipo,c1:form.c1,c2:form.c2,cat:catAuto,d:form.desc,fm:form.forma,be:form.bancoEmisor,tot:totalCalc};
+    const reg={id:Date.now(),f:form.fecha,m:mes,a:form.fecha?String(new Date(form.fecha).getFullYear()):"",b:form.bancoCobPag,t:form.tipo,c1:form.c1,c2:form.c2,cat:catAuto,d:form.desc,fm:form.forma,be:form.bancoEmisor,plazo:form.plazo,p:pesosCalc,iva:ivaNum||null,tot:totalCalc};
+    await saveRegToDB(reg);
     setRegs(p=>[reg,...p]);
     setForm(emptyForm());
     setSaved(true);
@@ -830,11 +830,12 @@ export default function Moneyland() {
           const vc = visibleCols;
           const toggleCol = (id) => setVisibleCols(prev=>prev.includes(id)?prev.filter(c=>c!==id):[...prev,id]);
 
-          const filteredRegs = regs.filter(r=>{
+          const filteredAll = regs.filter(r=>{
             if(filterTipo!=="todos"&&r.t!==filterTipo) return false;
-            if(searchQ&&!(r.d+r.c1+r.c2+r.b).toLowerCase().includes(searchQ.toLowerCase())) return false;
+            if(searchQ&&![r.d,r.c1,r.c2,r.b].join(" ").toLowerCase().includes(searchQ.toLowerCase())) return false;
             return true;
-          }).slice(0,80);
+          });
+          const filteredRegs = filteredAll.slice(0,80);
 
           const startEdit = (r) => { setEditingId(r.id); setEditFechaCP(r.fechaCP||r.f||""); };
           const saveEdit = (id) => {
@@ -883,7 +884,11 @@ export default function Moneyland() {
                   )}
                 </div>
 
-                <span style={{marginLeft:"auto",fontSize:11,color:"#8C8C8C"}}>{filteredRegs.length} registros</span>
+                <span style={{marginLeft:"auto",fontSize:11,color:"#8C8C8C"}}>
+                  {filteredAll.length>filteredRegs.length
+                    ? `Mostrando ${filteredRegs.length} de ${filteredAll.length} registros — afiná la búsqueda para ver más`
+                    : `${filteredRegs.length} registros`}
+                </span>
               </div>
 
               {/* Tabla con scroll horizontal */}
