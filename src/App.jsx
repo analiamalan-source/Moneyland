@@ -227,6 +227,15 @@ export default function Moneyland() {
       })
     });
   };
+
+  const deleteAllRegs = async () => {
+    if(!session?.access_token) return;
+    await fetch(`${SUPABASE_URL}/rest/v1/registros?user_id=eq.${session.user?.id}`, {
+      method: "DELETE",
+      headers: {"apikey": SUPABASE_KEY, "Authorization": `Bearer ${session.access_token}`}
+    });
+    setRegs([]);
+  };
   const bancoDropRef = useRef(null);
 
   useEffect(()=>{
@@ -1686,6 +1695,18 @@ export default function Moneyland() {
                 </div>
               </>
             )}
+
+            {/* ── ZONA DE PELIGRO ── */}
+            <div style={{...S.card,marginTop:16,border:"1px solid rgba(240,96,96,0.25)"}}>
+              <div style={{...S.secT,color:"#f06060"}}>Zona de peligro</div>
+              <div style={{color:"#8C8C8C",fontSize:12,marginBottom:10}}>Borra todos los movimientos guardados en Registros. No se puede deshacer.</div>
+              <button onClick={async()=>{
+                if(!window.confirm("¿Borrar TODOS tus registros guardados? Esta acción no se puede deshacer.")) return;
+                await deleteAllRegs();
+              }} style={{background:"none",border:"1px solid rgba(240,96,96,0.4)",borderRadius:6,color:"#f06060",fontFamily:"Lora",fontSize:12,fontWeight:700,padding:"9px 16px",cursor:"pointer"}}>
+                Borrar todos mis registros
+              </button>
+            </div>
           </>
         )}
       </div>
