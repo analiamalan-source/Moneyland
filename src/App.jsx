@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, Fragment } from "react";
 import * as XLSX from "xlsx";
 // ── SUPABASE ─────────────────────────────────────────────────────────────────
 const SUPABASE_URL = "https://ayyglgljvlrhgcllevup.supabase.co";
@@ -78,6 +78,10 @@ const MESES_NOM = ["","Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct
 const CAT_C = {"Ingresos":"#4CAF82","Gasto Fijo":"#f06060","Gasto Variable":"#f0a060","Cobros":"#DDB863","Pagos":"#c860f0","Necesidad":"#8888ee","Deseos":"#cc88cc","Transferencias":"#1D445C","Inversiones":"#1D445C","Variable":"#f0a060","Fijo":"#f06060"};
 const MESES_DISP = ["1","2","3","4"];
 
+// Patrones de descripción que indican un pago/traspaso para saldar una tarjeta de crédito
+// (quedan pendientes de conciliación con el extracto de la tarjeta). Se chequean en mayúsculas.
+const PAGO_TARJETA_PATTERNS = ["PAGO OCA","PAGOTARD","PAGO TARJETA","PAGO TARD","TRASPASO A PAGO","VISA-ILINK","DEB. VARIOS VISA","DEB. VARIOS MASTER","DEB. VARIOS OCA","DEB VARIOS VISA","DEB VARIOS MASTER","DEB VARIOS OCA"];
+
 const fmtN = (n) => "$ " + Math.abs(n||0).toLocaleString("es-UY",{minimumFractionDigits:0,maximumFractionDigits:0});
 const fmtD = (d) => { if(!d) return "—"; const [y,m,day]=d.split("-"); return `${day}/${m}/${y}`; };
 const today = () => new Date().toISOString().split("T")[0];
@@ -128,7 +132,7 @@ export default function Moneyland() {
   const [saldosInicialEdit, setSaldosInicialEdit] = useState({});
   const [saldosFinalEdit, setSaldosFinalEdit] = useState({});
   const [editingId, setEditingId] = useState(null);
-  const [editFechaCP, setEditFechaCP] = useState("");
+  const [editRow, setEditRow] = useState(null);
   const [saved, setSaved] = useState(false);
   const [loadType, setLoadType] = useState("manual");
   const [loadStep, setLoadStep] = useState("upload");
@@ -235,6 +239,30 @@ export default function Moneyland() {
       headers: {"apikey": SUPABASE_KEY, "Authorization": `Bearer ${session.access_token}`}
     });
     setRegs([]);
+  };
+
+  const updateRegInDB = async (id, reg) => {
+    if(!session?.access_token) return;
+    const headers = {"apikey": SUPABASE_KEY, "Authorization": `Bearer ${session.access_token}`, "Content-Type": "application/json", "Prefer": "return=minimal"};
+    await fetch(`${SUPABASE_URL}/rest/v1/registros?id=eq.${id}`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({
+        fecha: reg.f, mes: reg.m, ano: reg.a,
+        banco_cob_pag: reg.b, tipo: reg.t,
+        concepto1: reg.c1, concepto2: reg.c2,
+        categoria: reg.cat, descripcion: reg.d,
+        forma: reg.fm, banco_emisor: reg.be,
+        plazo: reg.plazo, pesos: reg.p,
+        iva: reg.iva, total: reg.tot
+      })
+    });
+    // best-effort: solo aplica si existe la columna fecha_cp
+    fetch(`${SUPABASE_URL}/rest/v1/registros?id=eq.${id}`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ fecha_cp: reg.fechaCP })
+    }).catch(()=>{});
   };
   const bancoDropRef = useRef(null);
 
@@ -394,7 +422,11 @@ export default function Moneyland() {
       });
       const data = await res.json();
       const parsed = JSON.parse((data.content?.[0]?.text||"{}").replace(/```json|```/g,"").trim());
-      const movs = (parsed.movimientos||[]).map((m,i)=>({id:i+1,f:m.fecha,m:String(new Date(m.fecha||"2026-01-01").getMonth()+1),b:bancoCarga,t:m.tipo||"Personal",c1:m.concepto1,c2:m.concepto2||"",cat:TX[m.tipo||"Personal"]?.[m.concepto1]?.cat||"",d:m.descripcion,fm:tipo==="banco"?"Pago transferencia":"Pago crédito",be:bancoCarga,plazo:"0",p:Math.abs(m.monto||0)*(m.monto<0?-1:1),iva:null,tot:m.monto||0,moneda:m.moneda||"UYU",esPagoTarjeta:m.esPagoTarjeta||false,confianza:m.confianza||"alta",pendiente:m.esPagoTarjeta||false}));
+      const movs = (parsed.movimientos||[]).map((m,i)=>{
+        const desc = (m.descripcion||"").toUpperCase();
+        const esPagoTarjeta = (tipo==="banco") && (PAGO_TARJETA_PATTERNS.some(p=>desc.includes(p)) || m.esPagoTarjeta||false);
+        return {id:i+1,f:m.fecha,m:String(new Date(m.fecha||"2026-01-01").getMonth()+1),b:bancoCarga,t:m.tipo||"Personal",c1:m.concepto1,c2:m.concepto2||"",cat:TX[m.tipo||"Personal"]?.[m.concepto1]?.cat||"",d:m.descripcion,fm:tipo==="banco"?"Pago transferencia":"Pago crédito",be:bancoCarga,plazo:"0",p:Math.abs(m.monto||0)*(m.monto<0?-1:1),iva:null,tot:m.monto||0,moneda:m.moneda||"UYU",esPagoTarjeta,confianza:m.confianza||"alta",pendiente:esPagoTarjeta};
+      });
       setLoadMovs(movs); setLoadStep("review");
     } catch(e) { setLoadError("Error al procesar. Verificá el archivo."); setLoadStep("upload"); }
   };
@@ -677,9 +709,9 @@ export default function Moneyland() {
                     <div style={{fontFamily:"Lora",fontSize:13,fontWeight:700,marginBottom:4}}>Revisá y ajustá si es necesario</div>
                     {loadMovs.some(m=>m.esPagoTarjeta)&&<div style={{fontSize:11,color:"#c860f0"}}>💳 Los pagos de tarjeta quedarán pendientes de conciliación</div>}
                   </div>
-                  <div style={{display:"grid",gridTemplateColumns:"80px 1fr 140px 100px 80px",gap:4,padding:"6px 10px",fontSize:10,color:"#4A4A4A",textTransform:"uppercase"}}><div>Fecha</div><div>Descripción</div><div>Concepto 1</div><div>Tipo</div><div style={{textAlign:"right"}}>Monto</div></div>
+                  <div style={{display:"grid",gridTemplateColumns:"80px 1fr 140px 100px 80px 90px",gap:4,padding:"6px 10px",fontSize:10,color:"#4A4A4A",textTransform:"uppercase"}}><div>Fecha</div><div>Descripción</div><div>Concepto 1</div><div>Tipo</div><div style={{textAlign:"right"}}>Monto</div><div style={{textAlign:"center"}}>Conciliación</div></div>
                   {loadMovs.map(m=>(
-                    <div key={m.id} style={{display:"grid",gridTemplateColumns:"80px 1fr 140px 100px 80px",gap:4,padding:"7px 10px",borderTop:"1px solid rgba(255,255,255,0.03)",background:m.esPagoTarjeta?"rgba(200,96,240,0.05)":m.confianza==="baja"?"rgba(240,160,96,0.05)":"transparent",alignItems:"center"}}>
+                    <div key={m.id} style={{display:"grid",gridTemplateColumns:"80px 1fr 140px 100px 80px 90px",gap:4,padding:"7px 10px",borderTop:"1px solid rgba(255,255,255,0.03)",background:m.esPagoTarjeta?"rgba(200,96,240,0.05)":m.confianza==="baja"?"rgba(240,160,96,0.05)":"transparent",alignItems:"center"}}>
                       <div style={{fontSize:11,color:"#8C8C8C"}}>{m.f}</div>
                       <div><div style={{fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.d}</div>
                         <div style={{display:"flex",gap:4,marginTop:2}}>
@@ -697,6 +729,12 @@ export default function Moneyland() {
                       </select>
                       <div style={{fontFamily:"Lora",fontSize:12,fontWeight:700,textAlign:"right",color:(m.tot||0)>0?"#4CAF82":"#f06060"}}>
                         {(m.tot||0)>0?"+":"-"}{"$ "+Math.abs(m.tot||0).toLocaleString("es-UY",{minimumFractionDigits:0,maximumFractionDigits:0})}
+                      </div>
+                      <div style={{textAlign:"center"}}>
+                        <button type="button" onClick={()=>setLoadMovs(p=>p.map(x=>x.id===m.id?{...x,esPagoTarjeta:!x.esPagoTarjeta,pendiente:!x.esPagoTarjeta}:x))}
+                          style={{background:m.esPagoTarjeta?"rgba(200,96,240,0.15)":"#1E1E1E",border:`1px solid ${m.esPagoTarjeta?"rgba(200,96,240,0.4)":"rgba(221,184,99,0.15)"}`,borderRadius:4,color:m.esPagoTarjeta?"#c860f0":"#8C8C8C",fontFamily:"Roboto",fontSize:9,padding:"3px 6px",cursor:"pointer",whiteSpace:"nowrap"}}>
+                          {m.esPagoTarjeta?"💳 Pendiente":"Registrar"}
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -839,6 +877,7 @@ export default function Moneyland() {
             {id:"total",      label:"Total (con IVA)"},
           ];
           const vc = visibleCols;
+          const colCount = ALL_COLS.filter(c=>vc.includes(c.id)).length;
           const toggleCol = (id) => setVisibleCols(prev=>prev.includes(id)?prev.filter(c=>c!==id):[...prev,id]);
 
           const filteredAll = regs.filter(r=>{
@@ -848,10 +887,21 @@ export default function Moneyland() {
           });
           const filteredRegs = filteredAll.slice(0,80);
 
-          const startEdit = (r) => { setEditingId(r.id); setEditFechaCP(r.fechaCP||r.f||""); };
-          const saveEdit = (id) => {
-            setRegs(prev=>prev.map(r=>r.id===id?{...r,fechaCP:editFechaCP}:r));
-            setEditingId(null);
+          const startEdit = (r) => {
+            setEditingId(r.id);
+            setEditRow({f:r.f||"",t:r.t||"Personal",b:r.b||"",c1:r.c1||"",c2:r.c2||"",d:r.d||"",fm:r.fm||"",be:r.be||"",plazo:r.plazo??"",fechaCP:r.fechaCP||r.f||"",p:r.p??"",iva:r.iva??""});
+          };
+          const cancelEdit = () => { setEditingId(null); setEditRow(null); };
+          const saveEdit = async (id) => {
+            const mes = editRow.f?String(new Date(editRow.f).getMonth()+1):"";
+            const ano = editRow.f?String(new Date(editRow.f).getFullYear()):"";
+            const cat = TX[editRow.t]?.[editRow.c1]?.cat||"";
+            const p = parseFloat(editRow.p)||0;
+            const iva = editRow.iva===""?null:parseFloat(editRow.iva)||0;
+            const updated = {f:editRow.f,m:mes,a:ano,b:editRow.b,t:editRow.t,c1:editRow.c1,c2:editRow.c2,cat,d:editRow.d,fm:editRow.fm,be:editRow.be,plazo:editRow.plazo,fechaCP:editRow.fechaCP,p,iva,tot:p+(iva||0)};
+            await updateRegInDB(id, updated);
+            setRegs(prev=>prev.map(r=>r.id===id?{...r,...updated}:r));
+            cancelEdit();
           };
 
           return (
@@ -918,10 +968,16 @@ export default function Moneyland() {
                     {filteredRegs.map(r=>{
                       const isPos=(r.tot||0)>0;
                       return (
-                        <tr key={r.id} style={{borderBottom:"1px solid rgba(255,255,255,0.03)"}}
+                      <Fragment key={r.id}>
+                        <tr style={{borderBottom:"1px solid rgba(255,255,255,0.03)"}}
                           onMouseEnter={e=>{e.currentTarget.style.background="#1E1E1E"; const ic=e.currentTarget.querySelector('.edit-ic'); if(ic)ic.style.opacity="1";}}
                           onMouseLeave={e=>{e.currentTarget.style.background="transparent"; const ic=e.currentTarget.querySelector('.edit-ic'); if(ic)ic.style.opacity="0";}}>
-                          {vc.includes("fecha")&&<td style={{padding:"7px 10px",fontSize:11,color:"#8C8C8C",whiteSpace:"nowrap",background:"#141414",position:"sticky",left:0}}>{fmtD(r.f)}</td>}
+                          {vc.includes("fecha")&&<td style={{padding:"7px 10px",fontSize:11,color:"#8C8C8C",whiteSpace:"nowrap",background:"#141414",position:"sticky",left:0,cursor:"pointer"}} onClick={()=>editingId===r.id?cancelEdit():startEdit(r)}>
+                            <div style={{display:"flex",alignItems:"center",gap:6}}>
+                              {fmtD(r.f)}
+                              <span className="edit-ic" style={{fontSize:9,color:"#DDB863",opacity:0,transition:"opacity 0.1s"}}>✎</span>
+                            </div>
+                          </td>}
                           {vc.includes("tipo")&&<td style={{padding:"7px 10px"}}><span style={S.pill(r.t==="Negocio"?"#1D445C":"#DDB863")}>{r.t}</span></td>}
                           {vc.includes("banco")&&<td style={{padding:"7px 10px",fontSize:11,color:"#4A4A4A",whiteSpace:"nowrap",maxWidth:120,overflow:"hidden",textOverflow:"ellipsis"}}>{r.b||"—"}</td>}
                           {vc.includes("categoria")&&<td style={{padding:"7px 10px"}}><span style={S.badge(r.cat)}>{(r.cat||"").slice(0,10)}</span></td>}
@@ -930,32 +986,67 @@ export default function Moneyland() {
                           {vc.includes("forma")&&<td style={{padding:"7px 10px",fontSize:11,color:"#4A4A4A",whiteSpace:"nowrap"}}>{r.fm||"—"}</td>}
                           {vc.includes("bancoEmisor")&&<td style={{padding:"7px 10px",fontSize:11,color:"#4A4A4A",whiteSpace:"nowrap"}}>{r.be||"—"}</td>}
                           {vc.includes("plazo")&&<td style={{padding:"7px 10px",fontSize:11,color:"#4A4A4A",textAlign:"right"}}>{r.plazo||"—"}</td>}
-                          {vc.includes("fechaCP")&&<td style={{padding:"4px 6px",whiteSpace:"nowrap"}}>
-                            {editingId===r.id ? (
-                              <div style={{display:"flex",gap:4,alignItems:"center"}}>
-                                <input
-                                  type="date"
-                                  value={editFechaCP}
-                                  onChange={e=>setEditFechaCP(e.target.value)}
-                                  autoFocus
-                                  style={{background:"#1E1E1E",border:"1px solid #c8f060",borderRadius:4,color:"#DDB863",fontFamily:"Roboto",fontSize:11,padding:"3px 6px",outline:"none",width:130}}
-                                />
-                                <button onClick={()=>saveEdit(r.id)} style={{background:"#DDB863",border:"none",borderRadius:3,color:"#0A0A0A",fontFamily:"Roboto",fontSize:10,padding:"3px 7px",cursor:"pointer",fontWeight:700}}>✓</button>
-                                <button onClick={()=>setEditingId(null)} style={{background:"none",border:"1px solid rgba(221,184,99,0.18)",borderRadius:3,color:"#8C8C8C",fontFamily:"Roboto",fontSize:10,padding:"3px 6px",cursor:"pointer"}}>✕</button>
-                              </div>
-                            ) : (
-                              <div style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer"}} onClick={()=>startEdit(r)}>
-                                <span style={{fontSize:11,color:"#1D445C"}}>{r.fechaCP?fmtD(r.fechaCP):"—"}</span>
-                                <span className="edit-ic" style={{fontSize:9,color:"#DDB863",opacity:0,transition:"opacity 0.1s"}}>✎</span>
-                              </div>
-                            )}
-                          </td>}
+                          {vc.includes("fechaCP")&&<td style={{padding:"7px 10px",fontSize:11,color:"#1D445C",whiteSpace:"nowrap"}}>{r.fechaCP?fmtD(r.fechaCP):"—"}</td>}
                           {vc.includes("moneda")&&<td style={{padding:"7px 10px",fontSize:11,color:"#4A4A4A"}}>{r.usd?"USD":"UYU"}</td>}
                           {vc.includes("tc")&&<td style={{padding:"7px 10px",fontSize:11,color:"#4A4A4A",textAlign:"right"}}>{r.tc||"—"}</td>}
                           {vc.includes("subtotal")&&<td style={{padding:"7px 10px",fontFamily:"Lora",fontSize:11,fontWeight:600,textAlign:"right",color:isPos?"#4CAF82":"#f06060",whiteSpace:"nowrap"}}>{r.p!=null?(isPos?"+":"-")+fmtN(r.p).replace("$ ",""):"—"}</td>}
                           {vc.includes("iva")&&<td style={{padding:"7px 10px",fontSize:11,color:"#f0a060",textAlign:"right"}}>{r.iva?fmtN(r.iva).replace("$ ",""):"—"}</td>}
                           {vc.includes("total")&&<td style={{padding:"7px 10px",fontFamily:"Lora",fontSize:12,fontWeight:700,textAlign:"right",color:isPos?"#4CAF82":"#f06060",whiteSpace:"nowrap"}}>{isPos?"+":"-"}{fmtN(r.tot).replace("$ ","")}</td>}
                         </tr>
+                        {editingId===r.id && editRow && (
+                          <tr style={{borderBottom:"1px solid rgba(221,184,99,0.15)"}}>
+                            <td colSpan={colCount} style={{padding:14,background:"#1A1A1A"}}>
+                              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:10}}>
+                                <div><label style={S.lbl}>Fecha</label><input type="date" value={editRow.f} onChange={e=>setEditRow(p=>({...p,f:e.target.value}))} style={S.inp}/></div>
+                                <div><label style={S.lbl}>Tipo</label>
+                                  <select value={editRow.t} onChange={e=>{const nt=e.target.value; const nc1=Object.keys(TX[nt])[0]; setEditRow(p=>({...p,t:nt,c1:nc1,c2:TX[nt][nc1].subs[0]}));}} style={S.sel}>
+                                    <option>Personal</option><option>Negocio</option>
+                                  </select>
+                                </div>
+                                <div><label style={S.lbl}>Banco C/P</label>
+                                  <select value={editRow.b} onChange={e=>setEditRow(p=>({...p,b:e.target.value}))} style={S.sel}>
+                                    {!BANCOS_LIST.includes(editRow.b)&&editRow.b&&<option value={editRow.b}>{editRow.b}</option>}
+                                    {BANCOS_LIST.map(bn=><option key={bn}>{bn}</option>)}
+                                  </select>
+                                </div>
+                                <div><label style={S.lbl}>Concepto</label>
+                                  <select value={editRow.c1} onChange={e=>{const nc1=e.target.value; setEditRow(p=>({...p,c1:nc1,c2:TX[p.t][nc1].subs[0]}));}} style={S.sel}>
+                                    {Object.keys(TX[editRow.t]||{}).map(c=><option key={c}>{c}</option>)}
+                                  </select>
+                                </div>
+                                <div><label style={S.lbl}>Subconcepto</label>
+                                  <select value={editRow.c2} onChange={e=>setEditRow(p=>({...p,c2:e.target.value}))} style={S.sel}>
+                                    {(TX[editRow.t]?.[editRow.c1]?.subs||[]).map(s=><option key={s}>{s}</option>)}
+                                    {!(TX[editRow.t]?.[editRow.c1]?.subs||[]).includes(editRow.c2)&&editRow.c2&&<option value={editRow.c2}>{editRow.c2}</option>}
+                                  </select>
+                                </div>
+                                <div><label style={S.lbl}>Categoría</label><div style={S.calc}>{TX[editRow.t]?.[editRow.c1]?.cat||"—"}</div></div>
+                                <div style={{gridColumn:"span 2"}}><label style={S.lbl}>Descripción</label><input value={editRow.d} onChange={e=>setEditRow(p=>({...p,d:e.target.value}))} style={S.inp}/></div>
+                                <div><label style={S.lbl}>Forma cobro/pago</label>
+                                  <select value={editRow.fm} onChange={e=>setEditRow(p=>({...p,fm:e.target.value}))} style={S.sel}>
+                                    {FORMAS.map(f=><option key={f}>{f}</option>)}
+                                  </select>
+                                </div>
+                                <div><label style={S.lbl}>Banco emisor</label>
+                                  <select value={editRow.be} onChange={e=>setEditRow(p=>({...p,be:e.target.value}))} style={S.sel}>
+                                    {!BANCOS_LIST.includes(editRow.be)&&editRow.be&&<option value={editRow.be}>{editRow.be}</option>}
+                                    {BANCOS_LIST.map(bn=><option key={bn}>{bn}</option>)}
+                                  </select>
+                                </div>
+                                <div><label style={S.lbl}>Plazo (días)</label><input type="number" value={editRow.plazo} onChange={e=>setEditRow(p=>({...p,plazo:e.target.value}))} style={S.inp}/></div>
+                                <div><label style={S.lbl}>Fecha cobro/pago</label><input type="date" value={editRow.fechaCP} onChange={e=>setEditRow(p=>({...p,fechaCP:e.target.value}))} style={S.inp}/></div>
+                                <div><label style={S.lbl}>Subtotal (sin IVA)</label><input type="number" step="0.01" value={editRow.p} onChange={e=>setEditRow(p=>({...p,p:e.target.value}))} style={S.inp}/></div>
+                                <div><label style={S.lbl}>IVA</label><input type="number" step="0.01" value={editRow.iva} onChange={e=>setEditRow(p=>({...p,iva:e.target.value}))} style={S.inp}/></div>
+                                <div><label style={S.lbl}>Total (con IVA)</label><div style={S.calc}>{fmtN((parseFloat(editRow.p)||0)+(parseFloat(editRow.iva)||0))}</div></div>
+                              </div>
+                              <div style={{display:"flex",gap:8,marginTop:12}}>
+                                <button onClick={()=>saveEdit(r.id)} style={{background:"#DDB863",border:"none",borderRadius:6,color:"#0A0A0A",fontFamily:"Lora",fontSize:12,fontWeight:700,padding:"8px 16px",cursor:"pointer"}}>Guardar</button>
+                                <button onClick={cancelEdit} style={{background:"none",border:"1px solid rgba(221,184,99,0.18)",borderRadius:6,color:"#8C8C8C",fontFamily:"Roboto",fontSize:12,padding:"8px 16px",cursor:"pointer"}}>Cancelar</button>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
                       );
                     })}
                   </tbody>
