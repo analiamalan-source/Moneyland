@@ -82,6 +82,10 @@ const MESES_DISP = ["1","2","3","4"];
 // (quedan pendientes de conciliación con el extracto de la tarjeta). Se chequean en mayúsculas.
 const PAGO_TARJETA_PATTERNS = ["PAGO OCA","PAGOTARD","PAGO TARJETA","PAGO TARD","TRASPASO A PAGO","VISA-ILINK","DEB. VARIOS VISA","DEB. VARIOS MASTER","DEB. VARIOS OCA","DEB VARIOS VISA","DEB VARIOS MASTER","DEB VARIOS OCA"];
 
+// Normaliza una descripción de movimiento para usarla como "patrón" de aprendizaje:
+// quita números/fechas/montos variables, dejando solo la parte fija del texto.
+const normalizarDesc = (d) => (d||"").toUpperCase().replace(/[0-9]+/g," ").replace(/\s+/g," ").trim();
+
 const fmtN = (n) => "$ " + Math.abs(n||0).toLocaleString("es-UY",{minimumFractionDigits:0,maximumFractionDigits:0});
 const fmtD = (d) => { if(!d) return "—"; const [y,m,day]=d.split("-"); return `${day}/${m}/${y}`; };
 const today = () => new Date().toISOString().split("T")[0];
@@ -151,6 +155,7 @@ export default function Moneyland() {
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [dbLoading, setDbLoading] = useState(false);
+  const [reglas, setReglas] = useState({});
 
   // Load session from localStorage on mount
   useEffect(()=>{
@@ -169,17 +174,24 @@ export default function Moneyland() {
     setDbLoading(true);
     try {
       const headers = {"apikey": SUPABASE_KEY, "Authorization": `Bearer ${session.access_token}`};
-      const [regsRes, bancosRes, tarjetasRes] = await Promise.all([
+      const [regsRes, bancosRes, tarjetasRes, reglasRes] = await Promise.all([
         fetch(`${SUPABASE_URL}/rest/v1/registros?select=*&order=fecha.desc`, {headers}),
         fetch(`${SUPABASE_URL}/rest/v1/bancos?select=*`, {headers}),
         fetch(`${SUPABASE_URL}/rest/v1/tarjetas?select=*`, {headers}),
+        fetch(`${SUPABASE_URL}/rest/v1/reglas_categorizacion?select=*`, {headers}),
       ]);
       const regsData = await regsRes.json();
       const bancosData = await bancosRes.json();
       const tarjetasData = await tarjetasRes.json();
+      const reglasData = await reglasRes.json();
       if(Array.isArray(regsData)) setRegs(regsData.map(r=>({...r, f:r.fecha, m:r.mes, b:r.banco_cob_pag, t:r.tipo, c1:r.concepto1, c2:r.concepto2, cat:r.categoria, d:r.descripcion, fm:r.forma, be:r.banco_emisor, p:r.pesos, tot:r.total})));
       if(Array.isArray(bancosData) && bancosData.length>0) setConfig(prev=>({...prev, bancos:bancosData}));
       if(Array.isArray(tarjetasData) && tarjetasData.length>0) setConfig(prev=>({...prev, tarjetas:tarjetasData}));
+      if(Array.isArray(reglasData)) {
+        const map = {};
+        reglasData.forEach(r=>{ map[r.patron] = {t:r.tipo, c1:r.concepto1, c2:r.concepto2, esPagoTarjeta:r.es_pago_tarjeta}; });
+        setReglas(map);
+      }
     } catch(e){ console.error(e); }
     setDbLoading(false);
   };
@@ -264,6 +276,24 @@ export default function Moneyland() {
       body: JSON.stringify({ fecha_cp: reg.fechaCP })
     }).catch(()=>{});
   };
+  // Guarda/actualiza una regla de clasificación aprendida para futuras cargas
+  const saveReglaToDB = async (patron, regla) => {
+    if(!session?.access_token || !patron) return;
+    setReglas(prev=>({...prev, [patron]: {t:regla.t, c1:regla.c1, c2:regla.c2, esPagoTarjeta:!!regla.esPagoTarjeta}}));
+    await fetch(`${SUPABASE_URL}/rest/v1/reglas_categorizacion?on_conflict=user_id,patron`, {
+      method: "POST",
+      headers: {"apikey": SUPABASE_KEY, "Authorization": `Bearer ${session.access_token}`, "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates,return=minimal"},
+      body: JSON.stringify({
+        user_id: session.user?.id,
+        patron,
+        tipo: regla.t,
+        concepto1: regla.c1,
+        concepto2: regla.c2,
+        es_pago_tarjeta: !!regla.esPagoTarjeta
+      })
+    });
+  };
+
   const bancoDropRef = useRef(null);
 
   useEffect(()=>{
@@ -424,8 +454,12 @@ export default function Moneyland() {
       const parsed = JSON.parse((data.content?.[0]?.text||"{}").replace(/```json|```/g,"").trim());
       const movs = (parsed.movimientos||[]).map((m,i)=>{
         const desc = (m.descripcion||"").toUpperCase();
-        const esPagoTarjeta = (tipo==="banco") && (PAGO_TARJETA_PATTERNS.some(p=>desc.includes(p)) || m.esPagoTarjeta||false);
-        return {id:i+1,f:m.fecha,m:String(new Date(m.fecha||"2026-01-01").getMonth()+1),b:bancoCarga,t:m.tipo||"Personal",c1:m.concepto1,c2:m.concepto2||"",cat:TX[m.tipo||"Personal"]?.[m.concepto1]?.cat||"",d:m.descripcion,fm:tipo==="banco"?"Pago transferencia":"Pago crédito",be:bancoCarga,plazo:"0",p:Math.abs(m.monto||0)*(m.monto<0?-1:1),iva:null,tot:m.monto||0,moneda:m.moneda||"UYU",esPagoTarjeta,confianza:m.confianza||"alta",pendiente:esPagoTarjeta};
+        const regla = reglas[normalizarDesc(m.descripcion)];
+        const esPagoTarjeta = (tipo==="banco") && (regla ? !!regla.esPagoTarjeta : (PAGO_TARJETA_PATTERNS.some(p=>desc.includes(p)) || m.esPagoTarjeta||false));
+        const t = regla?.t || m.tipo || "Personal";
+        const c1 = regla?.c1 || m.concepto1;
+        const c2 = regla?.c2 ?? (m.concepto2||"");
+        return {id:i+1,f:m.fecha,m:String(new Date(m.fecha||"2026-01-01").getMonth()+1),b:bancoCarga,t,c1,c2,cat:TX[t]?.[c1]?.cat||"",d:m.descripcion,fm:tipo==="banco"?"Pago transferencia":"Pago crédito",be:bancoCarga,plazo:"0",p:Math.abs(m.monto||0)*(m.monto<0?-1:1),iva:null,tot:m.monto||0,moneda:m.moneda||"UYU",esPagoTarjeta,confianza:regla?"alta":(m.confianza||"alta"),pendiente:esPagoTarjeta};
       });
       setLoadMovs(movs); setLoadStep("review");
     } catch(e) { setLoadError("Error al procesar. Verificá el archivo."); setLoadStep("upload"); }
@@ -462,6 +496,11 @@ export default function Moneyland() {
   const confirmar = async () => {
     const toSave = loadMovs.filter(m=>!m.pendiente).map(m=>({...m, a: m.f ? String(new Date(m.f).getFullYear()) : ""}));
     await Promise.all(toSave.map(m=>saveRegToDB(m)));
+    // Aprende la clasificación de cada movimiento (incluidos los pendientes de conciliación) para futuras cargas
+    loadMovs.forEach(m=>{
+      const patron = normalizarDesc(m.d);
+      if(patron) saveReglaToDB(patron, {t:m.t, c1:m.c1, c2:m.c2, esPagoTarjeta:!!m.esPagoTarjeta});
+    });
     setRegs(prev=>[...toSave.map(m=>({...m,id:Date.now()+m.id})),...prev]);
     setLoadStep("done"); setLoadMovs([]);
   };
@@ -900,6 +939,8 @@ export default function Moneyland() {
             const iva = editRow.iva===""?null:parseFloat(editRow.iva)||0;
             const updated = {f:editRow.f,m:mes,a:ano,b:editRow.b,t:editRow.t,c1:editRow.c1,c2:editRow.c2,cat,d:editRow.d,fm:editRow.fm,be:editRow.be,plazo:editRow.plazo,fechaCP:editRow.fechaCP,p,iva,tot:p+(iva||0)};
             await updateRegInDB(id, updated);
+            const patron = normalizarDesc(updated.d);
+            if(patron) saveReglaToDB(patron, {t:updated.t, c1:updated.c1, c2:updated.c2, esPagoTarjeta:false});
             setRegs(prev=>prev.map(r=>r.id===id?{...r,...updated}:r));
             cancelEdit();
           };
