@@ -44,6 +44,14 @@ const sb = {
       });
       return r.json();
     },
+    refresh: async (refresh_token) => {
+      const r = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+        method: "POST",
+        headers: {"apikey": SUPABASE_KEY, "Content-Type": "application/json"},
+        body: JSON.stringify({refresh_token})
+      });
+      return r.json();
+    },
     signOut: async (token) => {
       await fetch(`${SUPABASE_URL}/auth/v1/logout`, {
         method: "POST",
@@ -157,11 +165,44 @@ export default function Moneyland() {
   const [dbLoading, setDbLoading] = useState(false);
   const [reglas, setReglas] = useState({});
 
-  // Load session from localStorage on mount
+  // Load session from localStorage on mount, renovando el token si ya venció o está por vencer
   useEffect(()=>{
     const saved = localStorage.getItem("ml_session");
-    if(saved) { try { setSession(JSON.parse(saved)); } catch(e){} }
+    if(!saved) return;
+    let sess;
+    try { sess = JSON.parse(saved); } catch(e){ return; }
+    const expSoon = !sess.expires_at || (sess.expires_at*1000 - Date.now() < 60000);
+    if(expSoon && sess.refresh_token) {
+      sb.auth.refresh(sess.refresh_token).then(data=>{
+        if(data.access_token) {
+          const newSess = {...sess, ...data};
+          setSession(newSess);
+          localStorage.setItem("ml_session", JSON.stringify(newSess));
+        } else {
+          setSession(sess);
+        }
+      });
+    } else {
+      setSession(sess);
+    }
   },[]);
+
+  // Renueva el token periódicamente para que sesiones largas no se corten
+  useEffect(()=>{
+    if(!session?.refresh_token) return;
+    const id = setInterval(()=>{
+      const expSoon = !session.expires_at || (session.expires_at*1000 - Date.now() < 5*60000);
+      if(!expSoon) return;
+      sb.auth.refresh(session.refresh_token).then(data=>{
+        if(data.access_token) {
+          const newSess = {...session, ...data};
+          setSession(newSess);
+          localStorage.setItem("ml_session", JSON.stringify(newSess));
+        }
+      });
+    }, 4*60000);
+    return ()=>clearInterval(id);
+  },[session]);
 
   // Load data from Supabase when session changes
   useEffect(()=>{
