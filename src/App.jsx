@@ -232,6 +232,8 @@ export default function Moneyland() {
         const map = {};
         reglasData.forEach(r=>{ map[r.patron] = {t:r.tipo, c1:r.concepto1, c2:r.concepto2, esPagoTarjeta:r.es_pago_tarjeta}; });
         setReglas(map);
+      } else {
+        console.error("Error cargando reglas_categorizacion:", reglasData);
       }
     } catch(e){ console.error(e); }
     setDbLoading(false);
@@ -321,18 +323,21 @@ export default function Moneyland() {
   const saveReglaToDB = async (patron, regla) => {
     if(!session?.access_token || !patron) return;
     setReglas(prev=>({...prev, [patron]: {t:regla.t, c1:regla.c1, c2:regla.c2, esPagoTarjeta:!!regla.esPagoTarjeta}}));
-    await fetch(`${SUPABASE_URL}/rest/v1/reglas_categorizacion?on_conflict=user_id,patron`, {
-      method: "POST",
-      headers: {"apikey": SUPABASE_KEY, "Authorization": `Bearer ${session.access_token}`, "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates,return=minimal"},
-      body: JSON.stringify({
-        user_id: session.user?.id,
-        patron,
-        tipo: regla.t,
-        concepto1: regla.c1,
-        concepto2: regla.c2,
-        es_pago_tarjeta: !!regla.esPagoTarjeta
-      })
-    });
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/reglas_categorizacion?on_conflict=user_id,patron`, {
+        method: "POST",
+        headers: {"apikey": SUPABASE_KEY, "Authorization": `Bearer ${session.access_token}`, "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates,return=minimal"},
+        body: JSON.stringify({
+          user_id: session.user?.id,
+          patron,
+          tipo: regla.t,
+          concepto1: regla.c1,
+          concepto2: regla.c2,
+          es_pago_tarjeta: !!regla.esPagoTarjeta
+        })
+      });
+      if(!r.ok) console.error("Error guardando regla de clasificación:", patron, r.status, await r.text());
+    } catch(e) { console.error("Error guardando regla de clasificación:", patron, e); }
   };
 
   const bancoDropRef = useRef(null);
