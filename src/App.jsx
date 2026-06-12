@@ -161,14 +161,15 @@ export default function Moneyland() {
   const [newBanco, setNewBanco] = useState({nombre:"",moneda:"UYU",tipo:"Ambos",activo:true});
   const [newTarjeta, setNewTarjeta] = useState({nombre:"",banco:"",moneda:"UYU",tipoCarta:"crédito",tipo:"Personal",activo:true});
   const [reportTab, setReportTab] = useState("rentabilidad");
-  const [filterTipo, setFilterTipo] = useState("todos");
   const [searchQ, setSearchQ] = useState("");
-  const [filterMesAno, setFilterMesAno] = useState("todos");
-  const [filterConcepto, setFilterConcepto] = useState("todos");
   const [selectedIds, setSelectedIds] = useState([]);
   const [colDropOpen, setColDropOpen] = useState(false);
   const colDropRef = useRef(null);
   const [visibleCols, setVisibleCols] = useState(["fecha","tipo","banco","categoria","concepto","descripcion","subtotal","total"]);
+  const [colFilters, setColFilters] = useState({});
+  const [filterDropOpen, setFilterDropOpen] = useState(null);
+  const [colFilterSearch, setColFilterSearch] = useState("");
+  const filterDropRef = useRef(null);
 
   useEffect(()=>{
     if(!colDropOpen) return;
@@ -176,6 +177,13 @@ export default function Moneyland() {
     document.addEventListener("mousedown",h);
     return ()=>document.removeEventListener("mousedown",h);
   },[colDropOpen]);
+
+  useEffect(()=>{
+    if(!filterDropOpen) return;
+    const h=(e)=>{if(filterDropRef.current&&!filterDropRef.current.contains(e.target)){setFilterDropOpen(null);setColFilterSearch("");}};
+    document.addEventListener("mousedown",h);
+    return ()=>document.removeEventListener("mousedown",h);
+  },[filterDropOpen]);
   const [dashFiltro, setDashFiltro] = useState("todos");
   const [persDesde, setPersDesde] = useState("1");
   const [persHasta, setPersHasta] = useState("4");
@@ -1054,25 +1062,66 @@ export default function Moneyland() {
           const colCount = ALL_COLS.filter(c=>vc.includes(c.id)).length;
           const toggleCol = (id) => setVisibleCols(prev=>prev.includes(id)?prev.filter(c=>c!==id):[...prev,id]);
 
-          // Opciones de filtro de Mes/Año, derivadas de los registros existentes
-          const mesesDisponibles = Object.entries(regs.reduce((acc,r)=>{
-            if(r.f) acc[r.f.slice(0,7)] = true;
-            return acc;
-          },{})).map(([k])=>k).sort().reverse().map(k=>{
-            const [a,m] = k.split("-");
-            return {key:k, label:`${MESES_NOM[+m]} ${a}`};
-          });
-          // Opciones de filtro de Concepto, derivadas de los registros existentes
-          const conceptosDisponibles = [...new Set(regs.map(r=>r.c1).filter(Boolean))].sort();
+          // Valor "de exhibición" de cada celda, usado tanto para los filtros tipo Excel como para sus listas de opciones
+          const colValue = (colId, r) => {
+            switch(colId) {
+              case "fecha": return r.f ? fmtD(r.f) : "—";
+              case "tipo": return r.t || "—";
+              case "banco": return r.b || "—";
+              case "categoria": return r.cat || "—";
+              case "concepto": return r.c1 ? (r.c1 + (r.c2 ? ` · ${r.c2}` : "")) : "—";
+              case "descripcion": return r.d || "—";
+              case "forma": return r.fm || "—";
+              case "bancoEmisor": return r.be || "—";
+              case "plazo": return (r.plazo!==undefined&&r.plazo!==null&&r.plazo!=="") ? String(r.plazo) : "—";
+              case "fechaCP": return r.fechaCP ? fmtD(r.fechaCP) : "—";
+              case "moneda": return r.usd ? "USD" : "UYU";
+              case "tc": return (r.tc!==undefined&&r.tc!==null&&r.tc!=="") ? String(r.tc) : "—";
+              case "subtotal": return r.p!=null ? fmtN(r.p) : "—";
+              case "iva": return r.iva!=null ? fmtN(r.iva) : "—";
+              case "total": return r.tot!=null ? fmtN(r.tot) : "—";
+              default: return "—";
+            }
+          };
+          const uniqueVals = (colId) => [...new Set(regs.map(r=>colValue(colId,r)))].sort((a,b)=>a.localeCompare(b,"es",{numeric:true}));
+          const toggleColFilterVal = (colId, val) => {
+            setColFilters(prev=>{
+              const all = uniqueVals(colId);
+              const current = prev[colId] || all;
+              const next = current.includes(val) ? current.filter(v=>v!==val) : [...current, val];
+              if(next.length===all.length){ const {[colId]:_, ...rest}=prev; return rest; }
+              return {...prev,[colId]:next};
+            });
+          };
+          const activeFilterCount = Object.keys(colFilters).length;
 
           const filteredAll = regs.filter(r=>{
-            if(filterTipo!=="todos"&&r.t!==filterTipo) return false;
-            if(filterMesAno!=="todos"&&r.f?.slice(0,7)!==filterMesAno) return false;
-            if(filterConcepto!=="todos"&&r.c1!==filterConcepto) return false;
             if(searchQ&&![r.d,r.c1,r.c2,r.b].join(" ").toLowerCase().includes(searchQ.toLowerCase())) return false;
+            for(const colId of Object.keys(colFilters)){
+              if(!colFilters[colId].includes(colValue(colId,r))) return false;
+            }
             return true;
           });
           const filteredRegs = filteredAll.slice(0,80);
+
+          // Exporta los registros filtrados a CSV (mismo formato que la plantilla de carga masiva)
+          const exportToCSV = (data) => {
+            const csvNum = (n) => (n===null||n===undefined||n==="") ? "" : String(n).replace(".",",");
+            const rows = [
+              "sep=;",
+              "Fecha;Año;Mes;Banco cobra/paga;Tipo;Concepto 1;Concepto 2;Categoría;Descripcion;Forma cobro/pago;Banco emisor;Plazo dias;Fecha de cobro / pago;USD;TC;Pesos;IVA;Total"
+            ];
+            data.forEach(r=>{
+              rows.push([
+                r.f||"", r.a||(r.f?String(new Date(r.f).getFullYear()):""), r.m||"",
+                r.b||"", r.t||"", r.c1||"", r.c2||"", r.cat||"", (r.d||"").replace(/[;\r\n]/g," "),
+                r.fm||"", r.be||"", r.plazo??"", r.fechaCP||"",
+                csvNum(r.usd), csvNum(r.tc), csvNum(r.p), csvNum(r.iva), csvNum(r.tot)
+              ].join(";"));
+            });
+            const csv = "﻿" + rows.join("\r\n");
+            const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"})); a.download = `FinCFO_registros.csv`; a.click();
+          };
 
           const allFilteredSelected = filteredAll.length>0 && filteredAll.every(r=>selectedIds.includes(r.id));
           const toggleSelectAll = () => {
@@ -1113,22 +1162,18 @@ export default function Moneyland() {
               {/* Toolbar */}
               <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
                 <input value={searchQ} onChange={e=>setSearchQ(e.target.value)} placeholder="Buscar..." style={{...S.inp,width:160,padding:"5px 10px"}}/>
-                {["todos","Negocio","Personal"].map(t=>(
-                  <button key={t} onClick={()=>setFilterTipo(t)}
-                    style={{background:filterTipo===t?"rgba(221,184,99,0.12)":"#141414",border:`1px solid ${filterTipo===t?"rgba(221,184,99,0.45)":"rgba(221,184,99,0.12)"}`,color:filterTipo===t?"#DDB863":"#8C8C8C",borderRadius:4,padding:"4px 10px",fontFamily:"Roboto",fontSize:10,cursor:"pointer"}}>
-                    {t}
+
+                {activeFilterCount>0 && (
+                  <button onClick={()=>setColFilters({})}
+                    style={{background:"rgba(221,184,99,0.12)",border:"1px solid rgba(221,184,99,0.45)",borderRadius:4,color:"#DDB863",fontFamily:"Roboto",fontSize:10,padding:"4px 10px",cursor:"pointer"}}>
+                    ✕ Limpiar filtros ({activeFilterCount})
                   </button>
-                ))}
+                )}
 
-                <select value={filterMesAno} onChange={e=>setFilterMesAno(e.target.value)} style={{...selStyle,fontSize:10,padding:"5px 8px"}}>
-                  <option value="todos">Todos los meses</option>
-                  {mesesDisponibles.map(o=><option key={o.key} value={o.key}>{o.label}</option>)}
-                </select>
-
-                <select value={filterConcepto} onChange={e=>setFilterConcepto(e.target.value)} style={{...selStyle,fontSize:10,padding:"5px 8px"}}>
-                  <option value="todos">Todos los conceptos</option>
-                  {conceptosDisponibles.map(c=><option key={c} value={c}>{c}</option>)}
-                </select>
+                <button onClick={()=>exportToCSV(filteredAll)}
+                  style={{background:"rgba(76,175,130,0.1)",border:"1px solid rgba(76,175,130,0.35)",borderRadius:4,color:"#4CAF82",fontFamily:"Roboto",fontSize:10,padding:"4px 10px",cursor:"pointer"}}>
+                  ⬇ Exportar ({filteredAll.length})
+                </button>
 
                 {/* Selector de columnas */}
                 <div style={{position:"relative",marginLeft:4}} ref={colDropRef}>
@@ -1181,11 +1226,45 @@ export default function Moneyland() {
                       <th style={{padding:"7px 8px",background:"#141414",width:28}}>
                         <input type="checkbox" checked={allFilteredSelected} onChange={toggleSelectAll} style={{cursor:"pointer"}}/>
                       </th>
-                      {ALL_COLS.filter(c=>vc.includes(c.id)).map(c=>(
-                        <th key={c.id} style={{textAlign:c.id==="total"?"right":"left",padding:"7px 10px",fontSize:10,color:"#8C8C8C",textTransform:"uppercase",letterSpacing:0.5,whiteSpace:"nowrap",background:"#141414",position:c.id==="fecha"?"sticky":undefined,left:c.id==="fecha"?28:undefined,zIndex:c.id==="fecha"?1:undefined}}>
-                          {c.label}
+                      {ALL_COLS.filter(c=>vc.includes(c.id)).map(c=>{
+                        const filterActive = !!colFilters[c.id];
+                        const isOpen = filterDropOpen===c.id;
+                        return (
+                        <th key={c.id} style={{textAlign:c.id==="total"?"right":"left",padding:"7px 10px",fontSize:10,color:"#8C8C8C",textTransform:"uppercase",letterSpacing:0.5,whiteSpace:"nowrap",background:"#141414",position:c.id==="fecha"?"sticky":"relative",left:c.id==="fecha"?28:undefined,zIndex:isOpen?1001:(c.id==="fecha"?1:undefined)}}>
+                          <div style={{display:"flex",alignItems:"center",gap:4,cursor:"pointer",justifyContent:c.id==="total"?"flex-end":"flex-start"}}
+                            onClick={()=>{setFilterDropOpen(o=>o===c.id?null:c.id); setColFilterSearch("");}}>
+                            {c.label}
+                            <span style={{fontSize:8,color:filterActive?"#DDB863":"#5A5A5A"}}>▾</span>
+                          </div>
+                          {isOpen && (
+                            <div ref={filterDropRef} style={{position:"absolute",top:"calc(100% + 4px)",left:0,background:"#1E1E1E",border:"1px solid rgba(221,184,99,0.22)",borderRadius:6,zIndex:1001,minWidth:180,maxWidth:240,boxShadow:"0 12px 32px rgba(0,0,0,0.7)",textTransform:"none",fontWeight:400}}>
+                              <div style={{padding:8}}>
+                                <input value={colFilterSearch} onChange={e=>setColFilterSearch(e.target.value)} placeholder="Buscar valor..." autoFocus style={{...S.inp,width:"100%",fontSize:10,padding:"4px 8px",boxSizing:"border-box"}}/>
+                              </div>
+                              <div style={{display:"flex",gap:6,padding:"0 8px 6px"}}>
+                                <button onClick={()=>setColFilters(prev=>{const {[c.id]:_,...rest}=prev; return rest;})} style={{flex:1,background:"rgba(221,184,99,0.1)",border:"1px solid rgba(221,184,99,0.3)",borderRadius:4,color:"#DDB863",fontFamily:"Roboto",fontSize:9,padding:"3px",cursor:"pointer"}}>Todos</button>
+                                <button onClick={()=>setColFilters(prev=>({...prev,[c.id]:[]}))} style={{flex:1,background:"#1A1A1A",border:"1px solid rgba(221,184,99,0.15)",borderRadius:4,color:"#8C8C8C",fontFamily:"Roboto",fontSize:9,padding:"3px",cursor:"pointer"}}>Ninguno</button>
+                              </div>
+                              <div style={{maxHeight:200,overflowY:"auto",padding:"0 8px"}}>
+                                {uniqueVals(c.id).filter(v=>v.toLowerCase().includes(colFilterSearch.toLowerCase())).map(v=>{
+                                  const checked = !colFilters[c.id] || colFilters[c.id].includes(v);
+                                  return (
+                                    <div key={v} onClick={()=>toggleColFilterVal(c.id,v)}
+                                      style={{display:"flex",alignItems:"center",gap:6,padding:"3px 0",cursor:"pointer",fontSize:11,color:checked?"#F8F4E8":"#5A5A5A"}}>
+                                      <span style={{width:11,height:11,borderRadius:2,border:`1px solid ${checked?"#DDB863":"rgba(255,255,255,0.2)"}`,background:checked?"#DDB863":"transparent",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:8,color:"#0d0d10",flexShrink:0}}>{checked?"✓":""}</span>
+                                      <span style={{whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{v}</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                              <div style={{padding:8,borderTop:"1px solid rgba(221,184,99,0.12)"}}>
+                                <button onClick={()=>{setFilterDropOpen(null);setColFilterSearch("");}} style={{width:"100%",background:"rgba(221,184,99,0.14)",border:"1px solid rgba(221,184,99,0.45)",borderRadius:4,color:"#DDB863",fontFamily:"Roboto",fontSize:10,padding:"4px",cursor:"pointer",fontWeight:700}}>Aplicar →</button>
+                              </div>
+                            </div>
+                          )}
                         </th>
-                      ))}
+                        );
+                      })}
                     </tr>
                   </thead>
                   <tbody>
