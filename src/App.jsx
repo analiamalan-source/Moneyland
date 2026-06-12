@@ -494,7 +494,7 @@ export default function Moneyland() {
   const downloadTemplate = () => {
     const rows = [
       "sep=;",
-      "Fecha;Banco cobra/paga;Tipo;Concepto 1;Concepto 2;Descripcion;Forma cobro/pago;Banco emisor;Plazo dias;USD;TC;Pesos;IVA"
+      "Fecha;Año;Mes;Banco cobra/paga;Tipo;Concepto 1;Concepto 2;Categoría;Descripcion;Forma cobro/pago;Banco emisor;Plazo dias;Fecha de cobro / pago;USD;TC;Pesos;IVA;Total"
     ];
     const csv = "﻿" + rows.join("\r\n");
     const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"})); a.download = "FinCFO_plantilla.csv"; a.click();
@@ -540,16 +540,33 @@ export default function Moneyland() {
       // Detecta el separador: ; (plantilla es-UY) o , (xlsx exportado por SheetJS)
       const delim = lines[0].split(";").length > lines[0].split(",").length ? ";" : ",";
       const clean = (s) => (s||"").trim().replace(/^"(.*)"$/,"$1").trim();
+      // Normaliza encabezados para comparar sin tildes, mayúsculas ni espacios
+      const norm = (s) => (s||"").toLowerCase().normalize("NFD").replace(new RegExp("[\\u0300-\\u036f]","g"),"").replace(/\s+/g,"");
       const hdr = lines[0].split(delim).map(clean);
       const movs = [];
       for(let i=1;i<lines.length;i++){
         const cols = lines[i].split(delim).map(clean);
         if(cols.length<3) continue;
-        const get=(n)=>{const idx=hdr.findIndex(h=>h.toLowerCase().includes(n.toLowerCase()));return idx>=0?(cols[idx]||"").trim():"";};
-        const f=get("fecha"),c1=get("concepto 1");
+        const get=(key)=>{
+          const target = norm(key);
+          let idx = hdr.findIndex(h=>norm(h)===target);
+          if(idx<0) idx = hdr.findIndex(h=>norm(h).includes(target));
+          return idx>=0?(cols[idx]||"").trim():"";
+        };
+        const f=get("fecha"),c1=get("concepto1");
         if(!f||!c1) continue;
-        const p=parseNum(get("pesos")),iv=parseNum(get("iva"))||null;
-        movs.push({id:i,f,m:String(new Date(f).getMonth()+1),b:get("banco"),t:get("tipo")||"Personal",c1,c2:get("concepto 2"),cat:TX[get("tipo")||"Personal"]?.[c1]?.cat||"",d:get("descripcion"),fm:get("forma"),be:get("banco emisor"),plazo:get("plazo"),p,iva:iv,tot:p+(iv||0),pendiente:false,confianza:"alta"});
+        const t = get("tipo")||"Personal";
+        const plazo = get("plazodias");
+        const usd = parseNum(get("usd"));
+        const tc = parseNum(get("tc"));
+        const pesosCSV = parseNum(get("pesos"));
+        const p = (usd&&tc) ? usd*tc : pesosCSV;
+        const iva = parseNum(get("iva"))||null;
+        const totalCSV = get("total");
+        const tot = totalCSV ? parseNum(totalCSV) : p+(iva||0);
+        const cat = get("categoria") || TX[t]?.[c1]?.cat || "";
+        const fechaCP = get("fechadecobro/pago") || (plazo?addDays(f,plazo):f);
+        movs.push({id:i,f,m:String(new Date(f).getMonth()+1),b:get("bancocobra/paga"),t,c1,c2:get("concepto2"),cat,d:get("descripcion"),fm:get("formacobro/pago"),be:get("bancoemisor"),plazo,fechaCP,p,iva,tot,pendiente:false,confianza:"alta"});
       }
       setLoadMovs(movs); setLoadStep("review");
     } else await procesarConIA(text, tipo);
