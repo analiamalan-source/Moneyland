@@ -94,6 +94,14 @@ const PAGO_TARJETA_PATTERNS = ["PAGO OCA","PAGOTARD","PAGO TARJETA","PAGO TARD",
 // quita números/fechas/montos variables, dejando solo la parte fija del texto.
 const normalizarDesc = (d) => (d||"").toUpperCase().replace(/[0-9]+/g," ").replace(/\s+/g," ").trim();
 
+// Convierte un número en formato es-UY ("1.500,50") o estándar ("1500.50") a float.
+const parseNum = (s) => {
+  if(!s) return 0;
+  let v = String(s).trim();
+  if(v.includes(",")) v = v.replace(/\./g,"").replace(",",".");
+  return parseFloat(v)||0;
+};
+
 const fmtN = (n) => "$ " + Math.abs(n||0).toLocaleString("es-UY",{minimumFractionDigits:0,maximumFractionDigits:0});
 const fmtD = (d) => { if(!d) return "—"; const [y,m,day]=d.split("-"); return `${day}/${m}/${y}`; };
 const today = () => new Date().toISOString().split("T")[0];
@@ -484,8 +492,13 @@ export default function Moneyland() {
   const selStyle = {background:"#1E1E1E",border:"1px solid rgba(221,184,99,0.18)",borderRadius:5,color:"#F8F4E8",fontFamily:"Roboto",fontSize:11,padding:"5px 8px",cursor:"pointer"};
 
   const downloadTemplate = () => {
-    const csv = ["Fecha,Banco cobra/paga,Tipo,Concepto 1,Concepto 2,Descripcion,Forma cobro/pago,Banco emisor,Plazo dias,USD,TC,Pesos,IVA","2026-05-01,Itaú UYU,Personal,Alimentación,Supermercado,Devoto,Pago transferencia,Itaú UYU,0,,,1500,"].join("\n");
-    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv],{type:"text/csv"})); a.download = "FinCFO_plantilla.csv"; a.click();
+    const rows = [
+      "sep=;",
+      "Fecha;Banco cobra/paga;Tipo;Concepto 1;Concepto 2;Descripcion;Forma cobro/pago;Banco emisor;Plazo dias;USD;TC;Pesos;IVA",
+      "2026-05-01;Itaú UYU;Personal;Alimentación;Supermercado;Devoto;Pago transferencia;Itaú UYU;0;;;1500;"
+    ];
+    const csv = "﻿" + rows.join("\r\n");
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"})); a.download = "FinCFO_plantilla.csv"; a.click();
   };
 
   const procesarConIA = async (texto, tipo) => {
@@ -516,23 +529,27 @@ export default function Moneyland() {
     let text;
     if(/\.xlsx?$/i.test(file.name)){
       const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, {type:"array"});
+      const wb = XLSX.read(buf, {type:"array", cellDates:true});
       const sheet = wb.Sheets[wb.SheetNames[0]];
-      text = XLSX.utils.sheet_to_csv(sheet);
+      text = XLSX.utils.sheet_to_csv(sheet, {dateNF:"yyyy-mm-dd"});
     } else {
       text = await file.text();
     }
     if(tipo==="masiva"){
-      const lines = text.split("\n").filter(l=>l.trim());
-      const hdr = lines[0].split(",");
+      let lines = text.split(/\r?\n/).filter(l=>l.trim());
+      if(/^sep=/i.test(lines[0])) lines = lines.slice(1);
+      // Detecta el separador: ; (plantilla es-UY) o , (xlsx exportado por SheetJS)
+      const delim = lines[0].split(";").length > lines[0].split(",").length ? ";" : ",";
+      const clean = (s) => (s||"").trim().replace(/^"(.*)"$/,"$1").trim();
+      const hdr = lines[0].split(delim).map(clean);
       const movs = [];
       for(let i=1;i<lines.length;i++){
-        const cols = lines[i].split(",");
+        const cols = lines[i].split(delim).map(clean);
         if(cols.length<3) continue;
         const get=(n)=>{const idx=hdr.findIndex(h=>h.toLowerCase().includes(n.toLowerCase()));return idx>=0?(cols[idx]||"").trim():"";};
         const f=get("fecha"),c1=get("concepto 1");
         if(!f||!c1) continue;
-        const p=parseFloat(get("pesos"))||0,iv=parseFloat(get("iva"))||null;
+        const p=parseNum(get("pesos")),iv=parseNum(get("iva"))||null;
         movs.push({id:i,f,m:String(new Date(f).getMonth()+1),b:get("banco"),t:get("tipo")||"Personal",c1,c2:get("concepto 2"),cat:TX[get("tipo")||"Personal"]?.[c1]?.cat||"",d:get("descripcion"),fm:get("forma"),be:get("banco emisor"),plazo:get("plazo"),p,iva:iv,tot:p+(iv||0),pendiente:false,confianza:"alta"});
       }
       setLoadMovs(movs); setLoadStep("review");
