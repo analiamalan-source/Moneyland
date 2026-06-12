@@ -94,21 +94,29 @@ const PAGO_TARJETA_PATTERNS = ["PAGO OCA","PAGOTARD","PAGO TARJETA","PAGO TARD",
 // quita números/fechas/montos variables, dejando solo la parte fija del texto.
 const normalizarDesc = (d) => (d||"").toUpperCase().replace(/[0-9]+/g," ").replace(/\s+/g," ").trim();
 
-// Convierte un número en formato es-UY ("1.500,50" o "1.500") o estándar ("1500.50") a float.
+// Convierte un número en formato es-UY ("1.500,50" o "1.500"), US ("1,500.50") o estándar ("1500.50") a float.
 const parseNum = (s) => {
   if(s===null||s===undefined||s==="") return 0;
   let v = String(s).trim();
   if(!v) return 0;
-  if(v.includes(",")) {
-    // Hay coma: es-UY -> el punto es separador de miles, la coma es el decimal
-    v = v.replace(/\./g,"").replace(",",".");
-  } else if(v.includes(".")) {
-    // Sin coma: si el punto separa grupos de 3 dígitos (ej "1.500" o "12.345.678")
+  const hasComma = v.includes(",");
+  const hasDot = v.includes(".");
+  if(hasComma && hasDot) {
+    // Tiene los dos: el que aparece más a la derecha es el decimal, el otro es separador de miles
+    if(v.lastIndexOf(",") > v.lastIndexOf(".")) v = v.replace(/\./g,"").replace(",","."); // es-UY: 1.234,56
+    else v = v.replace(/,/g,""); // US: 1,234.56
+  } else if(hasComma) {
+    // Solo coma -> decimal es-UY (ej "1500,50")
+    v = v.replace(",",".");
+  } else if(hasDot) {
+    // Solo punto: si separa grupos de 3 dígitos (ej "1.500", "-100.000", "12.345.678")
     // es separador de miles es-UY, no decimal. "1500.5" (2 decimales) se deja como está.
-    const parts = v.split(".");
+    const neg = v.startsWith("-");
+    const body = neg ? v.slice(1) : v;
+    const parts = body.split(".");
     const last = parts[parts.length-1];
     if(parts.length>1 && last.length===3 && parts.slice(0,-1).every(p=>p.length>=1&&p.length<=3)) {
-      v = parts.join("");
+      v = (neg?"-":"") + parts.join("");
     }
   }
   return parseFloat(v)||0;
