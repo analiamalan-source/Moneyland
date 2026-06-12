@@ -105,7 +105,16 @@ const parseNum = (s) => {
 const fmtN = (n) => "$ " + Math.abs(n||0).toLocaleString("es-UY",{minimumFractionDigits:0,maximumFractionDigits:0});
 const fmtD = (d) => { if(!d) return "—"; const [y,m,day]=d.split("-"); return `${day}/${m}/${y}`; };
 const today = () => new Date().toISOString().split("T")[0];
-const addDays = (d,n) => { if(!d||!n) return d; const dt=new Date(d); dt.setDate(dt.getDate()+parseInt(n)); return dt.toISOString().split("T")[0]; };
+const addDays = (d,n) => { if(!d||!n) return d; const dt=new Date(d); if(isNaN(dt.getTime())) return d; dt.setDate(dt.getDate()+parseInt(n)); return dt.toISOString().split("T")[0]; };
+// Convierte una fecha en formato dd/mm/yyyy o dd-mm-yyyy (es-UY) a "yyyy-mm-dd". Si ya viene en ISO, la deja igual.
+const parseFecha = (s) => {
+  if(!s) return "";
+  s = String(s).trim();
+  if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
+  const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if(m) return `${m[3]}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`;
+  return s;
+};
 
 const emptyForm = () => ({fecha:today(),bancoCobPag:"",tipo:"Personal",c1:"Ingresos",c2:"Sueldo",cat:"Ingresos",desc:"",forma:"Cobro transferencia",bancoEmisor:"SCOTIABANK UYU",plazo:"",fechaCP:today(),fechaManual:false,usd:"",tc:"",pesos:"",iva:""});
 
@@ -553,8 +562,8 @@ export default function Moneyland() {
           if(idx<0) idx = hdr.findIndex(h=>norm(h).includes(target));
           return idx>=0?(cols[idx]||"").trim():"";
         };
-        const f=get("fecha"),c1=get("concepto1");
-        if(!f||!c1) continue;
+        const f=parseFecha(get("fecha")),c1=get("concepto1");
+        if(!f||!c1||isNaN(new Date(f).getTime())) continue;
         const t = get("tipo")||"Personal";
         const plazo = get("plazodias");
         const usd = parseNum(get("usd"));
@@ -565,7 +574,7 @@ export default function Moneyland() {
         const totalCSV = get("total");
         const tot = totalCSV ? parseNum(totalCSV) : p+(iva||0);
         const cat = get("categoria") || TX[t]?.[c1]?.cat || "";
-        const fechaCP = get("fechadecobro/pago") || (plazo?addDays(f,plazo):f);
+        const fechaCP = parseFecha(get("fechadecobro/pago")) || (plazo?addDays(f,plazo):f);
         movs.push({id:i,f,m:String(new Date(f).getMonth()+1),b:get("bancocobra/paga"),t,c1,c2:get("concepto2"),cat,d:get("descripcion"),fm:get("formacobro/pago"),be:get("bancoemisor"),plazo,fechaCP,p,iva,tot,pendiente:false,confianza:"alta"});
       }
       setLoadMovs(movs); setLoadStep("review");
