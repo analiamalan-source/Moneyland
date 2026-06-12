@@ -494,8 +494,7 @@ export default function Moneyland() {
   const downloadTemplate = () => {
     const rows = [
       "sep=;",
-      "Fecha;Banco cobra/paga;Tipo;Concepto 1;Concepto 2;Descripcion;Forma cobro/pago;Banco emisor;Plazo dias;USD;TC;Pesos;IVA",
-      "2026-05-01;Itaú UYU;Personal;Alimentación;Supermercado;Devoto;Pago transferencia;Itaú UYU;0;;;1500;"
+      "Fecha;Banco cobra/paga;Tipo;Concepto 1;Concepto 2;Descripcion;Forma cobro/pago;Banco emisor;Plazo dias;USD;TC;Pesos;IVA"
     ];
     const csv = "﻿" + rows.join("\r\n");
     const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"})); a.download = "FinCFO_plantilla.csv"; a.click();
