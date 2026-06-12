@@ -94,11 +94,23 @@ const PAGO_TARJETA_PATTERNS = ["PAGO OCA","PAGOTARD","PAGO TARJETA","PAGO TARD",
 // quita números/fechas/montos variables, dejando solo la parte fija del texto.
 const normalizarDesc = (d) => (d||"").toUpperCase().replace(/[0-9]+/g," ").replace(/\s+/g," ").trim();
 
-// Convierte un número en formato es-UY ("1.500,50") o estándar ("1500.50") a float.
+// Convierte un número en formato es-UY ("1.500,50" o "1.500") o estándar ("1500.50") a float.
 const parseNum = (s) => {
-  if(!s) return 0;
+  if(s===null||s===undefined||s==="") return 0;
   let v = String(s).trim();
-  if(v.includes(",")) v = v.replace(/\./g,"").replace(",",".");
+  if(!v) return 0;
+  if(v.includes(",")) {
+    // Hay coma: es-UY -> el punto es separador de miles, la coma es el decimal
+    v = v.replace(/\./g,"").replace(",",".");
+  } else if(v.includes(".")) {
+    // Sin coma: si el punto separa grupos de 3 dígitos (ej "1.500" o "12.345.678")
+    // es separador de miles es-UY, no decimal. "1500.5" (2 decimales) se deja como está.
+    const parts = v.split(".");
+    const last = parts[parts.length-1];
+    if(parts.length>1 && last.length===3 && parts.slice(0,-1).every(p=>p.length>=1&&p.length<=3)) {
+      v = parts.join("");
+    }
+  }
   return parseFloat(v)||0;
 };
 
@@ -143,6 +155,9 @@ export default function Moneyland() {
   const [reportTab, setReportTab] = useState("rentabilidad");
   const [filterTipo, setFilterTipo] = useState("todos");
   const [searchQ, setSearchQ] = useState("");
+  const [filterMesAno, setFilterMesAno] = useState("todos");
+  const [filterConcepto, setFilterConcepto] = useState("todos");
+  const [selectedIds, setSelectedIds] = useState([]);
   const [colDropOpen, setColDropOpen] = useState(false);
   const colDropRef = useRef(null);
   const [visibleCols, setVisibleCols] = useState(["fecha","tipo","banco","categoria","concepto","descripcion","subtotal","total"]);
@@ -242,7 +257,7 @@ export default function Moneyland() {
       const bancosData = await bancosRes.json();
       const tarjetasData = await tarjetasRes.json();
       const reglasData = await reglasRes.json();
-      if(Array.isArray(regsData)) setRegs(regsData.map(r=>({...r, f:r.fecha, m:r.mes, b:r.banco_cob_pag, t:r.tipo, c1:r.concepto1, c2:r.concepto2, cat:r.categoria, d:r.descripcion, fm:r.forma, be:r.banco_emisor, p:r.pesos, tot:r.total})));
+      if(Array.isArray(regsData)) setRegs(regsData.map(r=>({...r, f:r.fecha, m:r.mes, b:r.banco_cob_pag, t:r.tipo, c1:r.concepto1, c2:r.concepto2, cat:r.categoria, d:r.descripcion, fm:r.forma, be:r.banco_emisor, p:r.pesos, tot:r.total, fechaCP:r.fecha_cp||r.fecha})));
       if(Array.isArray(bancosData) && bancosData.length>0) setConfig(prev=>({...prev, bancos:bancosData}));
       if(Array.isArray(tarjetasData) && tarjetasData.length>0) setConfig(prev=>({...prev, tarjetas:tarjetasData}));
       if(Array.isArray(reglasData)) {
@@ -287,10 +302,11 @@ export default function Moneyland() {
   };
 
   const saveRegToDB = async (reg) => {
-    if(!session?.access_token) return;
-    await fetch(`${SUPABASE_URL}/rest/v1/registros`, {
+    if(!session?.access_token) return null;
+    const headers = {"apikey": SUPABASE_KEY, "Authorization": `Bearer ${session.access_token}`, "Content-Type": "application/json"};
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/registros`, {
       method: "POST",
-      headers: {"apikey": SUPABASE_KEY, "Authorization": `Bearer ${session.access_token}`, "Content-Type": "application/json", "Prefer": "return=minimal"},
+      headers: {...headers, "Prefer": "return=representation"},
       body: JSON.stringify({
         user_id: session.user?.id,
         fecha: reg.f, mes: reg.m, ano: reg.a,
@@ -302,6 +318,17 @@ export default function Moneyland() {
         iva: reg.iva, total: reg.tot
       })
     });
+    const data = await r.json();
+    const id = Array.isArray(data) ? data[0]?.id : null;
+    // best-effort: solo aplica si existen las columnas fecha_cp, usd y tc
+    if(id) {
+      fetch(`${SUPABASE_URL}/rest/v1/registros?id=eq.${id}`, {
+        method: "PATCH",
+        headers: {...headers, "Prefer": "return=minimal"},
+        body: JSON.stringify({ fecha_cp: reg.fechaCP, usd: reg.usd??null, tc: reg.tc??null })
+      }).catch(()=>{});
+    }
+    return id;
   };
 
   const deleteAllRegs = async () => {
@@ -329,12 +356,24 @@ export default function Moneyland() {
         iva: reg.iva, total: reg.tot
       })
     });
-    // best-effort: solo aplica si existe la columna fecha_cp
+    // best-effort: solo aplica si existen las columnas fecha_cp, usd y tc
     fetch(`${SUPABASE_URL}/rest/v1/registros?id=eq.${id}`, {
       method: "PATCH",
       headers,
-      body: JSON.stringify({ fecha_cp: reg.fechaCP })
+      body: JSON.stringify({ fecha_cp: reg.fechaCP, usd: reg.usd??null, tc: reg.tc??null })
     }).catch(()=>{});
+  };
+
+  // Borra varios registros (por id) de Supabase y del estado local
+  const deleteRegsFromDB = async (ids) => {
+    if(!ids.length) return;
+    if(session?.access_token) {
+      await fetch(`${SUPABASE_URL}/rest/v1/registros?id=in.(${ids.join(",")})`, {
+        method: "DELETE",
+        headers: {"apikey": SUPABASE_KEY, "Authorization": `Bearer ${session.access_token}`}
+      });
+    }
+    setRegs(prev=>prev.filter(r=>!ids.includes(r.id)));
   };
   // Guarda/actualiza una regla de clasificación aprendida para futuras cargas
   const saveReglaToDB = async (patron, regla) => {
@@ -394,9 +433,9 @@ export default function Moneyland() {
 
   async function submit(){
     const mes=form.fecha?String(new Date(form.fecha).getMonth()+1):"";
-    const reg={id:Date.now(),f:form.fecha,m:mes,a:form.fecha?String(new Date(form.fecha).getFullYear()):"",b:form.bancoCobPag,t:form.tipo,c1:form.c1,c2:form.c2,cat:catAuto,d:form.desc,fm:form.forma,be:form.bancoEmisor,plazo:form.plazo,p:pesosCalc,iva:ivaNum||null,tot:totalCalc};
-    await saveRegToDB(reg);
-    setRegs(p=>[reg,...p]);
+    const reg={id:Date.now(),f:form.fecha,m:mes,a:form.fecha?String(new Date(form.fecha).getFullYear()):"",b:form.bancoCobPag,t:form.tipo,c1:form.c1,c2:form.c2,cat:catAuto,d:form.desc,fm:form.forma,be:form.bancoEmisor,plazo:form.plazo,fechaCP:fechaCPCalc,usd:usdN||null,tc:tcN||null,p:pesosCalc,iva:ivaNum||null,tot:totalCalc};
+    const id = await saveRegToDB(reg);
+    setRegs(p=>[{...reg,id:id||reg.id},...p]);
     setForm(emptyForm());
     setSaved(true);
     setTimeout(()=>setSaved(false),2000);
@@ -526,7 +565,7 @@ export default function Moneyland() {
         const t = regla?.t || m.tipo || "Personal";
         const c1 = regla?.c1 || m.concepto1;
         const c2 = regla?.c2 ?? (m.concepto2||"");
-        return {id:i+1,f:m.fecha,m:String(new Date(m.fecha||"2026-01-01").getMonth()+1),b:bancoCarga,t,c1,c2,cat:TX[t]?.[c1]?.cat||"",d:m.descripcion,fm:tipo==="banco"?"Pago transferencia":"Pago crédito",be:bancoCarga,plazo:"0",p:Math.abs(m.monto||0)*(m.monto<0?-1:1),iva:null,tot:m.monto||0,moneda:m.moneda||"UYU",esPagoTarjeta,confianza:regla?"alta":(m.confianza||"alta"),pendiente:esPagoTarjeta};
+        return {id:i+1,f:m.fecha,m:String(new Date(m.fecha||"2026-01-01").getMonth()+1),b:bancoCarga,t,c1,c2,cat:TX[t]?.[c1]?.cat||"",d:m.descripcion,fm:tipo==="banco"?"Pago transferencia":"Pago crédito",be:bancoCarga,plazo:"0",fechaCP:m.fecha,usd:null,tc:null,p:Math.abs(m.monto||0)*(m.monto<0?-1:1),iva:null,tot:m.monto||0,moneda:m.moneda||"UYU",esPagoTarjeta,confianza:regla?"alta":(m.confianza||"alta"),pendiente:esPagoTarjeta};
       });
       setLoadMovs(movs); setLoadStep("review");
     } catch(e) { setLoadError("Error al procesar. Verificá el archivo."); setLoadStep("upload"); }
@@ -575,7 +614,7 @@ export default function Moneyland() {
         const tot = totalCSV ? parseNum(totalCSV) : p+(iva||0);
         const cat = get("categoria") || TX[t]?.[c1]?.cat || "";
         const fechaCP = parseFecha(get("fechadecobro/pago")) || (plazo?addDays(f,plazo):f);
-        movs.push({id:i,f,m:String(new Date(f).getMonth()+1),b:get("bancocobra/paga"),t,c1,c2:get("concepto2"),cat,d:get("descripcion"),fm:get("formacobro/pago"),be:get("bancoemisor"),plazo,fechaCP,p,iva,tot,pendiente:false,confianza:"alta"});
+        movs.push({id:i,f,m:String(new Date(f).getMonth()+1),b:get("bancocobra/paga"),t,c1,c2:get("concepto2"),cat,d:get("descripcion"),fm:get("formacobro/pago"),be:get("bancoemisor"),plazo,fechaCP,usd:usd||null,tc:tc||null,p,iva,tot,pendiente:false,confianza:"alta"});
       }
       setLoadMovs(movs); setLoadStep("review");
     } else await procesarConIA(text, tipo);
@@ -583,13 +622,13 @@ export default function Moneyland() {
 
   const confirmar = async () => {
     const toSave = loadMovs.filter(m=>!m.pendiente).map(m=>({...m, a: m.f ? String(new Date(m.f).getFullYear()) : ""}));
-    await Promise.all(toSave.map(m=>saveRegToDB(m)));
+    const ids = await Promise.all(toSave.map(m=>saveRegToDB(m)));
     // Aprende la clasificación de cada movimiento (incluidos los pendientes de conciliación) para futuras cargas
     loadMovs.forEach(m=>{
       const patron = normalizarDesc(m.d);
       if(patron) saveReglaToDB(patron, {t:m.t, c1:m.c1, c2:m.c2, esPagoTarjeta:!!m.esPagoTarjeta});
     });
-    setRegs(prev=>[...toSave.map(m=>({...m,id:Date.now()+m.id})),...prev]);
+    setRegs(prev=>[...toSave.map((m,i)=>({...m,id:ids[i]||(Date.now()+m.id)})),...prev]);
     setLoadStep("done"); setLoadMovs([]);
   };
 
@@ -1007,16 +1046,42 @@ export default function Moneyland() {
           const colCount = ALL_COLS.filter(c=>vc.includes(c.id)).length;
           const toggleCol = (id) => setVisibleCols(prev=>prev.includes(id)?prev.filter(c=>c!==id):[...prev,id]);
 
+          // Opciones de filtro de Mes/Año, derivadas de los registros existentes
+          const mesesDisponibles = Object.entries(regs.reduce((acc,r)=>{
+            if(r.f) acc[r.f.slice(0,7)] = true;
+            return acc;
+          },{})).map(([k])=>k).sort().reverse().map(k=>{
+            const [a,m] = k.split("-");
+            return {key:k, label:`${MESES_NOM[+m]} ${a}`};
+          });
+          // Opciones de filtro de Concepto, derivadas de los registros existentes
+          const conceptosDisponibles = [...new Set(regs.map(r=>r.c1).filter(Boolean))].sort();
+
           const filteredAll = regs.filter(r=>{
             if(filterTipo!=="todos"&&r.t!==filterTipo) return false;
+            if(filterMesAno!=="todos"&&r.f?.slice(0,7)!==filterMesAno) return false;
+            if(filterConcepto!=="todos"&&r.c1!==filterConcepto) return false;
             if(searchQ&&![r.d,r.c1,r.c2,r.b].join(" ").toLowerCase().includes(searchQ.toLowerCase())) return false;
             return true;
           });
           const filteredRegs = filteredAll.slice(0,80);
 
+          const allFilteredSelected = filteredAll.length>0 && filteredAll.every(r=>selectedIds.includes(r.id));
+          const toggleSelectAll = () => {
+            if(allFilteredSelected) setSelectedIds(prev=>prev.filter(id=>!filteredAll.some(r=>r.id===id)));
+            else setSelectedIds(prev=>[...new Set([...prev, ...filteredAll.map(r=>r.id)])]);
+          };
+          const toggleSelectOne = (id) => setSelectedIds(prev=>prev.includes(id)?prev.filter(x=>x!==id):[...prev,id]);
+          const eliminarSeleccionados = async () => {
+            if(!selectedIds.length) return;
+            if(!window.confirm(`¿Eliminar ${selectedIds.length} registro(s)? Esta acción no se puede deshacer.`)) return;
+            await deleteRegsFromDB(selectedIds);
+            setSelectedIds([]);
+          };
+
           const startEdit = (r) => {
             setEditingId(r.id);
-            setEditRow({f:r.f||"",t:r.t||"Personal",b:r.b||"",c1:r.c1||"",c2:r.c2||"",d:r.d||"",fm:r.fm||"",be:r.be||"",plazo:r.plazo??"",fechaCP:r.fechaCP||r.f||"",p:r.p??"",iva:r.iva??""});
+            setEditRow({f:r.f||"",t:r.t||"Personal",b:r.b||"",c1:r.c1||"",c2:r.c2||"",d:r.d||"",fm:r.fm||"",be:r.be||"",plazo:r.plazo??"",fechaCP:r.fechaCP||r.f||"",usd:r.usd??"",tc:r.tc??"",p:r.p??"",iva:r.iva??""});
           };
           const cancelEdit = () => { setEditingId(null); setEditRow(null); };
           const saveEdit = async (id) => {
@@ -1025,7 +1090,9 @@ export default function Moneyland() {
             const cat = TX[editRow.t]?.[editRow.c1]?.cat||"";
             const p = parseFloat(editRow.p)||0;
             const iva = editRow.iva===""?null:parseFloat(editRow.iva)||0;
-            const updated = {f:editRow.f,m:mes,a:ano,b:editRow.b,t:editRow.t,c1:editRow.c1,c2:editRow.c2,cat,d:editRow.d,fm:editRow.fm,be:editRow.be,plazo:editRow.plazo,fechaCP:editRow.fechaCP,p,iva,tot:p+(iva||0)};
+            const usd = editRow.usd===""?null:parseFloat(editRow.usd)||0;
+            const tc = editRow.tc===""?null:parseFloat(editRow.tc)||0;
+            const updated = {f:editRow.f,m:mes,a:ano,b:editRow.b,t:editRow.t,c1:editRow.c1,c2:editRow.c2,cat,d:editRow.d,fm:editRow.fm,be:editRow.be,plazo:editRow.plazo,fechaCP:editRow.fechaCP,usd,tc,p,iva,tot:p+(iva||0)};
             await updateRegInDB(id, updated);
             const patron = normalizarDesc(updated.d);
             if(patron) saveReglaToDB(patron, {t:updated.t, c1:updated.c1, c2:updated.c2, esPagoTarjeta:false});
@@ -1044,6 +1111,16 @@ export default function Moneyland() {
                     {t}
                   </button>
                 ))}
+
+                <select value={filterMesAno} onChange={e=>setFilterMesAno(e.target.value)} style={{...selStyle,fontSize:10,padding:"5px 8px"}}>
+                  <option value="todos">Todos los meses</option>
+                  {mesesDisponibles.map(o=><option key={o.key} value={o.key}>{o.label}</option>)}
+                </select>
+
+                <select value={filterConcepto} onChange={e=>setFilterConcepto(e.target.value)} style={{...selStyle,fontSize:10,padding:"5px 8px"}}>
+                  <option value="todos">Todos los conceptos</option>
+                  {conceptosDisponibles.map(c=><option key={c} value={c}>{c}</option>)}
+                </select>
 
                 {/* Selector de columnas */}
                 <div style={{position:"relative",marginLeft:4}} ref={colDropRef}>
@@ -1074,6 +1151,13 @@ export default function Moneyland() {
                   )}
                 </div>
 
+                {selectedIds.length>0 && (
+                  <button onClick={eliminarSeleccionados}
+                    style={{background:"rgba(240,96,96,0.12)",border:"1px solid rgba(240,96,96,0.4)",borderRadius:4,color:"#f06060",fontFamily:"Roboto",fontSize:10,padding:"5px 10px",cursor:"pointer"}}>
+                    🗑 Eliminar seleccionados ({selectedIds.length})
+                  </button>
+                )}
+
                 <span style={{marginLeft:"auto",fontSize:11,color:"#8C8C8C"}}>
                   {filteredAll.length>filteredRegs.length
                     ? `Mostrando ${filteredRegs.length} de ${filteredAll.length} registros — afiná la búsqueda para ver más`
@@ -1086,8 +1170,11 @@ export default function Moneyland() {
                 <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:400}}>
                   <thead>
                     <tr style={{borderBottom:"1px solid rgba(221,184,99,0.15)"}}>
+                      <th style={{padding:"7px 8px",background:"#141414",width:28}}>
+                        <input type="checkbox" checked={allFilteredSelected} onChange={toggleSelectAll} style={{cursor:"pointer"}}/>
+                      </th>
                       {ALL_COLS.filter(c=>vc.includes(c.id)).map(c=>(
-                        <th key={c.id} style={{textAlign:c.id==="total"?"right":"left",padding:"7px 10px",fontSize:10,color:"#8C8C8C",textTransform:"uppercase",letterSpacing:0.5,whiteSpace:"nowrap",background:"#141414",position:c.id==="fecha"?"sticky":undefined,left:c.id==="fecha"?0:undefined,zIndex:c.id==="fecha"?1:undefined}}>
+                        <th key={c.id} style={{textAlign:c.id==="total"?"right":"left",padding:"7px 10px",fontSize:10,color:"#8C8C8C",textTransform:"uppercase",letterSpacing:0.5,whiteSpace:"nowrap",background:"#141414",position:c.id==="fecha"?"sticky":undefined,left:c.id==="fecha"?28:undefined,zIndex:c.id==="fecha"?1:undefined}}>
                           {c.label}
                         </th>
                       ))}
@@ -1101,7 +1188,10 @@ export default function Moneyland() {
                         <tr style={{borderBottom:"1px solid rgba(255,255,255,0.03)"}}
                           onMouseEnter={e=>{e.currentTarget.style.background="#1E1E1E"; const ic=e.currentTarget.querySelector('.edit-ic'); if(ic)ic.style.opacity="1";}}
                           onMouseLeave={e=>{e.currentTarget.style.background="transparent"; const ic=e.currentTarget.querySelector('.edit-ic'); if(ic)ic.style.opacity="0";}}>
-                          {vc.includes("fecha")&&<td style={{padding:"7px 10px",fontSize:11,color:"#8C8C8C",whiteSpace:"nowrap",background:"#141414",position:"sticky",left:0,cursor:"pointer"}} onClick={()=>editingId===r.id?cancelEdit():startEdit(r)}>
+                          <td style={{padding:"7px 8px",width:28}}>
+                            <input type="checkbox" checked={selectedIds.includes(r.id)} onChange={()=>toggleSelectOne(r.id)} style={{cursor:"pointer"}}/>
+                          </td>
+                          {vc.includes("fecha")&&<td style={{padding:"7px 10px",fontSize:11,color:"#8C8C8C",whiteSpace:"nowrap",background:"#141414",position:"sticky",left:28,cursor:"pointer"}} onClick={()=>editingId===r.id?cancelEdit():startEdit(r)}>
                             <div style={{display:"flex",alignItems:"center",gap:6}}>
                               {fmtD(r.f)}
                               <span className="edit-ic" style={{fontSize:9,color:"#DDB863",opacity:0,transition:"opacity 0.1s"}}>✎</span>
@@ -1124,7 +1214,7 @@ export default function Moneyland() {
                         </tr>
                         {editingId===r.id && editRow && (
                           <tr style={{borderBottom:"1px solid rgba(221,184,99,0.15)"}}>
-                            <td colSpan={colCount} style={{padding:14,background:"#1A1A1A"}}>
+                            <td colSpan={colCount+1} style={{padding:14,background:"#1A1A1A"}}>
                               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:10}}>
                                 <div><label style={S.lbl}>Fecha</label><input type="date" value={editRow.f} onChange={e=>setEditRow(p=>({...p,f:e.target.value}))} style={S.inp}/></div>
                                 <div><label style={S.lbl}>Tipo</label>
@@ -1164,6 +1254,8 @@ export default function Moneyland() {
                                 </div>
                                 <div><label style={S.lbl}>Plazo (días)</label><input type="number" value={editRow.plazo} onChange={e=>setEditRow(p=>({...p,plazo:e.target.value}))} style={S.inp}/></div>
                                 <div><label style={S.lbl}>Fecha cobro/pago</label><input type="date" value={editRow.fechaCP} onChange={e=>setEditRow(p=>({...p,fechaCP:e.target.value}))} style={S.inp}/></div>
+                                <div><label style={S.lbl}>USD (moneda original)</label><input type="number" step="0.01" value={editRow.usd} placeholder="0.00" onChange={e=>setEditRow(p=>({...p,usd:e.target.value}))} style={S.inp}/></div>
+                                <div><label style={S.lbl}>Tipo de cambio</label><input type="number" step="0.01" value={editRow.tc} placeholder="0.00" onChange={e=>setEditRow(p=>({...p,tc:e.target.value}))} style={S.inp}/></div>
                                 <div><label style={S.lbl}>Subtotal (sin IVA)</label><input type="number" step="0.01" value={editRow.p} onChange={e=>setEditRow(p=>({...p,p:e.target.value}))} style={S.inp}/></div>
                                 <div><label style={S.lbl}>IVA</label><input type="number" step="0.01" value={editRow.iva} onChange={e=>setEditRow(p=>({...p,iva:e.target.value}))} style={S.inp}/></div>
                                 <div><label style={S.lbl}>Total (con IVA)</label><div style={S.calc}>{fmtN((parseFloat(editRow.p)||0)+(parseFloat(editRow.iva)||0))}</div></div>
