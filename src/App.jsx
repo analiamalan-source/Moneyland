@@ -105,7 +105,7 @@ const parseNum = (s) => {
 const fmtN = (n) => "$ " + Math.abs(n||0).toLocaleString("es-UY",{minimumFractionDigits:0,maximumFractionDigits:0});
 const fmtD = (d) => { if(!d) return "—"; const [y,m,day]=d.split("-"); return `${day}/${m}/${y}`; };
 const today = () => new Date().toISOString().split("T")[0];
-const addDays = (d,n) => { if(!d||!n) return d; const dt=new Date(d); if(isNaN(dt.getTime())) return d; dt.setDate(dt.getDate()+parseInt(n)); return dt.toISOString().split("T")[0]; };
+const addDays = (d,n) => { if(!d||!n) return d; const days=parseInt(n); if(isNaN(days)) return d; const dt=new Date(d); if(isNaN(dt.getTime())) return d; dt.setDate(dt.getDate()+days); return dt.toISOString().split("T")[0]; };
 // Convierte una fecha en formato dd/mm/yyyy o dd-mm-yyyy (es-UY) a "yyyy-mm-dd". Si ya viene en ISO, la deja igual.
 const parseFecha = (s) => {
   if(!s) return "";
