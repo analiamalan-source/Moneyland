@@ -201,6 +201,7 @@ export default function Moneyland() {
   const [bancoCarga, setBancoCarga] = useState("");
   const [periodoMes, setPeriodoMes] = useState("5");
   const [periodoAno, setPeriodoAno] = useState("2026");
+  const [fechaPagoTarjeta, setFechaPagoTarjeta] = useState("");
   const [fileName, setFileName] = useState("");
   const fileRef = useRef(null);
   const fileRef2 = useRef(null);
@@ -581,7 +582,8 @@ export default function Moneyland() {
         const t = regla?.t || m.tipo || "Personal";
         const c1 = regla?.c1 || m.concepto1;
         const c2 = regla?.c2 ?? (m.concepto2||"");
-        return {id:i+1,f:m.fecha,m:String(new Date(m.fecha||"2026-01-01").getMonth()+1),b:bancoCarga,t,c1,c2,cat:TX[t]?.[c1]?.cat||"",d:m.descripcion,fm:tipo==="banco"?"Pago transferencia":"Pago crédito",be:bancoCarga,plazo:"0",fechaCP:m.fecha,usd:null,tc:null,p:Math.abs(m.monto||0)*(m.monto<0?-1:1),iva:null,tot:m.monto||0,moneda:m.moneda||"UYU",esPagoTarjeta,confianza:regla?"alta":(m.confianza||"alta"),pendiente:esPagoTarjeta};
+        const fecha = (tipo==="tarjeta" && fechaPagoTarjeta) ? fechaPagoTarjeta : m.fecha;
+        return {id:i+1,f:fecha,m:String(new Date(fecha||"2026-01-01").getMonth()+1),b:bancoCarga,t,c1,c2,cat:TX[t]?.[c1]?.cat||"",d:m.descripcion,fm:tipo==="banco"?"Pago transferencia":"Pago crédito",be:bancoCarga,plazo:"0",fechaCP:fecha,usd:null,tc:null,p:Math.abs(m.monto||0)*(m.monto<0?-1:1),iva:null,tot:m.monto||0,moneda:m.moneda||"UYU",esPagoTarjeta,confianza:regla?"alta":(m.confianza||"alta"),pendiente:esPagoTarjeta};
       });
       setLoadMovs(movs); setLoadStep("review");
     } catch(e) { setLoadError("Error al procesar. Verificá el archivo."); setLoadStep("upload"); }
@@ -809,7 +811,7 @@ export default function Moneyland() {
             {/* Selector de modo */}
             <div style={{...S.g4,marginBottom:20}}>
               {[{k:"manual",i:"✏️",t:"Manual",d:"Un registro"},{k:"masiva",i:"📊",t:"Carga masiva",d:"Subí un CSV"},{k:"banco",i:"🏦",t:"Extracto banco",d:"IA categoriza"},{k:"tarjeta",i:"💳",t:"Tarjeta crédito",d:"IA categoriza"}].map(o=>(
-                <div key={o.k} onClick={()=>{setLoadType(o.k);setLoadStep("upload");setLoadMovs([]);setLoadError("");setFileName("");}}
+                <div key={o.k} onClick={()=>{setLoadType(o.k);setLoadStep("upload");setLoadMovs([]);setLoadError("");setFileName("");setFechaPagoTarjeta("");}}
                   style={{...S.card,cursor:"pointer",border:`1px solid ${loadType===o.k?"rgba(221,184,99,0.4)":"rgba(221,184,99,0.12)"}`,background:loadType===o.k?"rgba(221,184,99,0.08)":"#141414",marginBottom:0,transition:"all .1s"}}>
                   <div style={{fontSize:22,marginBottom:6}}>{o.i}</div>
                   <div style={{fontFamily:"Lora",fontSize:12,fontWeight:700,color:loadType===o.k?"#DDB863":"#F8F4E8",marginBottom:3}}>{o.t}</div>
@@ -840,7 +842,7 @@ export default function Moneyland() {
             {(loadType==="banco"||loadType==="tarjeta")&&loadStep==="upload"&&(
               <div style={S.card}>
                 <div style={S.secT}>{loadType==="banco"?"Estado de cuenta bancario":"Estado de cuenta de tarjeta"}</div>
-                <div style={{...S.g3,marginBottom:16}}>
+                <div style={{...(loadType==="tarjeta"?S.g4:S.g3),marginBottom:16}}>
                   <div>
                     <label style={S.lbl}>{loadType==="banco"?"Banco":"Tarjeta"}</label>
                     <select value={bancoCarga} onChange={e=>setBancoCarga(e.target.value)} style={S.sel}>
@@ -855,15 +857,25 @@ export default function Moneyland() {
                     </select>
                   </div>
                   <div><label style={S.lbl}>Año</label><input type="number" value={periodoAno} onChange={e=>setPeriodoAno(e.target.value)} style={S.inp}/></div>
+                  {loadType==="tarjeta"&&(
+                    <div>
+                      <label style={S.lbl}>Fecha de pago *</label>
+                      <input type="date" value={fechaPagoTarjeta} onChange={e=>setFechaPagoTarjeta(e.target.value)} style={{...S.inp,color:fechaPagoTarjeta?"#DDB863":"#8C8C8C"}}/>
+                      <div style={{fontSize:10,color:"#8C8C8C",marginTop:4}}>Cuándo salió del banco</div>
+                    </div>
+                  )}
                 </div>
-                <div style={{border:"1.5px dashed rgba(221,184,99,0.2)",borderRadius:8,padding:32,textAlign:"center",cursor:bancoCarga?"pointer":"not-allowed",opacity:bancoCarga?1:0.5}}
-                  onClick={()=>bancoCarga&&fileRef2.current?.click()}
+                {/* Para tarjeta también se requiere la fecha de pago antes de subir */}
+                {(() => { const canUpload = bancoCarga && (loadType==="banco" || fechaPagoTarjeta); return (
+                <div style={{border:"1.5px dashed rgba(221,184,99,0.2)",borderRadius:8,padding:32,textAlign:"center",cursor:canUpload?"pointer":"not-allowed",opacity:canUpload?1:0.5}}
+                  onClick={()=>canUpload&&fileRef2.current?.click()}
                   onMouseEnter={e=>bancoCarga&&(e.currentTarget.style.borderColor="rgba(221,184,99,0.5)")}
                   onMouseLeave={e=>e.currentTarget.style.borderColor="rgba(221,184,99,0.2)"}>
                   <div style={{fontSize:28,marginBottom:8}}>{loadType==="banco"?"🏦":"💳"}</div>
                   <div style={{fontSize:13,color:"#8C8C8C"}}>{fileName||`Subir ${loadType==="banco"?"extracto bancario":"estado de tarjeta"} — PDF · Excel · CSV`}</div>
                   <input ref={fileRef2} type="file" accept=".csv,.txt,.pdf,.xls,.xlsx" style={{display:"none"}} onChange={e=>handleFile(e.target.files[0],loadType)}/>
                 </div>
+                ); })()}
                 {loadError&&<div style={{color:"#f06060",fontSize:12,marginTop:10}}>{loadError}</div>}
               </div>
             )}
