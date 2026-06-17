@@ -81,7 +81,7 @@ const TX = {
 };
 
 const BANCOS_LIST = ["ITAU UYU","ITAU USD","SCOTIABANK UYU","SCOTIABANK USD","BROU UYU","BROU USD","OCA","VISA SCOTIA","VISA ITAU","MASTER OCA","AMEX SCOTIA","PREX","Otro"];
-const FORMAS = ["Cobro efectivo","Cobro transferencia","Cobro crédito","Pago efectivo","Pago transferencia","Pago crédito"];
+const FORMAS = ["Cobro efectivo","Cobro transferencia","Cobro crédito","Pago efectivo","Pago transferencia","Pago crédito","Pago tarjeta de crédito"];
 const MESES_NOM = ["","Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 const CAT_C = {"Ingresos":"#4CAF82","Gasto Fijo":"#f06060","Gasto Variable":"#f0a060","Cobros":"#DDB863","Pagos":"#c860f0","Necesidad":"#8888ee","Deseos":"#cc88cc","Transferencias":"#1D445C","Inversiones":"#1D445C","Variable":"#f0a060","Fijo":"#f06060"};
 const MESES_DISP = ["1","2","3","4"];
@@ -202,6 +202,7 @@ export default function Moneyland() {
   const [periodoMes, setPeriodoMes] = useState("5");
   const [periodoAno, setPeriodoAno] = useState("2026");
   const [fechaPagoTarjeta, setFechaPagoTarjeta] = useState("");
+  const [tcCarga, setTcCarga] = useState("");
   const [fileName, setFileName] = useState("");
   const fileRef = useRef(null);
   const fileRef2 = useRef(null);
@@ -583,7 +584,8 @@ export default function Moneyland() {
         const c1 = regla?.c1 || m.concepto1;
         const c2 = regla?.c2 ?? (m.concepto2||"");
         const fecha = (tipo==="tarjeta" && fechaPagoTarjeta) ? fechaPagoTarjeta : m.fecha;
-        return {id:i+1,f:fecha,m:String(new Date(fecha||"2026-01-01").getMonth()+1),b:bancoCarga,t,c1,c2,cat:TX[t]?.[c1]?.cat||"",d:m.descripcion,fm:tipo==="banco"?"Pago transferencia":"Pago crédito",be:bancoCarga,plazo:"0",fechaCP:fecha,usd:null,tc:null,p:Math.abs(m.monto||0)*(m.monto<0?-1:1),iva:null,tot:m.monto||0,moneda:m.moneda||"UYU",esPagoTarjeta,confianza:regla?"alta":(m.confianza||"alta"),pendiente:esPagoTarjeta};
+        const fm = tipo==="banco" ? "Pago transferencia" : "Pago tarjeta de crédito";
+        return {id:i+1,f:fecha,m:String(new Date(fecha||"2026-01-01").getMonth()+1),b:bancoCarga,t,c1,c2,cat:TX[t]?.[c1]?.cat||"",d:m.descripcion,fm,be:bancoCarga,plazo:"0",fechaCP:fecha,usd:null,tc:null,p:Math.abs(m.monto||0)*(m.monto<0?-1:1),iva:null,tot:m.monto||0,moneda:m.moneda||"UYU",esPagoTarjeta,confianza:regla?"alta":(m.confianza||"alta"),pendiente:esPagoTarjeta};
       });
       setLoadMovs(movs); setLoadStep("review");
     } catch(e) { setLoadError("Error al procesar. Verificá el archivo."); setLoadStep("upload"); }
@@ -639,7 +641,17 @@ export default function Moneyland() {
   };
 
   const confirmar = async () => {
-    const toSave = loadMovs.filter(m=>!m.pendiente).map(m=>({...m, a: m.f ? String(new Date(m.f).getFullYear()) : ""}));
+    const tcVal = parseFloat(tcCarga)||0;
+    const toSave = loadMovs.filter(m=>!m.pendiente).map(m=>{
+      const base = {...m, a: m.f ? String(new Date(m.f).getFullYear()) : ""};
+      if(m.moneda==="USD" && tcVal) {
+        const usdAmt = Math.abs(m.tot||0);
+        const sign = (m.tot||0)<0 ? -1 : 1;
+        const pesos = usdAmt * tcVal * sign;
+        return {...base, usd:usdAmt, tc:tcVal, p:pesos, tot:pesos};
+      }
+      return base;
+    });
     const ids = await Promise.all(toSave.map(m=>saveRegToDB(m)));
     // Aprende la clasificación de cada movimiento (incluidos los pendientes de conciliación) para futuras cargas
     loadMovs.forEach(m=>{
@@ -898,17 +910,43 @@ export default function Moneyland() {
                     <div key={k.l} style={S.card}><div style={{...S.lbl,marginBottom:4}}>{k.l}</div><div style={{fontFamily:"Lora",fontSize:20,fontWeight:800,color:k.c}}>{k.v}</div></div>
                   ))}
                 </div>
+                {/* Panel tipo de cambio para movimientos en USD */}
+                {loadMovs.some(m=>m.moneda==="USD")&&(
+                  <div style={{...S.card,background:"rgba(221,184,99,0.06)",border:"1px solid rgba(221,184,99,0.3)",marginBottom:12,padding:"12px 16px"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+                      <span style={{fontSize:16}}>💱</span>
+                      <div style={{flex:1}}>
+                        <div style={{fontFamily:"Lora",fontSize:13,fontWeight:700,color:"#DDB863"}}>Movimientos en USD detectados</div>
+                        <div style={{fontSize:11,color:"#8C8C8C",marginTop:2}}>{loadMovs.filter(m=>m.moneda==="USD").length} movimiento(s) en USD — ingresá el tipo de cambio para convertir a pesos uruguayos</div>
+                      </div>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <span style={{fontSize:11,color:"#8C8C8C",whiteSpace:"nowrap"}}>1 USD =</span>
+                        <input type="number" step="0.01" min="0" value={tcCarga} onChange={e=>setTcCarga(e.target.value)}
+                          placeholder="Ej: 43.50"
+                          style={{...S.inp,width:110,color:tcCarga?"#DDB863":"#8C8C8C"}}/>
+                        <span style={{fontSize:11,color:"#8C8C8C"}}>UYU</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div style={{...S.card,padding:0,marginBottom:12}}>
                   <div style={{padding:"10px 14px",borderBottom:"1px solid rgba(221,184,99,0.12)"}}>
                     <div style={{fontFamily:"Lora",fontSize:13,fontWeight:700,marginBottom:4}}>Revisá y ajustá si es necesario</div>
                     {loadMovs.some(m=>m.esPagoTarjeta)&&<div style={{fontSize:11,color:"#c860f0"}}>💳 Los pagos de tarjeta quedarán pendientes de conciliación</div>}
                   </div>
-                  <div style={{display:"grid",gridTemplateColumns:"80px 1fr 140px 100px 80px 90px",gap:4,padding:"6px 10px",fontSize:10,color:"#4A4A4A",textTransform:"uppercase"}}><div>Fecha</div><div>Descripción</div><div>Concepto 1</div><div>Tipo</div><div style={{textAlign:"right"}}>Monto</div><div style={{textAlign:"center"}}>Conciliación</div></div>
-                  {loadMovs.map(m=>(
-                    <div key={m.id} style={{display:"grid",gridTemplateColumns:"80px 1fr 140px 100px 80px 90px",gap:4,padding:"7px 10px",borderTop:"1px solid rgba(255,255,255,0.03)",background:m.esPagoTarjeta?"rgba(200,96,240,0.05)":m.confianza==="baja"?"rgba(240,160,96,0.05)":"transparent",alignItems:"center"}}>
+                  <div style={{display:"grid",gridTemplateColumns:"80px 1fr 140px 100px 90px 90px",gap:4,padding:"6px 10px",fontSize:10,color:"#4A4A4A",textTransform:"uppercase"}}><div>Fecha</div><div>Descripción</div><div>Concepto 1</div><div>Tipo</div><div style={{textAlign:"right"}}>Monto</div><div style={{textAlign:"center"}}>Conciliación</div></div>
+                  {loadMovs.map(m=>{
+                    const tcVal = parseFloat(tcCarga)||0;
+                    const isUSD = m.moneda==="USD";
+                    const montoDisplay = isUSD && tcVal ? Math.abs(m.tot||0)*tcVal : Math.abs(m.tot||0);
+                    const sign = (m.tot||0)>0;
+                    return (
+                    <div key={m.id} style={{display:"grid",gridTemplateColumns:"80px 1fr 140px 100px 90px 90px",gap:4,padding:"7px 10px",borderTop:"1px solid rgba(255,255,255,0.03)",background:m.esPagoTarjeta?"rgba(200,96,240,0.05)":m.confianza==="baja"?"rgba(240,160,96,0.05)":"transparent",alignItems:"center"}}>
                       <div style={{fontSize:11,color:"#8C8C8C"}}>{m.f}</div>
                       <div><div style={{fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.d}</div>
                         <div style={{display:"flex",gap:4,marginTop:2}}>
+                          {isUSD&&<span style={{fontSize:9,padding:"1px 6px",borderRadius:3,background:"rgba(29,68,92,0.4)",color:"#5AAFDF"}}>USD</span>}
                           {m.esPagoTarjeta&&<span style={{fontSize:9,padding:"1px 6px",borderRadius:3,background:"rgba(200,96,240,0.2)",color:"#c860f0"}}>💳 pendiente</span>}
                           {m.confianza==="baja"&&<span style={{fontSize:9,padding:"1px 6px",borderRadius:3,background:"rgba(240,160,96,0.2)",color:"#f0a060"}}>⚠ revisar</span>}
                         </div>
@@ -921,8 +959,11 @@ export default function Moneyland() {
                         style={{background:"#1E1E1E",border:"1px solid rgba(221,184,99,0.15)",borderRadius:4,color:"#F8F4E8",fontFamily:"Roboto",fontSize:10,padding:"3px 6px",cursor:"pointer"}}>
                         <option>Personal</option><option>Negocio</option>
                       </select>
-                      <div style={{fontFamily:"Lora",fontSize:12,fontWeight:700,textAlign:"right",color:(m.tot||0)>0?"#4CAF82":"#f06060"}}>
-                        {(m.tot||0)>0?"+":"-"}{"$ "+Math.abs(m.tot||0).toLocaleString("es-UY",{minimumFractionDigits:0,maximumFractionDigits:0})}
+                      <div style={{textAlign:"right"}}>
+                        <div style={{fontFamily:"Lora",fontSize:12,fontWeight:700,color:sign?"#4CAF82":"#f06060"}}>
+                          {sign?"+":"-"}{"$ "+montoDisplay.toLocaleString("es-UY",{minimumFractionDigits:0,maximumFractionDigits:0})}
+                        </div>
+                        {isUSD&&<div style={{fontSize:9,color:"#5AAFDF"}}>USD {Math.abs(m.tot||0).toLocaleString("es-UY",{minimumFractionDigits:2,maximumFractionDigits:2})}{tcVal?"":" (sin TC)"}</div>}
                       </div>
                       <div style={{textAlign:"center"}}>
                         <button type="button" onClick={()=>setLoadMovs(p=>p.map(x=>x.id===m.id?{...x,esPagoTarjeta:!x.esPagoTarjeta,pendiente:!x.esPagoTarjeta}:x))}
@@ -931,14 +972,22 @@ export default function Moneyland() {
                         </button>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
-                <div style={{display:"flex",gap:10}}>
-                  <button onClick={()=>setLoadStep("upload")} style={{background:"#141414",border:"1px solid rgba(221,184,99,0.2)",borderRadius:6,color:"#8C8C8C",fontFamily:"Roboto",fontSize:12,padding:"10px 20px",cursor:"pointer"}}>← Volver</button>
-                  <button onClick={confirmar} style={{flex:1,background:"#DDB863",color:"#0A0A0A",border:"none",borderRadius:8,padding:13,fontFamily:"Lora",fontSize:14,fontWeight:800,cursor:"pointer"}}>
-                    Confirmar — registrar {loadMovs.filter(m=>!m.esPagoTarjeta).length} · dejar {loadMovs.filter(m=>m.esPagoTarjeta).length} pendientes →
-                  </button>
-                </div>
+                {(()=>{
+                  const hasUSD = loadMovs.some(m=>m.moneda==="USD");
+                  const tcMissing = hasUSD && !parseFloat(tcCarga);
+                  return (
+                  <div style={{display:"flex",gap:10}}>
+                    <button onClick={()=>setLoadStep("upload")} style={{background:"#141414",border:"1px solid rgba(221,184,99,0.2)",borderRadius:6,color:"#8C8C8C",fontFamily:"Roboto",fontSize:12,padding:"10px 20px",cursor:"pointer"}}>← Volver</button>
+                    <button onClick={tcMissing?null:confirmar} disabled={tcMissing}
+                      style={{flex:1,background:tcMissing?"#2A2A2A":"#DDB863",color:tcMissing?"#555":"#0A0A0A",border:tcMissing?"1px solid rgba(221,184,99,0.2)":"none",borderRadius:8,padding:13,fontFamily:"Lora",fontSize:14,fontWeight:800,cursor:tcMissing?"not-allowed":"pointer"}}>
+                      {tcMissing?"Ingresá el tipo de cambio para los movimientos en USD →":`Confirmar — registrar ${loadMovs.filter(m=>!m.esPagoTarjeta).length} · dejar ${loadMovs.filter(m=>m.esPagoTarjeta).length} pendientes →`}
+                    </button>
+                  </div>
+                  );
+                })()}
               </>
             )}
 
