@@ -1414,7 +1414,16 @@ export default function Moneyland() {
                           {isOpen && (
                             <div ref={filterDropRef} style={{position:"absolute",top:"calc(100% + 4px)",left:0,background:"#1E1E1E",border:"1px solid rgba(221,184,99,0.22)",borderRadius:6,zIndex:1001,minWidth:180,maxWidth:240,boxShadow:"0 12px 32px rgba(0,0,0,0.7)",textTransform:"none",fontWeight:400}}>
                               <div style={{padding:8}}>
-                                <input value={colFilterSearch} onChange={e=>setColFilterSearch(e.target.value)} placeholder="Buscar valor..." autoFocus style={{...S.inp,width:"100%",fontSize:10,padding:"4px 8px",boxSizing:"border-box"}}/>
+                                <input value={colFilterSearch} onChange={e=>{
+                                  const val = e.target.value;
+                                  setColFilterSearch(val);
+                                  if(val.trim()) {
+                                    const matched = uniqueVals(c.id).filter(v=>v.toLowerCase().includes(val.toLowerCase()));
+                                    setColFilters(prev=>({...prev,[c.id]:matched}));
+                                  } else {
+                                    setColFilters(prev=>{ const {[c.id]:_, ...rest}=prev; return rest; });
+                                  }
+                                }} placeholder="Buscar valor..." autoFocus style={{...S.inp,width:"100%",fontSize:10,padding:"4px 8px",boxSizing:"border-box"}}/>
                               </div>
                               <div style={{display:"flex",gap:6,padding:"0 8px 6px"}}>
                                 <button onClick={()=>setColFilters(prev=>{const {[c.id]:_,...rest}=prev; return rest;})} style={{flex:1,background:"rgba(221,184,99,0.1)",border:"1px solid rgba(221,184,99,0.3)",borderRadius:4,color:"#DDB863",fontFamily:"Roboto",fontSize:9,padding:"3px",cursor:"pointer"}}>Todos</button>
