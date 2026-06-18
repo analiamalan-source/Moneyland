@@ -214,6 +214,9 @@ export default function Moneyland() {
   const [authLoading, setAuthLoading] = useState(false);
   const [dbLoading, setDbLoading] = useState(false);
   const [reglas, setReglas] = useState({});
+  const [pagosPendientes, setPagosPendientes] = useState([]);
+  const [pendienteSelUYU, setPendienteSelUYU] = useState(null);
+  const [pendienteSelUSD, setPendienteSelUSD] = useState(null);
 
   // Load session from localStorage on mount, renovando el token si ya venció o está por vencer
   useEffect(()=>{
@@ -265,16 +268,18 @@ export default function Moneyland() {
     setDbLoading(true);
     try {
       const headers = {"apikey": SUPABASE_KEY, "Authorization": `Bearer ${session.access_token}`};
-      const [regsRes, bancosRes, tarjetasRes, reglasRes] = await Promise.all([
+      const [regsRes, bancosRes, tarjetasRes, reglasRes, pagosPendRes] = await Promise.all([
         fetch(`${SUPABASE_URL}/rest/v1/registros?select=*&order=fecha.desc`, {headers}),
         fetch(`${SUPABASE_URL}/rest/v1/bancos?select=*`, {headers}),
         fetch(`${SUPABASE_URL}/rest/v1/tarjetas?select=*`, {headers}),
         fetch(`${SUPABASE_URL}/rest/v1/reglas_categorizacion?select=*`, {headers}),
+        fetch(`${SUPABASE_URL}/rest/v1/pagos_tarjeta_pendientes?select=*&conciliado=eq.false`, {headers}),
       ]);
       const regsData = await regsRes.json();
       const bancosData = await bancosRes.json();
       const tarjetasData = await tarjetasRes.json();
       const reglasData = await reglasRes.json();
+      const pagosPendData = await pagosPendRes.json();
       if(Array.isArray(regsData)) setRegs(regsData.map(r=>({...r, f:r.fecha, m:r.mes, b:r.banco_cob_pag, t:r.tipo, c1:r.concepto1, c2:r.concepto2, cat:r.categoria, d:r.descripcion, fm:r.forma, be:r.banco_emisor, p:r.pesos, tot:r.total, fechaCP:r.fecha_cp||r.fecha})));
       if(Array.isArray(bancosData) && bancosData.length>0) setConfig(prev=>({...prev, bancos:bancosData}));
       if(Array.isArray(tarjetasData) && tarjetasData.length>0) setConfig(prev=>({...prev, tarjetas:tarjetasData}));
@@ -285,6 +290,8 @@ export default function Moneyland() {
       } else {
         console.error("Error cargando reglas_categorizacion:", reglasData);
       }
+      if(Array.isArray(pagosPendData)) setPagosPendientes(pagosPendData);
+      else console.error("Error cargando pagos_tarjeta_pendientes:", pagosPendData);
     } catch(e){ console.error(e); }
     setDbLoading(false);
   };
@@ -412,6 +419,44 @@ export default function Moneyland() {
       });
       if(!r.ok) console.error("Error guardando regla de clasificación:", patron, r.status, await r.text());
     } catch(e) { console.error("Error guardando regla de clasificación:", patron, e); }
+  };
+  // Guarda un pago a tarjeta detectado en un extracto bancario, para conciliarlo luego con el estado de la tarjeta
+  const savePagoPendiente = async (pago) => {
+    if(!session?.access_token) return;
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/pagos_tarjeta_pendientes`, {
+        method: "POST",
+        headers: {"apikey": SUPABASE_KEY, "Authorization": `Bearer ${session.access_token}`, "Content-Type": "application/json", "Prefer": "return=representation"},
+        body: JSON.stringify({
+          user_id: session.user?.id,
+          tarjeta: pago.tarjeta,
+          banco: pago.banco,
+          fecha: pago.fecha,
+          mes: pago.mes,
+          ano: pago.ano,
+          moneda: pago.moneda,
+          monto: pago.monto,
+          descripcion: pago.descripcion,
+          conciliado: false
+        })
+      });
+      const data = await r.json();
+      const nuevo = Array.isArray(data) ? data[0] : null;
+      if(nuevo) setPagosPendientes(prev=>[...prev, nuevo]);
+      else console.error("Error guardando pago pendiente:", pago, data);
+    } catch(e) { console.error("Error guardando pago pendiente:", pago, e); }
+  };
+  // Marca un pago pendiente como conciliado al confirmar el estado de la tarjeta correspondiente
+  const marcarPendienteConciliado = async (id) => {
+    if(!session?.access_token || !id) return;
+    setPagosPendientes(prev=>prev.filter(p=>p.id!==id));
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/pagos_tarjeta_pendientes?id=eq.${id}`, {
+        method: "PATCH",
+        headers: {"apikey": SUPABASE_KEY, "Authorization": `Bearer ${session.access_token}`, "Content-Type": "application/json", "Prefer": "return=minimal"},
+        body: JSON.stringify({ conciliado: true })
+      });
+    } catch(e) { console.error("Error conciliando pago pendiente:", id, e); }
   };
 
   const bancoDropRef = useRef(null);
@@ -657,7 +702,15 @@ export default function Moneyland() {
     loadMovs.forEach(m=>{
       const patron = normalizarDesc(m.d);
       if(patron) saveReglaToDB(patron, {t:m.t, c1:m.c1, c2:m.c2, esPagoTarjeta:!!m.esPagoTarjeta});
+      if(m.esPagoTarjeta && m.tarjetaDestino) {
+        savePagoPendiente({tarjeta:m.tarjetaDestino, banco:bancoCarga, fecha:m.f, mes:periodoMes, ano:periodoAno, moneda:m.moneda||"UYU", monto:Math.abs(m.tot||0), descripcion:m.d});
+      }
     });
+    if(loadType==="tarjeta") {
+      if(pendienteSelUYU) marcarPendienteConciliado(pendienteSelUYU);
+      if(pendienteSelUSD) marcarPendienteConciliado(pendienteSelUSD);
+      setPendienteSelUYU(null); setPendienteSelUSD(null);
+    }
     setRegs(prev=>[...toSave.map((m,i)=>({...m,id:ids[i]||(Date.now()+m.id)})),...prev]);
     setLoadStep("done"); setLoadMovs([]);
   };
@@ -823,7 +876,7 @@ export default function Moneyland() {
             {/* Selector de modo */}
             <div style={{...S.g4,marginBottom:20}}>
               {[{k:"manual",i:"✏️",t:"Manual",d:"Un registro"},{k:"masiva",i:"📊",t:"Carga masiva",d:"Subí un CSV"},{k:"banco",i:"🏦",t:"Extracto banco",d:"IA categoriza"},{k:"tarjeta",i:"💳",t:"Tarjeta crédito",d:"IA categoriza"}].map(o=>(
-                <div key={o.k} onClick={()=>{setLoadType(o.k);setLoadStep("upload");setLoadMovs([]);setLoadError("");setFileName("");setFechaPagoTarjeta("");}}
+                <div key={o.k} onClick={()=>{setLoadType(o.k);setLoadStep("upload");setLoadMovs([]);setLoadError("");setFileName("");setFechaPagoTarjeta("");setPendienteSelUYU(null);setPendienteSelUSD(null);}}
                   style={{...S.card,cursor:"pointer",border:`1px solid ${loadType===o.k?"rgba(221,184,99,0.4)":"rgba(221,184,99,0.12)"}`,background:loadType===o.k?"rgba(221,184,99,0.08)":"#141414",marginBottom:0,transition:"all .1s"}}>
                   <div style={{fontSize:22,marginBottom:6}}>{o.i}</div>
                   <div style={{fontFamily:"Lora",fontSize:12,fontWeight:700,color:loadType===o.k?"#DDB863":"#F8F4E8",marginBottom:3}}>{o.t}</div>
@@ -857,7 +910,7 @@ export default function Moneyland() {
                 <div style={{...(loadType==="tarjeta"?S.g4:S.g3),marginBottom:16}}>
                   <div>
                     <label style={S.lbl}>{loadType==="banco"?"Banco":"Tarjeta"}</label>
-                    <select value={bancoCarga} onChange={e=>setBancoCarga(e.target.value)} style={S.sel}>
+                    <select value={bancoCarga} onChange={e=>{setBancoCarga(e.target.value);setPendienteSelUYU(null);setPendienteSelUSD(null);}} style={S.sel}>
                       <option value="">— seleccionar —</option>
                       {(loadType==="banco"?bancosActivos:tarjetasActivas).map(b=><option key={b}>{b}</option>)}
                     </select>
@@ -877,6 +930,31 @@ export default function Moneyland() {
                     </div>
                   )}
                 </div>
+                {loadType==="tarjeta" && bancoCarga && (()=>{
+                  const pendientesTarjeta = pagosPendientes.filter(p=>p.tarjeta===bancoCarga && !p.conciliado);
+                  if(!pendientesTarjeta.length) return null;
+                  return (
+                    <div style={{...S.card,background:"rgba(200,96,240,0.06)",border:"1px solid rgba(200,96,240,0.3)",marginBottom:16,padding:"12px 16px"}}>
+                      <div style={{fontFamily:"Lora",fontSize:13,fontWeight:700,color:"#c860f0",marginBottom:8}}>💳 Pagos detectados en el banco para esta tarjeta</div>
+                      <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                        {pendientesTarjeta.map(p=>{
+                          const sel = (p.moneda==="USD"?pendienteSelUSD:pendienteSelUYU)===p.id;
+                          return (
+                            <div key={p.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,background:sel?"rgba(200,96,240,0.12)":"#1A1A1A",border:`1px solid ${sel?"rgba(200,96,240,0.5)":"rgba(255,255,255,0.06)"}`,borderRadius:6,padding:"6px 10px"}}>
+                              <div style={{fontSize:11,color:"#F8F4E8"}}>{fmtD(p.fecha)} — {p.moneda==="USD"?"U$S ":"$ "}{Math.abs(p.monto).toLocaleString("es-UY",{minimumFractionDigits:0,maximumFractionDigits:0})} {p.moneda} ({p.banco})</div>
+                              <button type="button" onClick={()=>{
+                                setFechaPagoTarjeta(p.fecha);
+                                if(p.moneda==="USD") setPendienteSelUSD(p.id); else setPendienteSelUYU(p.id);
+                              }} style={{background:sel?"#c860f0":"rgba(221,184,99,0.1)",border:"none",borderRadius:4,color:sel?"#0A0A0A":"#DDB863",fontFamily:"Roboto",fontSize:10,padding:"4px 10px",cursor:"pointer",fontWeight:700,whiteSpace:"nowrap"}}>
+                                {sel?"✓ Vinculado":"Usar esta fecha"}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
                 {/* Para tarjeta también se requiere la fecha de pago antes de subir */}
                 {(() => { const canUpload = bancoCarga && (loadType==="banco" || fechaPagoTarjeta); return (
                 <div style={{border:"1.5px dashed rgba(221,184,99,0.2)",borderRadius:8,padding:32,textAlign:"center",cursor:canUpload?"pointer":"not-allowed",opacity:canUpload?1:0.5}}
@@ -930,6 +1008,33 @@ export default function Moneyland() {
                   </div>
                 )}
 
+                {loadType==="tarjeta" && (pendienteSelUYU || pendienteSelUSD) && (()=>{
+                  const monedas = [
+                    pendienteSelUYU ? {moneda:"UYU", pend: pagosPendientes.find(p=>p.id===pendienteSelUYU)} : null,
+                    pendienteSelUSD ? {moneda:"USD", pend: pagosPendientes.find(p=>p.id===pendienteSelUSD)} : null,
+                  ].filter(x=>x && x.pend);
+                  if(!monedas.length) return null;
+                  return (
+                    <div style={{...S.card,marginBottom:12,padding:"12px 16px"}}>
+                      <div style={{fontFamily:"Lora",fontSize:13,fontWeight:700,marginBottom:8}}>🔎 Conciliación con el pago del banco</div>
+                      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                        {monedas.map(({moneda,pend})=>{
+                          const totalCalc = loadMovs.filter(m=>(m.moneda||"UYU")===moneda).reduce((s,m)=>s+Math.abs(m.tot||0),0);
+                          const diff = totalCalc - Math.abs(pend.monto);
+                          const ok = Math.abs(diff) < 1;
+                          const pre = moneda==="USD" ? "U$S " : "$ ";
+                          return (
+                            <div key={moneda} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,background:ok?"rgba(76,175,130,0.08)":"rgba(240,96,96,0.08)",border:`1px solid ${ok?"rgba(76,175,130,0.3)":"rgba(240,96,96,0.3)"}`,borderRadius:6,padding:"8px 12px"}}>
+                              <div style={{fontSize:11,color:"#8C8C8C"}}>{moneda} — Pago banco: {pre}{Math.abs(pend.monto).toLocaleString("es-UY",{maximumFractionDigits:0})} · Total tarjeta: {pre}{totalCalc.toLocaleString("es-UY",{maximumFractionDigits:0})}</div>
+                              <div style={{fontFamily:"Lora",fontSize:12,fontWeight:700,color:ok?"#4CAF82":"#f06060",whiteSpace:"nowrap"}}>{ok?"✓ Coincide":`⚠ Dif. ${diff>0?"+":""}${diff.toLocaleString("es-UY",{maximumFractionDigits:0})}`}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 <div style={{...S.card,padding:0,marginBottom:12}}>
                   <div style={{padding:"10px 14px",borderBottom:"1px solid rgba(221,184,99,0.12)"}}>
                     <div style={{fontFamily:"Lora",fontSize:13,fontWeight:700,marginBottom:4}}>Revisá y ajustá si es necesario</div>
@@ -970,6 +1075,13 @@ export default function Moneyland() {
                           style={{background:m.esPagoTarjeta?"rgba(200,96,240,0.15)":"#1E1E1E",border:`1px solid ${m.esPagoTarjeta?"rgba(200,96,240,0.4)":"rgba(221,184,99,0.15)"}`,borderRadius:4,color:m.esPagoTarjeta?"#c860f0":"#8C8C8C",fontFamily:"Roboto",fontSize:9,padding:"3px 6px",cursor:"pointer",whiteSpace:"nowrap"}}>
                           {m.esPagoTarjeta?"💳 Pendiente":"Registrar"}
                         </button>
+                        {loadType==="banco"&&m.esPagoTarjeta&&(
+                          <select value={m.tarjetaDestino||""} onChange={e=>setLoadMovs(p=>p.map(x=>x.id===m.id?{...x,tarjetaDestino:e.target.value}:x))}
+                            style={{marginTop:4,width:"100%",background:"#1E1E1E",border:`1px solid ${m.tarjetaDestino?"rgba(200,96,240,0.4)":"rgba(240,96,96,0.5)"}`,borderRadius:4,color:m.tarjetaDestino?"#c860f0":"#f06060",fontFamily:"Roboto",fontSize:9,padding:"3px 4px",cursor:"pointer"}}>
+                            <option value="">— tarjeta —</option>
+                            {tarjetasActivas.map(t=><option key={t} value={t}>{t}</option>)}
+                          </select>
+                        )}
                       </div>
                     </div>
                     );
@@ -978,12 +1090,14 @@ export default function Moneyland() {
                 {(()=>{
                   const hasUSD = loadMovs.some(m=>m.moneda==="USD");
                   const tcMissing = hasUSD && !parseFloat(tcCarga);
+                  const tarjetaFaltante = loadType==="banco" && loadMovs.some(m=>m.esPagoTarjeta && !m.tarjetaDestino);
+                  const blocked = tcMissing || tarjetaFaltante;
                   return (
                   <div style={{display:"flex",gap:10}}>
                     <button onClick={()=>setLoadStep("upload")} style={{background:"#141414",border:"1px solid rgba(221,184,99,0.2)",borderRadius:6,color:"#8C8C8C",fontFamily:"Roboto",fontSize:12,padding:"10px 20px",cursor:"pointer"}}>← Volver</button>
-                    <button onClick={tcMissing?null:confirmar} disabled={tcMissing}
-                      style={{flex:1,background:tcMissing?"#2A2A2A":"#DDB863",color:tcMissing?"#555":"#0A0A0A",border:tcMissing?"1px solid rgba(221,184,99,0.2)":"none",borderRadius:8,padding:13,fontFamily:"Lora",fontSize:14,fontWeight:800,cursor:tcMissing?"not-allowed":"pointer"}}>
-                      {tcMissing?"Ingresá el tipo de cambio para los movimientos en USD →":`Confirmar — registrar ${loadMovs.filter(m=>!m.esPagoTarjeta).length} · dejar ${loadMovs.filter(m=>m.esPagoTarjeta).length} pendientes →`}
+                    <button onClick={blocked?null:confirmar} disabled={blocked}
+                      style={{flex:1,background:blocked?"#2A2A2A":"#DDB863",color:blocked?"#555":"#0A0A0A",border:blocked?"1px solid rgba(221,184,99,0.2)":"none",borderRadius:8,padding:13,fontFamily:"Lora",fontSize:14,fontWeight:800,cursor:blocked?"not-allowed":"pointer"}}>
+                      {tcMissing?"Ingresá el tipo de cambio para los movimientos en USD →":tarjetaFaltante?"Elegí a qué tarjeta corresponde cada pago pendiente →":`Confirmar — registrar ${loadMovs.filter(m=>!m.esPagoTarjeta).length} · dejar ${loadMovs.filter(m=>m.esPagoTarjeta).length} pendientes →`}
                     </button>
                   </div>
                   );
