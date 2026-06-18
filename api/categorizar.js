@@ -31,9 +31,9 @@ Banco: ${banco} Período: ${mesNombre} ${ano}. Solo JSON: {"movimientos":[{"fech
       },
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
-        max_tokens: 4096,
+        max_tokens: 8192,
         messages: [
-          { role: "user", content: `${prompt}\n\nArchivo:\n${texto.slice(0, 4000)}` },
+          { role: "user", content: `${prompt}\n\nArchivo:\n${texto.slice(0, 40000)}` },
         ],
       }),
     });
