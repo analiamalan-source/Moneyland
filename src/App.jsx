@@ -707,7 +707,7 @@ export default function Moneyland() {
       const patron = normalizarDesc(m.d);
       if(patron) saveReglaToDB(patron, {t:m.t, c1:m.c1, c2:m.c2, esPagoTarjeta:!!m.esPagoTarjeta});
       if(m.esPagoTarjeta && m.tarjetaDestino) {
-        savePagoPendiente({tarjeta:m.tarjetaDestino, banco:bancoCarga, fecha:m.f, mes:periodoMes, ano:periodoAno, moneda:m.moneda||"UYU", monto:Math.abs(m.tot||0), descripcion:m.d});
+        savePagoPendiente({tarjeta:m.tarjetaDestino, banco:bancoCarga, fecha:m.f, mes:periodoMes, ano:periodoAno, moneda:m.monedaPago||m.moneda||"UYU", monto:Math.abs(m.tot||0), descripcion:m.d});
       }
     });
     if(loadType==="tarjeta") {
@@ -1080,11 +1080,19 @@ export default function Moneyland() {
                           {m.esPagoTarjeta?"💳 Pendiente":"Registrar"}
                         </button>
                         {loadType==="banco"&&m.esPagoTarjeta&&(
-                          <select value={m.tarjetaDestino||""} onChange={e=>setLoadMovs(p=>p.map(x=>x.id===m.id?{...x,tarjetaDestino:e.target.value}:x))}
-                            style={{marginTop:4,width:"100%",background:"#1E1E1E",border:`1px solid ${m.tarjetaDestino?"rgba(200,96,240,0.4)":"rgba(240,96,96,0.5)"}`,borderRadius:4,color:m.tarjetaDestino?"#c860f0":"#f06060",fontFamily:"Roboto",fontSize:9,padding:"3px 4px",cursor:"pointer"}}>
-                            <option value="">— tarjeta —</option>
-                            {tarjetasActivas.map(t=><option key={t} value={t}>{t}</option>)}
-                          </select>
+                          <>
+                            <select value={m.tarjetaDestino||""} onChange={e=>setLoadMovs(p=>p.map(x=>x.id===m.id?{...x,tarjetaDestino:e.target.value}:x))}
+                              style={{marginTop:4,width:"100%",background:"#1E1E1E",border:`1px solid ${m.tarjetaDestino?"rgba(200,96,240,0.4)":"rgba(240,96,96,0.5)"}`,borderRadius:4,color:m.tarjetaDestino?"#c860f0":"#f06060",fontFamily:"Roboto",fontSize:9,padding:"3px 4px",cursor:"pointer"}}>
+                              <option value="">— tarjeta —</option>
+                              {tarjetasActivas.map(t=><option key={t} value={t}>{t}</option>)}
+                            </select>
+                            <select value={m.monedaPago||m.moneda||"UYU"} onChange={e=>setLoadMovs(p=>p.map(x=>x.id===m.id?{...x,monedaPago:e.target.value}:x))}
+                              title="¿Qué parte de la tarjeta (UYU o USD) cubre este pago?"
+                              style={{marginTop:3,width:"100%",background:"#1E1E1E",border:"1px solid rgba(221,184,99,0.2)",borderRadius:4,color:"#DDB863",fontFamily:"Roboto",fontSize:9,padding:"3px 4px",cursor:"pointer"}}>
+                              <option value="UYU">paga UYU</option>
+                              <option value="USD">paga USD</option>
+                            </select>
+                          </>
                         )}
                       </div>
                     </div>
