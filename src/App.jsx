@@ -621,6 +621,9 @@ export default function Moneyland() {
       });
       const data = await res.json();
       const parsed = JSON.parse((data.content?.[0]?.text||"{}").replace(/```json|```/g,"").trim());
+      // Para extractos bancarios, la moneda es la de la cuenta elegida (cada cuenta es de una sola moneda) —
+      // no se confía en lo que la IA detecte por movimiento, que puede ser inconsistente.
+      const monedaCuenta = tipo==="banco" ? (config.bancos.find(b=>b.nombre===bancoCarga)?.moneda || "UYU") : null;
       const movs = (parsed.movimientos||[]).map((m,i)=>{
         const desc = (m.descripcion||"").toUpperCase();
         const regla = reglas[normalizarDesc(m.descripcion)];
@@ -630,7 +633,8 @@ export default function Moneyland() {
         const c2 = regla?.c2 ?? (m.concepto2||"");
         const fecha = (tipo==="tarjeta" && fechaPagoTarjeta) ? fechaPagoTarjeta : m.fecha;
         const fm = tipo==="banco" ? "Pago transferencia" : "Pago tarjeta de crédito";
-        return {id:i+1,f:fecha,m:String(new Date(fecha||"2026-01-01").getMonth()+1),b:bancoCarga,t,c1,c2,cat:TX[t]?.[c1]?.cat||"",d:m.descripcion,fm,be:bancoCarga,plazo:"0",fechaCP:fecha,usd:null,tc:null,p:Math.abs(m.monto||0)*(m.monto<0?-1:1),iva:null,tot:m.monto||0,moneda:m.moneda||"UYU",esPagoTarjeta,confianza:regla?"alta":(m.confianza||"alta"),pendiente:esPagoTarjeta};
+        const moneda = tipo==="banco" ? monedaCuenta : (m.moneda||"UYU");
+        return {id:i+1,f:fecha,m:String(new Date(fecha||"2026-01-01").getMonth()+1),b:bancoCarga,t,c1,c2,cat:TX[t]?.[c1]?.cat||"",d:m.descripcion,fm,be:bancoCarga,plazo:"0",fechaCP:fecha,usd:null,tc:null,p:Math.abs(m.monto||0)*(m.monto<0?-1:1),iva:null,tot:m.monto||0,moneda,esPagoTarjeta,confianza:regla?"alta":(m.confianza||"alta"),pendiente:esPagoTarjeta};
       });
       setLoadMovs(movs); setLoadStep("review");
     } catch(e) { setLoadError("Error al procesar. Verificá el archivo."); setLoadStep("upload"); }
