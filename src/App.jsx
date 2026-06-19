@@ -165,7 +165,7 @@ export default function Moneyland() {
   const [selectedIds, setSelectedIds] = useState([]);
   const [colDropOpen, setColDropOpen] = useState(false);
   const colDropRef = useRef(null);
-  const [visibleCols, setVisibleCols] = useState(["fecha","tipo","banco","categoria","concepto","descripcion","subtotal","total"]);
+  const [visibleCols, setVisibleCols] = useState(["fecha","tipo","banco","categoria","concepto","descripcion","forma","subtotal","total"]);
   const [colFilters, setColFilters] = useState({});
   const [filterDropOpen, setFilterDropOpen] = useState(null);
   const [colFilterSearch, setColFilterSearch] = useState("");
@@ -710,12 +710,31 @@ export default function Moneyland() {
         savePagoPendiente({tarjeta:m.tarjetaDestino, banco:bancoCarga, fecha:m.f, mes:periodoMes, ano:periodoAno, moneda:m.monedaPago||m.moneda||"UYU", monto:Math.abs(m.tot||0), descripcion:m.d});
       }
     });
+    const diffRegs = [];
     if(loadType==="tarjeta") {
+      const monedasUsadas = [...new Set(loadMovs.map(m=>m.moneda||"UYU"))];
+      for(const moneda of monedasUsadas) {
+        const pendId = moneda==="USD" ? pendienteSelUSD : pendienteSelUYU;
+        if(!pendId) continue;
+        const pend = pagosPendientes.find(p=>p.id===pendId);
+        if(!pend) continue;
+        const totalCalc = loadMovs.filter(m=>(m.moneda||"UYU")===moneda).reduce((s,m)=>s+(m.tot||0),0);
+        const diff = totalCalc - Math.abs(pend.monto);
+        if(Math.abs(diff)>=1) {
+          const fechaDiff = fechaPagoTarjeta || today();
+          diffRegs.push({id:Date.now()+Math.random(), f:fechaDiff, m:String(new Date(fechaDiff).getMonth()+1), a:String(new Date(fechaDiff).getFullYear()), b:bancoCarga, t:"Personal", c1:"Otros gastos", c2:"Otros gastos", cat:TX.Personal["Otros gastos"].cat, d:`Diferencia de conciliación con pago bancario (${moneda})`, fm:"Ajuste", be:bancoCarga, plazo:"0", fechaCP:fechaDiff, usd:null, tc:null, p:diff, iva:null, tot:diff, moneda});
+        }
+      }
       if(pendienteSelUYU) marcarPendienteConciliado(pendienteSelUYU);
       if(pendienteSelUSD) marcarPendienteConciliado(pendienteSelUSD);
       setPendienteSelUYU(null); setPendienteSelUSD(null);
     }
-    setRegs(prev=>[...toSave.map((m,i)=>({...m,id:ids[i]||(Date.now()+m.id)})),...prev]);
+    const diffIds = await Promise.all(diffRegs.map(m=>saveRegToDB(m)));
+    setRegs(prev=>[
+      ...diffRegs.map((m,i)=>({...m,id:diffIds[i]||m.id})),
+      ...toSave.map((m,i)=>({...m,id:ids[i]||(Date.now()+m.id)})),
+      ...prev
+    ]);
     setLoadStep("done"); setLoadMovs([]);
   };
 
@@ -1019,7 +1038,7 @@ export default function Moneyland() {
                       <div style={{fontFamily:"Lora",fontSize:13,fontWeight:700,marginBottom:8}}>🔎 Totales por moneda</div>
                       <div style={{display:"flex",flexDirection:"column",gap:8}}>
                         {currencies.map(moneda=>{
-                          const totalCalc = loadMovs.filter(m=>(m.moneda||"UYU")===moneda).reduce((s,m)=>s+Math.abs(m.tot||0),0);
+                          const totalCalc = loadMovs.filter(m=>(m.moneda||"UYU")===moneda).reduce((s,m)=>s+(m.tot||0),0);
                           const pendId = moneda==="USD" ? pendienteSelUSD : pendienteSelUYU;
                           const pend = pendId ? pagosPendientes.find(p=>p.id===pendId) : null;
                           const pre = moneda==="USD" ? "U$S " : "$ ";
