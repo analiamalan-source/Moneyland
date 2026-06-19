@@ -1012,21 +1012,25 @@ export default function Moneyland() {
                   </div>
                 )}
 
-                {loadType==="tarjeta" && (pendienteSelUYU || pendienteSelUSD) && (()=>{
-                  const monedas = [
-                    pendienteSelUYU ? {moneda:"UYU", pend: pagosPendientes.find(p=>p.id===pendienteSelUYU)} : null,
-                    pendienteSelUSD ? {moneda:"USD", pend: pagosPendientes.find(p=>p.id===pendienteSelUSD)} : null,
-                  ].filter(x=>x && x.pend);
-                  if(!monedas.length) return null;
+                {loadType==="tarjeta" && loadMovs.length>0 && (()=>{
+                  const currencies = [...new Set(loadMovs.map(m=>m.moneda||"UYU"))];
                   return (
                     <div style={{...S.card,marginBottom:12,padding:"12px 16px"}}>
-                      <div style={{fontFamily:"Lora",fontSize:13,fontWeight:700,marginBottom:8}}>🔎 Conciliación con el pago del banco</div>
+                      <div style={{fontFamily:"Lora",fontSize:13,fontWeight:700,marginBottom:8}}>🔎 Totales por moneda</div>
                       <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                        {monedas.map(({moneda,pend})=>{
+                        {currencies.map(moneda=>{
                           const totalCalc = loadMovs.filter(m=>(m.moneda||"UYU")===moneda).reduce((s,m)=>s+Math.abs(m.tot||0),0);
+                          const pendId = moneda==="USD" ? pendienteSelUSD : pendienteSelUYU;
+                          const pend = pendId ? pagosPendientes.find(p=>p.id===pendId) : null;
+                          const pre = moneda==="USD" ? "U$S " : "$ ";
+                          if(!pend) return (
+                            <div key={moneda} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,background:"#1A1A1A",border:"1px solid rgba(255,255,255,0.06)",borderRadius:6,padding:"8px 12px"}}>
+                              <div style={{fontSize:11,color:"#8C8C8C"}}>{moneda} — Total tarjeta: {pre}{totalCalc.toLocaleString("es-UY",{maximumFractionDigits:0})}</div>
+                              <div style={{fontSize:10,color:"#5A5A5A"}}>Sin pago de banco vinculado</div>
+                            </div>
+                          );
                           const diff = totalCalc - Math.abs(pend.monto);
                           const ok = Math.abs(diff) < 1;
-                          const pre = moneda==="USD" ? "U$S " : "$ ";
                           return (
                             <div key={moneda} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,background:ok?"rgba(76,175,130,0.08)":"rgba(240,96,96,0.08)",border:`1px solid ${ok?"rgba(76,175,130,0.3)":"rgba(240,96,96,0.3)"}`,borderRadius:6,padding:"8px 12px"}}>
                               <div style={{fontSize:11,color:"#8C8C8C"}}>{moneda} — Pago banco: {pre}{Math.abs(pend.monto).toLocaleString("es-UY",{maximumFractionDigits:0})} · Total tarjeta: {pre}{totalCalc.toLocaleString("es-UY",{maximumFractionDigits:0})}</div>
