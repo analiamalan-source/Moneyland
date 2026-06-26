@@ -197,6 +197,7 @@ export default function Moneyland() {
   const [loadType, setLoadType] = useState("manual");
   const [loadStep, setLoadStep] = useState("upload");
   const [loadMovs, setLoadMovs] = useState([]);
+  const [montoEdit, setMontoEdit] = useState(null);
   const [loadError, setLoadError] = useState("");
   const [bancoCarga, setBancoCarga] = useState("");
   const [periodoMes, setPeriodoMes] = useState("5");
@@ -1110,14 +1111,15 @@ export default function Moneyland() {
                     <div style={{fontFamily:"Lora",fontSize:13,fontWeight:700,marginBottom:4}}>Revisá y ajustá si es necesario</div>
                     {loadMovs.some(m=>m.esPagoTarjeta)&&<div style={{fontSize:11,color:"#c860f0"}}>💳 Los pagos de tarjeta quedarán pendientes de conciliación</div>}
                   </div>
-                  <div style={{display:"grid",gridTemplateColumns:"80px 1fr 140px 100px 90px 90px",gap:4,padding:"6px 10px",fontSize:10,color:"#4A4A4A",textTransform:"uppercase"}}><div>Fecha</div><div>Descripción</div><div>Concepto 1</div><div>Tipo</div><div style={{textAlign:"right"}}>Monto</div><div style={{textAlign:"center"}}>Conciliación</div></div>
+                  <div style={{display:"grid",gridTemplateColumns:"80px 1fr 140px 100px 110px 90px 24px",gap:4,padding:"6px 10px",fontSize:10,color:"#4A4A4A",textTransform:"uppercase"}}><div>Fecha</div><div>Descripción</div><div>Concepto 1</div><div>Tipo</div><div style={{textAlign:"right"}}>Monto</div><div style={{textAlign:"center"}}>Conciliación</div><div/></div>
                   {loadMovs.map(m=>{
                     const tcVal = parseFloat(tcCarga)||0;
                     const isUSD = m.moneda==="USD";
                     const montoDisplay = isUSD && tcVal ? Math.abs(m.tot||0)*tcVal : Math.abs(m.tot||0);
-                    const sign = (m.tot||0)>0;
+                    const sign = (m.tot||0)>=0;
+                    const editing = montoEdit?.id === m.id;
                     return (
-                    <div key={m.id} style={{display:"grid",gridTemplateColumns:"80px 1fr 140px 100px 90px 90px",gap:4,padding:"7px 10px",borderTop:"1px solid rgba(255,255,255,0.03)",background:m.esPagoTarjeta?"rgba(200,96,240,0.05)":m.confianza==="baja"?"rgba(240,160,96,0.05)":"transparent",alignItems:"center"}}>
+                    <div key={m.id} style={{display:"grid",gridTemplateColumns:"80px 1fr 140px 100px 110px 90px 24px",gap:4,padding:"7px 10px",borderTop:"1px solid rgba(255,255,255,0.03)",background:m.esPagoTarjeta?"rgba(200,96,240,0.05)":m.confianza==="baja"?"rgba(240,160,96,0.05)":"transparent",alignItems:"center"}}>
                       <div style={{fontSize:11,color:"#8C8C8C"}}>{m.f}</div>
                       <div><div style={{fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.d}</div>
                         <div style={{display:"flex",gap:4,marginTop:2}}>
@@ -1135,10 +1137,31 @@ export default function Moneyland() {
                         <option>Personal</option><option>Negocio</option>
                       </select>
                       <div style={{textAlign:"right"}}>
-                        <div style={{fontFamily:"Lora",fontSize:12,fontWeight:700,color:sign?"#4CAF82":"#f06060"}}>
-                          {sign?"+":"-"}{"$ "+montoDisplay.toLocaleString("es-UY",{minimumFractionDigits:0,maximumFractionDigits:0})}
-                        </div>
-                        {isUSD&&<div style={{fontSize:9,color:"#5AAFDF"}}>USD {Math.abs(m.tot||0).toLocaleString("es-UY",{minimumFractionDigits:2,maximumFractionDigits:2})}{tcVal?"":" (sin TC)"}</div>}
+                        {editing ? (
+                          <div style={{display:"flex",gap:3,alignItems:"center",justifyContent:"flex-end"}}>
+                            <button type="button" title="Cambiar signo"
+                              onClick={()=>setLoadMovs(p=>p.map(x=>x.id===m.id?{...x,tot:-(x.tot||0),p:-(x.p||0)}:x))}
+                              style={{background:sign?"rgba(76,175,130,0.15)":"rgba(240,96,96,0.15)",border:`1px solid ${sign?"rgba(76,175,130,0.4)":"rgba(240,96,96,0.4)"}`,borderRadius:3,color:sign?"#4CAF82":"#f06060",fontSize:11,fontWeight:700,padding:"1px 5px",cursor:"pointer",lineHeight:1}}>
+                              {sign?"+":"−"}
+                            </button>
+                            <input type="number" autoFocus value={montoEdit.val}
+                              onChange={e=>setMontoEdit(p=>({...p,val:e.target.value}))}
+                              onBlur={()=>{
+                                const abs = Math.abs(parseFloat(montoEdit.val)||0);
+                                const newTot = sign ? abs : -abs;
+                                setLoadMovs(p=>p.map(x=>x.id===m.id?{...x,tot:newTot,p:newTot}:x));
+                                setMontoEdit(null);
+                              }}
+                              onKeyDown={e=>e.key==="Enter"&&e.target.blur()}
+                              style={{width:60,background:"#1A1A1A",border:"1px solid rgba(221,184,99,0.4)",borderRadius:3,color:"#F8F4E8",fontFamily:"Lora",fontSize:11,padding:"2px 4px",textAlign:"right"}}/>
+                          </div>
+                        ) : (
+                          <div onClick={()=>setMontoEdit({id:m.id,val:String(Math.abs(m.tot||0))})} title="Clic para editar"
+                            style={{fontFamily:"Lora",fontSize:12,fontWeight:700,color:sign?"#4CAF82":"#f06060",cursor:"pointer",userSelect:"none"}}>
+                            {sign?"+":"−"}{"$ "+montoDisplay.toLocaleString("es-UY",{minimumFractionDigits:0,maximumFractionDigits:0})}
+                          </div>
+                        )}
+                        {isUSD&&!editing&&<div style={{fontSize:9,color:"#5AAFDF"}}>USD {Math.abs(m.tot||0).toLocaleString("es-UY",{minimumFractionDigits:2,maximumFractionDigits:2})}{tcVal?"":" (sin TC)"}</div>}
                       </div>
                       <div style={{textAlign:"center"}}>
                         <button type="button" onClick={()=>setLoadMovs(p=>p.map(x=>x.id===m.id?{...x,esPagoTarjeta:!x.esPagoTarjeta,pendiente:!x.esPagoTarjeta}:x))}
@@ -1160,6 +1183,13 @@ export default function Moneyland() {
                             </select>
                           </>
                         )}
+                      </div>
+                      <div style={{display:"flex",alignItems:"flex-start",paddingTop:2}}>
+                        <button type="button" title="Eliminar fila"
+                          onClick={()=>setLoadMovs(p=>p.filter(x=>x.id!==m.id))}
+                          style={{background:"transparent",border:"none",color:"#4A4A4A",fontSize:14,lineHeight:1,cursor:"pointer",padding:"2px 3px",borderRadius:3}}
+                          onMouseEnter={e=>e.target.style.color="#f06060"}
+                          onMouseLeave={e=>e.target.style.color="#4A4A4A"}>×</button>
                       </div>
                     </div>
                     );

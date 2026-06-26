@@ -27,7 +27,9 @@ REGLA DE SIGNO — OBLIGATORIA:
 Indicadores de que el monto debe ir NEGATIVO: aparece con "-" o entre paréntesis en el documento; está en una columna de "Créditos" o "Devoluciones"; la descripción incluye palabras como devolución, crédito, ajuste, nota de crédito, reintegro, cashback.
 NUNCA pongas un crédito o devolución como número positivo, aunque el documento no muestre el signo explícitamente.
 
-EXCLUÍ del array la línea del pago general que el titular hizo el mes pasado para saldar el resumen anterior — es un pago/abono al saldo, NO un consumo ni una devolución de comercio. Suele aparecer como "Pago", "Recibo de pago", "Su pago", "Pago recibido", "Abono", "Pago anterior", a veces en una sección "Pagos/Créditos". No confundas esto con devoluciones de comercios puntuales (esas sí van incluidas, con monto negativo).
+EXCLUÍ del array (no son consumos, son campos informativos):
+- La línea del pago general que el titular hizo el mes pasado para saldar el resumen anterior — es un pago/abono al saldo, NO un consumo ni una devolución de comercio. Suele aparecer como "Pago", "Recibo de pago", "Su pago", "Pago recibido", "Abono", "Pago anterior", a veces en una sección "Pagos/Créditos". No confundas esto con devoluciones de comercios puntuales (esas sí van incluidas, con monto negativo).
+- El interés bonificable y su IVA — son campos informativos que muestran el interés que se hubiera cobrado pero fue bonificado; no forman parte del saldo a liquidar y no deben incluirse como movimientos.
 
 Para CADA movimiento determiná su moneda real. Prioridad:
 1. Si el monto tiene prefijo [USD] o [UYU] (ej: "[USD]25,99" o "[UYU]1.500") usá esa etiqueta directamente — indica la columna del PDF en que apareció.
