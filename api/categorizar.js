@@ -15,10 +15,17 @@ export default async function handler(req, res) {
 
   const prompt =
     tipo === "banco"
-      ? `Analizá este extracto bancario uruguayo. Para cada movimiento: fecha (YYYY-MM-DD), descripcion, monto (positivo=ingreso negativo=gasto), moneda (UYU/USD), tipo (Personal/Negocio), concepto1 (de: Ingresos,Ventas,Vivienda,Servicios del hogar,Alimentación,Transporte,Salud,Educación,Cuidado personal,Mascotas,Ocio y cultura,Finanzas,Impuestos y trámites,Regalos y donaciones,Imprevistos,Otros gastos,Gasto de personal,Transferencias,Tarjetas,Pagos,Inversiones,Marketing,Servicios,Personal,Honorarios,Impuestos), concepto2, esPagoTarjeta, confianza (alta/media/baja).
+      ? `Analizá este extracto bancario uruguayo. Para cada movimiento: fecha (YYYY-MM-DD), descripcion, monto, moneda (UYU/USD), tipo (Personal/Negocio), concepto1 (de: Ingresos,Ventas,Vivienda,Servicios del hogar,Alimentación,Transporte,Salud,Educación,Cuidado personal,Mascotas,Ocio y cultura,Finanzas,Impuestos y trámites,Regalos y donaciones,Imprevistos,Otros gastos,Gasto de personal,Transferencias,Tarjetas,Pagos,Inversiones,Marketing,Servicios,Personal,Honorarios,Impuestos), concepto2, esPagoTarjeta, confianza (alta/media/baja).
+
+REGLA DE SIGNO — OBLIGATORIA:
+- Débitos / gastos / pagos / compras / transferencias salientes → monto NEGATIVO (ej: -1500)
+- Créditos / ingresos / cobros / depósitos / transferencias entrantes → monto POSITIVO (ej: +3000)
+La MAYORÍA de los movimientos en un extracto bancario son débitos: deben ir en NEGATIVO. Solo van en positivo los ingresos/créditos reales.
+NUNCA pongas todos los montos como positivos — si detectás que todos saldrían positivos, revisá el signo de cada uno.
+
 esPagoTarjeta debe ser true SOLO cuando el movimiento es un pago/traspaso desde la cuenta bancaria para saldar el resumen de una tarjeta de crédito (ej: "PAGO OCA", "PAGOTARD", "TRASPASO A PAGO OCA", "DEB. VARIOS VISA-ILINK", "PAGO TARJETA"). Esos pagos quedan pendientes de conciliación con el resumen de la tarjeta y NO se registran como gasto.
 esPagoTarjeta debe ser false para todo lo demás, incluyendo compras pagadas con tarjeta de débito (esas son gastos normales y se registran igual que cualquier otro movimiento).
-Banco: ${banco} Período: ${mesNombre} ${ano}. Solo JSON: {"movimientos":[{"fecha":"","descripcion":"","monto":0,"moneda":"UYU","tipo":"Personal","concepto1":"","concepto2":"","esPagoTarjeta":false,"confianza":"alta"}]}`
+Banco: ${banco} Período: ${mesNombre} ${ano}. Solo JSON: {"movimientos":[{"fecha":"","descripcion":"","monto":-1500,"moneda":"UYU","tipo":"Personal","concepto1":"","concepto2":"","esPagoTarjeta":false,"confianza":"alta"},{"fecha":"","descripcion":"ingreso ejemplo","monto":3000,"moneda":"UYU","tipo":"Personal","concepto1":"Ingresos","concepto2":"","esPagoTarjeta":false,"confianza":"alta"}]}`
       : `Analizá este estado de tarjeta uruguaya. Para cada movimiento: fecha (YYYY-MM-DD), descripcion, monto, moneda, tipo (Personal/Negocio), concepto1, concepto2, confianza.
 
 REGLA DE SIGNO — OBLIGATORIA:
