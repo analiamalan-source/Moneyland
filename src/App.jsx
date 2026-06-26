@@ -89,7 +89,7 @@ const MESES_DISP = ["1","2","3","4"];
 // Patrones de descripción que indican un pago/traspaso para saldar una tarjeta de crédito
 // (quedan pendientes de conciliación con el extracto de la tarjeta). Se chequean en mayúsculas.
 const PAGO_TARJETA_PATTERNS = ["PAGO OCA","PAGOTARD","PAGO TARJETA","PAGO TARD","TRASPASO A PAGO","VISA-ILINK","DEB. VARIOS VISA","DEB. VARIOS MASTER","DEB. VARIOS OCA","DEB VARIOS VISA","DEB VARIOS MASTER","DEB VARIOS OCA"];
-const PAGO_TARJETA_RE = /\bTARD\b|\bTARJETA\b/;
+const PAGO_TARJETA_RE = /PAGOTARD|\bTARD\b|\bTARJETA\b/;
 
 // Normaliza una descripción de movimiento para usarla como "patrón" de aprendizaje:
 // quita números/fechas/montos variables, dejando solo la parte fija del texto.
