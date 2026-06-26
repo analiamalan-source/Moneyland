@@ -623,6 +623,7 @@ export default function Moneyland() {
       });
       const data = await res.json();
       const parsed = JSON.parse((data.content?.[0]?.text||"{}").replace(/```json|```/g,"").trim());
+      if(tipo==="banco") console.log("🔍 DEBUG movimientos IA:", parsed.movimientos?.map(m=>({desc:m.descripcion, esPagoTarjeta:m.esPagoTarjeta})));
       // Para extractos bancarios, la moneda es la de la cuenta elegida (cada cuenta es de una sola moneda) —
       // no se confía en lo que la IA detecte por movimiento, que puede ser inconsistente.
       const monedaCuenta = tipo==="banco" ? (config.bancos.find(b=>b.nombre===bancoCarga)?.moneda || "UYU") : null;
