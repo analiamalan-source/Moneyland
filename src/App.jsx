@@ -89,6 +89,7 @@ const MESES_DISP = ["1","2","3","4"];
 // Patrones de descripción que indican un pago/traspaso para saldar una tarjeta de crédito
 // (quedan pendientes de conciliación con el extracto de la tarjeta). Se chequean en mayúsculas.
 const PAGO_TARJETA_PATTERNS = ["PAGO OCA","PAGOTARD","PAGO TARJETA","PAGO TARD","TRASPASO A PAGO","VISA-ILINK","DEB. VARIOS VISA","DEB. VARIOS MASTER","DEB. VARIOS OCA","DEB VARIOS VISA","DEB VARIOS MASTER","DEB VARIOS OCA"];
+const PAGO_TARJETA_RE = /\bTARD\b|\bTARJETA\b/;
 
 // Normaliza una descripción de movimiento para usarla como "patrón" de aprendizaje:
 // quita números/fechas/montos variables, dejando solo la parte fija del texto.
@@ -628,7 +629,7 @@ export default function Moneyland() {
       const movs = (parsed.movimientos||[]).map((m,i)=>{
         const desc = (m.descripcion||"").toUpperCase();
         const regla = reglas[normalizarDesc(m.descripcion)];
-        const esPagoTarjeta = (tipo==="banco") && (regla ? !!regla.esPagoTarjeta : (PAGO_TARJETA_PATTERNS.some(p=>desc.includes(p)) || m.esPagoTarjeta||false));
+        const esPagoTarjeta = (tipo==="banco") && (regla ? !!regla.esPagoTarjeta : (PAGO_TARJETA_PATTERNS.some(p=>desc.includes(p)) || PAGO_TARJETA_RE.test(desc) || m.esPagoTarjeta||false));
         const t = regla?.t || m.tipo || "Personal";
         const c1 = regla?.c1 || m.concepto1;
         const c2 = regla?.c2 ?? (m.concepto2||"");
