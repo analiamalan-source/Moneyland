@@ -629,7 +629,8 @@ export default function Moneyland() {
       const movs = (parsed.movimientos||[]).map((m,i)=>{
         const desc = (m.descripcion||"").toUpperCase();
         const regla = reglas[normalizarDesc(m.descripcion)];
-        const esPagoTarjeta = (tipo==="banco") && (regla ? !!regla.esPagoTarjeta : (PAGO_TARJETA_PATTERNS.some(p=>desc.includes(p)) || PAGO_TARJETA_RE.test(desc) || m.esPagoTarjeta||false));
+        const matchesPagoTarjeta = PAGO_TARJETA_PATTERNS.some(p=>desc.includes(p)) || PAGO_TARJETA_RE.test(desc);
+        const esPagoTarjeta = (tipo==="banco") && (matchesPagoTarjeta || (regla ? !!regla.esPagoTarjeta : m.esPagoTarjeta||false));
         const t = regla?.t || m.tipo || "Personal";
         const c1 = regla?.c1 || m.concepto1;
         const c2 = regla?.c2 ?? (m.concepto2||"");
