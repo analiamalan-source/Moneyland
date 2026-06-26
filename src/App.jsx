@@ -640,6 +640,31 @@ export default function Moneyland() {
     } catch(e) { setLoadError("Error al procesar. Verificá el archivo."); setLoadStep("upload"); }
   };
 
+  const extractPdfText = async (file) => {
+    const pdfjsLib = await import("pdfjs-dist");
+    pdfjsLib.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).href;
+    const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+    let text = "";
+    for (let p = 1; p <= pdf.numPages; p++) {
+      const page = await pdf.getPage(p);
+      const content = await page.getTextContent();
+      const items = content.items.filter(i => i.str.trim());
+      items.sort((a, b) => {
+        const dy = b.transform[5] - a.transform[5];
+        return Math.abs(dy) > 3 ? dy : a.transform[4] - b.transform[4];
+      });
+      let lastY = null;
+      for (const item of items) {
+        const y = item.transform[5];
+        if (lastY !== null) text += Math.abs(y - lastY) > 3 ? "\n" : "\t";
+        text += item.str;
+        lastY = y;
+      }
+      text += "\n";
+    }
+    return text;
+  };
+
   const handleFile = async (file, tipo) => {
     setFileName(file.name); setLoadError("");
     let text;
@@ -648,6 +673,8 @@ export default function Moneyland() {
       const wb = XLSX.read(buf, {type:"array", cellDates:true});
       const sheet = wb.Sheets[wb.SheetNames[0]];
       text = XLSX.utils.sheet_to_csv(sheet, {dateNF:"yyyy-mm-dd"});
+    } else if(/\.pdf$/i.test(file.name)){
+      text = await extractPdfText(file);
     } else {
       text = await file.text();
     }
