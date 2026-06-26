@@ -648,18 +648,34 @@ export default function Moneyland() {
     for (let p = 1; p <= pdf.numPages; p++) {
       const page = await pdf.getPage(p);
       const content = await page.getTextContent();
-      const items = content.items.filter(i => i.str.trim());
+      const items = content.items.filter(i => i.str && i.str.trim());
       items.sort((a, b) => {
         const dy = b.transform[5] - a.transform[5];
         return Math.abs(dy) > 3 ? dy : a.transform[4] - b.transform[4];
       });
+      // Detectar x del encabezado de columna USD para etiquetar montos por columna
+      let usdColX = null;
+      for (const item of items) {
+        if (/U\$S|USD/i.test(item.str.trim()) && usdColX === null) {
+          usdColX = item.transform[4] + (item.width || 0) / 2;
+        }
+      }
       let lastY = null;
+      let row = [];
+      const flush = () => { if (row.length) { text += row.join("\t") + "\n"; row = []; } };
       for (const item of items) {
         const y = item.transform[5];
-        if (lastY !== null) text += Math.abs(y - lastY) > 3 ? "\n" : "\t";
-        text += item.str;
+        const xCenter = item.transform[4] + (item.width || 0) / 2;
+        if (lastY !== null && Math.abs(y - lastY) > 3) flush();
+        let str = item.str;
+        if (usdColX !== null && /^[\d.,]+$/.test(str.trim())) {
+          if (Math.abs(xCenter - usdColX) < 80) str = `[USD]${str}`;
+          else if (xCenter < usdColX - 40) str = `[UYU]${str}`;
+        }
+        row.push(str);
         lastY = y;
       }
+      flush();
       text += "\n";
     }
     return text;

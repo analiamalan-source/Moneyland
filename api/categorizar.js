@@ -29,7 +29,10 @@ NUNCA pongas un crédito o devolución como número positivo, aunque el document
 
 EXCLUÍ del array la línea del pago general que el titular hizo el mes pasado para saldar el resumen anterior — es un pago/abono al saldo, NO un consumo ni una devolución de comercio. Suele aparecer como "Pago", "Recibo de pago", "Su pago", "Pago recibido", "Abono", "Pago anterior", a veces en una sección "Pagos/Créditos". No confundas esto con devoluciones de comercios puntuales (esas sí van incluidas, con monto negativo).
 
-Para CADA movimiento determiná su moneda real: buscá columnas ("Moneda"), encabezados de sección ("Operaciones en dólares", "Resumen en moneda extranjera"), o símbolos junto al monto ("U$S", "USD", "US$" vs "$"). moneda debe ser "USD" solo cuando encontraste esa marca; el resto "UYU".
+Para CADA movimiento determiná su moneda real. Prioridad:
+1. Si el monto tiene prefijo [USD] o [UYU] (ej: "[USD]25,99" o "[UYU]1.500") usá esa etiqueta directamente — indica la columna del PDF en que apareció.
+2. Si no hay prefijo, buscá encabezados de sección ("Operaciones en dólares", "Resumen en moneda extranjera", "Pesos uruguayos") o símbolos junto al monto ("U$S", "USD", "US$" vs "$").
+moneda debe ser "USD" solo cuando encontraste esa marca o prefijo; el resto "UYU".
 
 Tarjeta: ${banco} Período: ${mesNombre} ${ano}. Solo JSON: {"movimientos":[{"fecha":"","descripcion":"","monto":500,"moneda":"UYU","tipo":"Personal","concepto1":"","concepto2":"","confianza":"alta"},{"fecha":"","descripcion":"devolución ejemplo","monto":-200,"moneda":"UYU","tipo":"Personal","concepto1":"","concepto2":"","confianza":"alta"}],"totalTarjeta":0}`;
 
