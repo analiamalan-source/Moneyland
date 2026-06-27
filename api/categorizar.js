@@ -30,10 +30,10 @@ Banco: ${banco} Período: ${mesNombre} ${ano}. Solo JSON: {"movimientos":[{"fech
       : `Analizá este estado de tarjeta uruguaya. Para cada movimiento: fecha (YYYY-MM-DD), descripcion, monto, moneda, tipo (Personal/Negocio), concepto1, concepto2, confianza.
 
 REGLA DE SIGNO — OBLIGATORIA:
-- Compra / consumo normal → monto POSITIVO. Ejemplo: 1500
-- Devolución / crédito / nota de crédito / ajuste a favor → monto NEGATIVO (con signo menos). Ejemplo: -500
-Indicadores de que el monto debe ir NEGATIVO: aparece con "-" o entre paréntesis en el documento; está en una columna de "Créditos" o "Devoluciones"; la descripción incluye palabras como devolución, crédito, ajuste, nota de crédito, reintegro, cashback.
-NUNCA pongas un crédito o devolución como número positivo, aunque el documento no muestre el signo explícitamente.
+- Compra / consumo normal → monto NEGATIVO (es un gasto). Ejemplo: -1500
+- Devolución / crédito / nota de crédito / ajuste a favor / cashback → monto POSITIVO (reduce lo que se debe). Ejemplo: 500
+La MAYORÍA de los movimientos en un estado de tarjeta son compras: deben ir en NEGATIVO. Solo van en positivo las devoluciones y créditos reales.
+NUNCA pongas todos los montos como positivos — si ves que todos saldrían positivos, revisá el signo de cada uno.
 
 EXCLUÍ del array (no son consumos, son campos informativos):
 - La línea del pago general que el titular hizo el mes pasado para saldar el resumen anterior — es un pago/abono al saldo, NO un consumo ni una devolución de comercio. Suele aparecer como "Pago", "Recibo de pago", "Su pago", "Pago recibido", "Abono", "Pago anterior", a veces en una sección "Pagos/Créditos". No confundas esto con devoluciones de comercios puntuales (esas sí van incluidas, con monto negativo).
@@ -44,7 +44,7 @@ Para CADA movimiento determiná su moneda real. Prioridad:
 2. Si no hay prefijo, buscá encabezados de sección ("Operaciones en dólares", "Resumen en moneda extranjera", "Pesos uruguayos") o símbolos junto al monto ("U$S", "USD", "US$" vs "$").
 moneda debe ser "USD" solo cuando encontraste esa marca o prefijo; el resto "UYU".
 
-Tarjeta: ${banco} Período: ${mesNombre} ${ano}. Solo JSON: {"movimientos":[{"fecha":"","descripcion":"","monto":500,"moneda":"UYU","tipo":"Personal","concepto1":"","concepto2":"","confianza":"alta"},{"fecha":"","descripcion":"devolución ejemplo","monto":-200,"moneda":"UYU","tipo":"Personal","concepto1":"","concepto2":"","confianza":"alta"}],"totalTarjeta":0}`;
+Tarjeta: ${banco} Período: ${mesNombre} ${ano}. Solo JSON: {"movimientos":[{"fecha":"","descripcion":"","monto":-500,"moneda":"UYU","tipo":"Personal","concepto1":"","concepto2":"","confianza":"alta"},{"fecha":"","descripcion":"devolución ejemplo","monto":200,"moneda":"UYU","tipo":"Personal","concepto1":"","concepto2":"","confianza":"alta"}],"totalTarjeta":0}`;
 
   try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {

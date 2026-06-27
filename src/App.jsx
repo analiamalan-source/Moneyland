@@ -688,11 +688,10 @@ export default function Moneyland() {
       // Detectar x del encabezado de columna USD para etiquetar montos por columna
       let usdColX = null;
       for (const item of items) {
-        if (/U\$S|USD/i.test(item.str.trim()) && usdColX === null) {
+        if (/U\$S|U\$\$|USD/i.test(item.str.trim()) && usdColX === null) {
           usdColX = item.transform[4] + (item.width || 0) / 2;
         }
       }
-      console.log(`🔍 PDF pág ${p}: usdColX=${usdColX} | textos únicos:`, [...new Set(items.map(i=>i.str.trim()).filter(s=>s.length<30))].slice(0,60));
       let lastY = null;
       let row = [];
       const flush = () => { if (row.length) { text += row.join("\t") + "\n"; row = []; } };
@@ -795,7 +794,7 @@ export default function Moneyland() {
         const pend = pagosPendientes.find(p=>p.id===pendId);
         if(!pend) continue;
         const totalCalc = loadMovs.filter(m=>(m.moneda||"UYU")===moneda).reduce((s,m)=>s+(m.tot||0),0);
-        const diff = totalCalc - Math.abs(pend.monto);
+        const diff = Math.abs(totalCalc) - Math.abs(pend.monto);
         if(Math.abs(diff)>=1) {
           const fechaDiff = fechaPagoTarjeta || today();
           diffRegs.push({id:Date.now()+Math.random(), f:fechaDiff, m:String(new Date(fechaDiff).getMonth()+1), a:String(new Date(fechaDiff).getFullYear()), b:bancoCarga, t:"Personal", c1:"Otros gastos", c2:"Otros gastos", cat:TX.Personal["Otros gastos"].cat, d:`Diferencia de conciliación con pago bancario (${moneda})`, fm:"Ajuste", be:bancoCarga, plazo:"0", fechaCP:fechaDiff, usd:null, tc:null, p:diff, iva:null, tot:diff, moneda});
@@ -1118,17 +1117,18 @@ export default function Moneyland() {
                           const pendId = moneda==="USD" ? pendienteSelUSD : pendienteSelUYU;
                           const pend = pendId ? pagosPendientes.find(p=>p.id===pendId) : null;
                           const pre = moneda==="USD" ? "U$S " : "$ ";
+                          const absTotal = Math.abs(totalCalc);
                           if(!pend) return (
                             <div key={moneda} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,background:"#1A1A1A",border:"1px solid rgba(255,255,255,0.06)",borderRadius:6,padding:"8px 12px"}}>
-                              <div style={{fontSize:11,color:"#8C8C8C"}}>{moneda} — Total tarjeta: {pre}{totalCalc.toLocaleString("es-UY",{maximumFractionDigits:0})}</div>
+                              <div style={{fontSize:11,color:"#8C8C8C"}}>{moneda} — Total tarjeta: {pre}{absTotal.toLocaleString("es-UY",{maximumFractionDigits:0})}</div>
                               <div style={{fontSize:10,color:"#5A5A5A"}}>Sin pago de banco vinculado</div>
                             </div>
                           );
-                          const diff = totalCalc - Math.abs(pend.monto);
+                          const diff = absTotal - Math.abs(pend.monto);
                           const ok = Math.abs(diff) < 1;
                           return (
                             <div key={moneda} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,background:ok?"rgba(76,175,130,0.08)":"rgba(240,96,96,0.08)",border:`1px solid ${ok?"rgba(76,175,130,0.3)":"rgba(240,96,96,0.3)"}`,borderRadius:6,padding:"8px 12px"}}>
-                              <div style={{fontSize:11,color:"#8C8C8C"}}>{moneda} — Pago banco: {pre}{Math.abs(pend.monto).toLocaleString("es-UY",{maximumFractionDigits:0})} · Total tarjeta: {pre}{totalCalc.toLocaleString("es-UY",{maximumFractionDigits:0})}</div>
+                              <div style={{fontSize:11,color:"#8C8C8C"}}>{moneda} — Pago banco: {pre}{Math.abs(pend.monto).toLocaleString("es-UY",{maximumFractionDigits:0})} · Total tarjeta: {pre}{absTotal.toLocaleString("es-UY",{maximumFractionDigits:0})}</div>
                               <div style={{fontFamily:"Lora",fontSize:12,fontWeight:700,color:ok?"#4CAF82":"#f06060",whiteSpace:"nowrap"}}>{ok?"✓ Coincide":`⚠ Dif. ${diff>0?"+":""}${diff.toLocaleString("es-UY",{maximumFractionDigits:0})}`}</div>
                             </div>
                           );
