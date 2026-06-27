@@ -701,8 +701,8 @@ export default function Moneyland() {
         if (lastY !== null && Math.abs(y - lastY) > 3) flush();
         let str = item.str;
         if (usdColX !== null && /^[\d.,]+$/.test(str.trim())) {
-          if (Math.abs(xCenter - usdColX) < 80) str = `[USD]${str}`;
-          else if (xCenter < usdColX - 40) str = `[UYU]${str}`;
+          if (Math.abs(xCenter - usdColX) < 35) str = `[USD]${str}`;
+          else if (xCenter < usdColX - 20) str = `[UYU]${str}`;
         }
         row.push(str);
         lastY = y;
