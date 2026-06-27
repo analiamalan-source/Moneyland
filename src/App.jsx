@@ -1459,13 +1459,13 @@ export default function Moneyland() {
 
           const startEdit = (r) => {
             setEditingId(r.id);
-            setEditRow({f:r.f||"",t:r.t||"Personal",b:r.b||"",c1:r.c1||"",c2:r.c2||"",d:r.d||"",fm:r.fm||"",be:r.be||"",plazo:r.plazo??"",fechaCP:r.fechaCP||r.f||"",usd:r.usd??"",tc:r.tc??"",p:r.p??"",iva:r.iva??""});
+            setEditRow({f:r.f||"",t:r.t||"Personal",b:r.b||"",c1:r.c1||"",c2:r.c2||"",cat:r.cat||"",d:r.d||"",fm:r.fm||"",be:r.be||"",plazo:r.plazo??"",fechaCP:r.fechaCP||r.f||"",usd:r.usd??"",tc:r.tc??"",p:r.p??"",iva:r.iva??""});
           };
           const cancelEdit = () => { setEditingId(null); setEditRow(null); };
           const saveEdit = async (id) => {
             const mes = editRow.f?String(new Date(editRow.f).getMonth()+1):"";
             const ano = editRow.f?String(new Date(editRow.f).getFullYear()):"";
-            const cat = TX[editRow.t]?.[editRow.c1]?.cat||"";
+            const cat = editRow.cat||TX[editRow.t]?.[editRow.c1]?.cat||"";
             const p = parseFloat(editRow.p)||0;
             const iva = editRow.iva===""?null:parseFloat(editRow.iva)||0;
             const usd = editRow.usd===""?null:parseFloat(editRow.usd)||0;
@@ -1646,7 +1646,7 @@ export default function Moneyland() {
                                   </select>
                                 </div>
                                 <div><label style={S.lbl}>Concepto</label>
-                                  <select value={editRow.c1} onChange={e=>{const nc1=e.target.value; setEditRow(p=>({...p,c1:nc1,c2:TX[p.t][nc1].subs[0]}));}} style={S.sel}>
+                                  <select value={editRow.c1} onChange={e=>{const nc1=e.target.value; setEditRow(prev=>({...prev,c1:nc1,c2:TX[prev.t]?.[nc1]?.subs?.[0]||"",cat:TX[prev.t]?.[nc1]?.cat||prev.cat}));}} style={S.sel}>
                                     {Object.keys(TX[editRow.t]||{}).map(c=><option key={c}>{c}</option>)}
                                   </select>
                                 </div>
@@ -1656,7 +1656,11 @@ export default function Moneyland() {
                                     {!(TX[editRow.t]?.[editRow.c1]?.subs||[]).includes(editRow.c2)&&editRow.c2&&<option value={editRow.c2}>{editRow.c2}</option>}
                                   </select>
                                 </div>
-                                <div><label style={S.lbl}>Categoría</label><div style={S.calc}>{TX[editRow.t]?.[editRow.c1]?.cat||"—"}</div></div>
+                                <div><label style={S.lbl}>Categoría</label>
+                                  <select value={editRow.cat||""} onChange={e=>setEditRow(p=>({...p,cat:e.target.value}))} style={S.sel}>
+                                    {Object.keys(CAT_C).map(c=><option key={c} value={c}>{c}</option>)}
+                                  </select>
+                                </div>
                                 <div style={{gridColumn:"span 2"}}><label style={S.lbl}>Descripción</label><input value={editRow.d} onChange={e=>setEditRow(p=>({...p,d:e.target.value}))} style={S.inp}/></div>
                                 <div><label style={S.lbl}>Forma cobro/pago</label>
                                   <select value={editRow.fm} onChange={e=>setEditRow(p=>({...p,fm:e.target.value}))} style={S.sel}>
