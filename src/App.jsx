@@ -663,6 +663,7 @@ export default function Moneyland() {
           usdColX = item.transform[4] + (item.width || 0) / 2;
         }
       }
+      console.log(`🔍 PDF pág ${p}: usdColX=${usdColX} | textos únicos:`, [...new Set(items.map(i=>i.str.trim()).filter(s=>s.length<30))].slice(0,60));
       let lastY = null;
       let row = [];
       const flush = () => { if (row.length) { text += row.join("\t") + "\n"; row = []; } };
