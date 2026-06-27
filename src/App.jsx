@@ -192,6 +192,9 @@ export default function Moneyland() {
   const [bancoDropOpen, setBancoDropOpen] = useState(false);
   const [saldosInicialEdit, setSaldosInicialEdit] = useState({});
   const [saldosFinalEdit, setSaldosFinalEdit] = useState({});
+  const [conciliaciones, setConciliaciones] = useState([]);
+  const [saldoExtractoDetectado, setSaldoExtractoDetectado] = useState(null);
+  const [conciliarAno, setConciliarAno] = useState(String(new Date().getFullYear()));
   const [editingId, setEditingId] = useState(null);
   const [editRow, setEditRow] = useState(null);
   const [saved, setSaved] = useState(false);
@@ -270,12 +273,13 @@ export default function Moneyland() {
     setDbLoading(true);
     try {
       const headers = {"apikey": SUPABASE_KEY, "Authorization": `Bearer ${session.access_token}`};
-      const [regsRes, bancosRes, tarjetasRes, reglasRes, pagosPendRes] = await Promise.all([
+      const [regsRes, bancosRes, tarjetasRes, reglasRes, pagosPendRes, conciRes] = await Promise.all([
         fetch(`${SUPABASE_URL}/rest/v1/registros?select=*&order=fecha.desc`, {headers}),
         fetch(`${SUPABASE_URL}/rest/v1/bancos?select=*`, {headers}),
         fetch(`${SUPABASE_URL}/rest/v1/tarjetas?select=*`, {headers}),
         fetch(`${SUPABASE_URL}/rest/v1/reglas_categorizacion?select=*`, {headers}),
-        fetch(`${SUPABASE_URL}/rest/v1/pagos_tarjeta_pendientes?select=*&conciliado=eq.false`, {headers}),
+        fetch(`${SUPABASE_URL}/rest/v1/pagos_tarjeta_pendientes?select=*`, {headers}),
+        fetch(`${SUPABASE_URL}/rest/v1/conciliacion_bancaria?select=*`, {headers}),
       ]);
       const regsData = await regsRes.json();
       const bancosData = await bancosRes.json();
@@ -294,6 +298,8 @@ export default function Moneyland() {
       }
       if(Array.isArray(pagosPendData)) setPagosPendientes(pagosPendData);
       else console.error("Error cargando pagos_tarjeta_pendientes:", pagosPendData);
+      const conciData = await conciRes.json();
+      if(Array.isArray(conciData)) setConciliaciones(conciData);
     } catch(e){ console.error(e); }
     setDbLoading(false);
   };
@@ -480,7 +486,7 @@ export default function Moneyland() {
   // Marca un pago pendiente como conciliado al confirmar el estado de la tarjeta correspondiente
   const marcarPendienteConciliado = async (id) => {
     if(!session?.access_token || !id) return;
-    setPagosPendientes(prev=>prev.filter(p=>p.id!==id));
+    setPagosPendientes(prev=>prev.map(p=>p.id===id?{...p,conciliado:true}:p));
     try {
       await fetch(`${SUPABASE_URL}/rest/v1/pagos_tarjeta_pendientes?id=eq.${id}`, {
         method: "PATCH",
@@ -488,6 +494,22 @@ export default function Moneyland() {
         body: JSON.stringify({ conciliado: true })
       });
     } catch(e) { console.error("Error conciliando pago pendiente:", id, e); }
+  };
+
+  const upsertConciliacion = async ({banco, moneda, ano, mes, ...fields}) => {
+    if(!session?.access_token) return;
+    setConciliaciones(prev => {
+      const idx = prev.findIndex(c => c.banco===banco && c.moneda===moneda && c.ano===ano && c.mes===mes);
+      if(idx>=0){ const n=[...prev]; n[idx]={...n[idx],...fields}; return n; }
+      return [...prev, {banco, moneda, ano, mes, ...fields}];
+    });
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/conciliacion_bancaria`, {
+        method: "POST",
+        headers: {...authHeaders(), "Prefer": "resolution=merge-duplicates"},
+        body: JSON.stringify({banco, moneda, ano, mes, ...fields})
+      });
+    } catch(e) { console.error("Error guardando conciliacion:", e); }
   };
 
   const bancoDropRef = useRef(null);
@@ -668,6 +690,11 @@ export default function Moneyland() {
         const moneda = tipo==="banco" ? monedaCuenta : (m.moneda||"UYU");
         return {id:i+1,f:fecha,m:String(new Date(fecha||"2026-01-01").getMonth()+1),b:bancoCarga,t,c1,c2,cat:TX[t]?.[c1]?.cat||"",d:m.descripcion,fm,be:bancoCarga,plazo:"0",fechaCP:fecha,usd:null,tc:null,p:Math.abs(m.monto||0)*(m.monto<0?-1:1),iva:null,tot:m.monto||0,moneda,esPagoTarjeta,confianza:regla?"alta":(m.confianza||"alta"),pendiente:esPagoTarjeta};
       });
+      if(tipo==="banco" && typeof parsed.saldoFinal === "number" && parsed.saldoFinal !== 0) {
+        setSaldoExtractoDetectado(parsed.saldoFinal);
+      } else if(tipo==="banco") {
+        setSaldoExtractoDetectado(null);
+      }
       setLoadMovs(movs); setLoadStep("review");
     } catch(e) { setLoadError("Error al procesar. Verificá el archivo."); setLoadStep("upload"); }
   };
@@ -810,6 +837,11 @@ export default function Moneyland() {
       ...toSave.map((m,i)=>({...m,id:ids[i]||(Date.now()+m.id)})),
       ...prev
     ]);
+    if(loadType==="banco" && saldoExtractoDetectado != null) {
+      const monedaBanco = config.bancos.find(b=>b.nombre===bancoCarga)?.moneda || "UYU";
+      await upsertConciliacion({banco:bancoCarga, moneda:monedaBanco, ano:periodoAno, mes:periodoMes, saldo_extracto:saldoExtractoDetectado});
+      setSaldoExtractoDetectado(null);
+    }
     setLoadStep("done"); setLoadMovs([]);
   };
 
@@ -1086,6 +1118,21 @@ export default function Moneyland() {
                     <div key={k.l} style={S.card}><div style={{...S.lbl,marginBottom:4}}>{k.l}</div><div style={{fontFamily:"Lora",fontSize:20,fontWeight:800,color:k.c}}>{k.v}</div></div>
                   ))}
                 </div>
+                {/* Panel saldo final extracto — solo para extractos bancarios */}
+                {loadType==="banco"&&(
+                  <div style={{...S.card,background:"rgba(29,68,92,0.08)",border:"1px solid rgba(29,68,92,0.35)",marginBottom:12,padding:"12px 16px"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+                      <span style={{fontSize:16}}>🏦</span>
+                      <div style={{flex:1}}>
+                        <div style={{fontFamily:"Lora",fontSize:13,fontWeight:700,color:"#5AAFDF"}}>Saldo final del extracto</div>
+                        <div style={{fontSize:11,color:"#8C8C8C",marginTop:2}}>{saldoExtractoDetectado!=null?"La IA detectó este valor del PDF — corregilo si no es exacto.":"No se detectó saldo final — ingresalo para la conciliación bancaria."}</div>
+                      </div>
+                      <input type="number" step="0.01" value={saldoExtractoDetectado??""} onChange={e=>setSaldoExtractoDetectado(e.target.value===""?null:parseFloat(e.target.value))}
+                        placeholder="Ej: 187432.74"
+                        style={{...S.inp,width:160,color:saldoExtractoDetectado!=null?"#5AAFDF":"#8C8C8C"}}/>
+                    </div>
+                  </div>
+                )}
                 {/* Panel tipo de cambio para movimientos en USD */}
                 {loadMovs.some(m=>m.moneda==="USD")&&(
                   <div style={{...S.card,background:"rgba(221,184,99,0.06)",border:"1px solid rgba(221,184,99,0.3)",marginBottom:12,padding:"12px 16px"}}>
@@ -2161,71 +2208,111 @@ export default function Moneyland() {
             )}
 
             {/* ── CONCILIACIÓN BANCARIA ── */}
-            {reportTab==="conciliacion" && (
-              <>
-                <div style={{fontSize:11,color:"#8C8C8C",marginBottom:14}}>Una tabla por banco · saldo inicial y final editables · control = 0 si no hay errores</div>
-                {BANCOS_CONC.map(({id,label,moneda})=>(
-                  <div key={id} style={{...S.card,padding:0,overflowX:"auto",marginBottom:16}}>
-                    <div style={{padding:"10px 16px",background:"rgba(255,255,255,0.025)",borderBottom:"1px solid rgba(255,255,255,0.07)",display:"flex",alignItems:"center",gap:10}}>
-                      <div style={{fontFamily:"Lora",fontSize:14,fontWeight:800}}>{label}</div>
-                      <span style={{fontSize:10,fontWeight:600,borderRadius:3,padding:"2px 8px",color:moneda==="USD"?"#f0c060":"#1D445C",background:moneda==="USD"?"rgba(240,192,96,0.1)":"rgba(96,200,240,0.1)",border:`1px solid ${moneda==="USD"?"rgba(240,192,96,0.25)":"rgba(96,200,240,0.25)"}`}}>{moneda}</span>
-                      <span style={{fontSize:10,color:"#4A4A4A"}}>{moneda==="UYU"?"Dif. de cambio = 0":"Dif. de cambio calculada automáticamente"}</span>
-                    </div>
-                    <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-                      <thead>
-                        <tr style={{borderBottom:"1px solid rgba(221,184,99,0.15)"}}>
-                          <th style={{textAlign:"left",padding:"7px 14px",fontSize:10,color:"#8C8C8C",textTransform:"uppercase",letterSpacing:0.7,minWidth:220,background:"#141414",position:"sticky",left:0,zIndex:1}}>Concepto</th>
-                          {MESES_DISP.map(m=><th key={m} style={{textAlign:"right",padding:"7px 12px",fontSize:10,color:"#8C8C8C",textTransform:"uppercase",minWidth:130,whiteSpace:"nowrap"}}>{MESES_NOM[+m]}</th>)}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
-                          <td style={{padding:"6px 14px",fontSize:11,color:"#8C8C8C",background:"#141414",position:"sticky",left:0,borderRight:"1px solid rgba(255,255,255,0.05)"}}>Saldo inicial <span style={{fontSize:9,color:"#8C8C8C"}}>· editable</span></td>
-                          {MESES_DISP.map(m=>(
-                            <td key={m} style={{padding:"4px 6px"}}>
-                              <input type="number" step="0.01" value={getSI(id,m)} onChange={e=>editSI(id,m,e.target.value)} style={inpSt("#8C8C8C")}/>
-                            </td>
-                          ))}
-                        </tr>
-                        <tr style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
-                          <td style={{padding:"7px 14px 7px 24px",fontSize:11,color:"#DDB863",background:"#141414",position:"sticky",left:0,borderRight:"1px solid rgba(255,255,255,0.05)"}}>+ Flujo finanzas personales</td>
-                          {MESES_DISP.map(m=>{const v=getFlPers(id,m);return <td key={m} style={{textAlign:"right",padding:"7px 12px",fontFamily:"Lora",fontSize:11,fontWeight:600,color:v>0?"#4CAF82":v<0?"#f06060":"#4A4A4A"}}>{fmtC(v,moneda)}</td>;})}
-                        </tr>
-                        <tr style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
-                          <td style={{padding:"7px 14px 7px 24px",fontSize:11,color:"#1D445C",background:"#141414",position:"sticky",left:0,borderRight:"1px solid rgba(255,255,255,0.05)"}}>+ Flujo negocio</td>
-                          {MESES_DISP.map(m=>{const v=getFlNeg(id,m);return <td key={m} style={{textAlign:"right",padding:"7px 12px",fontFamily:"Lora",fontSize:11,fontWeight:600,color:v>0?"#4CAF82":v<0?"#f06060":"#4A4A4A"}}>{v!==0?fmtC(v,moneda):"—"}</td>;})}
-                        </tr>
-                        {moneda==="USD"&&(
-                          <tr style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
-                            <td style={{padding:"7px 14px 7px 24px",fontSize:11,color:"#4A4A4A",background:"#141414",position:"sticky",left:0,borderRight:"1px solid rgba(255,255,255,0.05)"}}>+ Dif. de cambio <span style={{fontSize:9,color:"#8C8C8C"}}>· calculada</span></td>
-                            {MESES_DISP.map(m=>{const v=getDC(id,m,moneda);return <td key={m} style={{textAlign:"right",padding:"7px 12px",fontFamily:"Lora",fontSize:11,fontWeight:600,color:v>0?"#4CAF82":v<0?"#f06060":"#4A4A4A"}}>{fmtC(v,moneda)}</td>;})}
-                          </tr>
-                        )}
-                        <tr style={{borderBottom:"2px solid rgba(221,184,99,0.18)",background:"rgba(255,255,255,0.015)"}}>
-                          <td style={{padding:"7px 14px",fontSize:11,fontWeight:700,color:"#8C8C8C",background:"rgba(255,255,255,0.015)",position:"sticky",left:0,borderRight:"1px solid rgba(255,255,255,0.05)"}}>= Saldo esperado</td>
-                          {MESES_DISP.map(m=>{const v=getSI(id,m)+getFl(id,m)+(moneda==="USD"?getDC(id,m,moneda):0);return <td key={m} style={{textAlign:"right",padding:"7px 12px",fontFamily:"Lora",fontSize:12,fontWeight:700,color:"#F8F4E8"}}>{fmtC(v,moneda)}</td>;})}
-                        </tr>
-                        <tr style={{borderBottom:"1px solid rgba(221,184,99,0.15)"}}>
-                          <td style={{padding:"6px 14px",fontSize:11,color:"#1D445C",background:"#141414",position:"sticky",left:0,borderRight:"1px solid rgba(255,255,255,0.05)"}}>Saldo final (extracto) <span style={{fontSize:9,color:"#8C8C8C"}}>· editable</span></td>
-                          {MESES_DISP.map(m=>(
-                            <td key={m} style={{padding:"4px 6px"}}>
-                              <input type="number" step="0.01" value={getSF(id,m)} onChange={e=>editSF(id,m,e.target.value)} style={inpSt("#1D445C")}/>
-                            </td>
-                          ))}
-                        </tr>
-                        <tr>
-                          <td style={{padding:"8px 14px",fontSize:11,fontWeight:800,color:"#8C8C8C",background:"#0d0d10",position:"sticky",left:0,borderRight:"1px solid rgba(255,255,255,0.05)"}}>Control</td>
-                          {MESES_DISP.map(m=>{
-                            const ctrl=getSI(id,m)+getFl(id,m)+(moneda==="USD"?getDC(id,m,moneda):0)-getSF(id,m);
-                            return <td key={m} style={ctrlSt(ctrl)}>{Math.abs(ctrl)<0.1?"✓ 0":fmtC(ctrl,moneda)}</td>;
-                          })}
-                        </tr>
-                      </tbody>
-                    </table>
+            {reportTab==="conciliacion" && (()=>{
+              const pre = (moneda) => moneda==="USD"?"U$S ":"$ ";
+              const fmtConci = (v, moneda) => v==null?"—":`${pre(moneda)}${Math.abs(v).toLocaleString("es-UY",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+              const bancosActivos = config.bancos.filter(b=>b.activo!==false);
+              const computar = (bancoDef) => {
+                const rows = [];
+                let prevSaldoFinal = null;
+                for(let mesN=1; mesN<=12; mesN++){
+                  const mes = String(mesN);
+                  const conci = conciliaciones.find(c=>c.banco===bancoDef.nombre&&c.moneda===bancoDef.moneda&&c.ano===conciliarAno&&c.mes===mes);
+                  const regsDelMes = regs.filter(r=>r.b===bancoDef.nombre&&r.moneda===bancoDef.moneda&&r.m===mes&&r.a===conciliarAno);
+                  const pagosT = pagosPendientes.filter(p=>{
+                    if(p.banco!==bancoDef.nombre||p.moneda!==bancoDef.moneda) return false;
+                    const pf = p.fecha||"";
+                    const d = new Date(pf+"T00:00:00");
+                    return String(d.getMonth()+1)===mes && String(d.getFullYear())===conciliarAno;
+                  });
+                  const cobros = regsDelMes.filter(r=>(r.tot||0)>0).reduce((s,r)=>s+(r.tot||0),0);
+                  const pagos = regsDelMes.filter(r=>(r.tot||0)<0).reduce((s,r)=>s+Math.abs(r.tot||0),0) + pagosT.reduce((s,p)=>s+(p.monto||0),0);
+                  const hasData = regsDelMes.length>0||pagosT.length>0||!!conci;
+                  const saldo_inicial = conci?.saldo_inicial??prevSaldoFinal;
+                  const saldo_final_calc = saldo_inicial!=null ? saldo_inicial+cobros-pagos : null;
+                  const saldo_extracto = conci?.saldo_extracto??null;
+                  const diferencia = saldo_final_calc!=null&&saldo_extracto!=null ? saldo_final_calc-saldo_extracto : null;
+                  if(hasData||saldo_inicial!=null) rows.push({mes,cobros,pagos,saldo_inicial,saldo_final_calc,saldo_extracto,diferencia,conci,hasData});
+                  if(saldo_final_calc!=null) prevSaldoFinal = saldo_final_calc;
+                }
+                return rows;
+              };
+              const anosDisp = [...new Set([String(new Date().getFullYear()-1), String(new Date().getFullYear()), String(new Date().getFullYear()+1)])];
+              return (
+                <>
+                  <div style={{display:"flex",gap:10,marginBottom:14,alignItems:"center"}}>
+                    <div style={{fontSize:11,color:"#8C8C8C"}}>Año:</div>
+                    {anosDisp.map(y=>(
+                      <button key={y} onClick={()=>setConciliarAno(y)}
+                        style={{background:conciliarAno===y?"rgba(221,184,99,0.12)":"#141414",border:`1px solid ${conciliarAno===y?"rgba(221,184,99,0.45)":"rgba(221,184,99,0.12)"}`,color:conciliarAno===y?"#DDB863":"#8C8C8C",borderRadius:5,padding:"5px 14px",fontFamily:"Roboto",fontSize:11,cursor:"pointer"}}>
+                        {y}
+                      </button>
+                    ))}
+                    <div style={{marginLeft:"auto",fontSize:11,color:"#4A4A4A"}}>Saldo inicial del primer mes: ingresalo manualmente · los siguientes se propagan automáticamente</div>
                   </div>
-                ))}
-              </>
-            )}
+                  {bancosActivos.length===0&&<div style={{...S.card,color:"#8C8C8C",fontSize:12}}>No hay bancos activos. Configurá tus cuentas en ⚙ Configuración.</div>}
+                  {bancosActivos.map(bancoDef=>{
+                    const rows = computar(bancoDef);
+                    if(rows.length===0) return (
+                      <div key={bancoDef.nombre+bancoDef.moneda} style={{...S.card,marginBottom:12,color:"#4A4A4A",fontSize:12}}>
+                        {bancoDef.nombre} ({bancoDef.moneda}) — sin movimientos en {conciliarAno}
+                      </div>
+                    );
+                    const p = pre(bancoDef.moneda);
+                    return (
+                      <div key={bancoDef.nombre+bancoDef.moneda} style={{...S.card,padding:0,marginBottom:16,overflow:"hidden"}}>
+                        <div style={{padding:"10px 16px",borderBottom:"1px solid rgba(221,184,99,0.12)",display:"flex",alignItems:"center",gap:10}}>
+                          <span style={{fontFamily:"Lora",fontSize:14,fontWeight:800}}>{bancoDef.nombre}</span>
+                          <span style={{fontSize:10,padding:"2px 8px",borderRadius:3,background:bancoDef.moneda==="USD"?"rgba(240,192,96,0.1)":"rgba(29,68,92,0.2)",color:bancoDef.moneda==="USD"?"#f0c060":"#5AAFDF",border:`1px solid ${bancoDef.moneda==="USD"?"rgba(240,192,96,0.25)":"rgba(29,68,92,0.4)"}`}}>{bancoDef.moneda}</span>
+                          <span style={{fontSize:10,color:"#4A4A4A"}}>· {conciliarAno}</span>
+                        </div>
+                        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                          <thead>
+                            <tr style={{borderBottom:"1px solid rgba(221,184,99,0.12)"}}>
+                              {["Mes","Saldo inicial","Cobros","Pagos","Saldo calculado","Saldo extracto","Diferencia"].map((h,i)=>(
+                                <th key={h} style={{padding:"7px 12px",fontSize:10,color:"#4A4A4A",textTransform:"uppercase",letterSpacing:0.5,textAlign:i===0?"left":"right",fontWeight:500,whiteSpace:"nowrap"}}>{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {rows.map(row=>{
+                              const ok = row.diferencia!=null&&Math.abs(row.diferencia)<1;
+                              const hayDif = row.diferencia!=null&&Math.abs(row.diferencia)>=1;
+                              return (
+                                <tr key={row.mes} style={{borderTop:"1px solid rgba(255,255,255,0.04)",background:hayDif?"rgba(240,96,96,0.05)":ok?"rgba(76,175,130,0.04)":"transparent"}}>
+                                  <td style={{padding:"8px 12px",fontWeight:600,color:"#F8F4E8"}}>{MESES_NOM[+row.mes]}</td>
+                                  <td style={{padding:"5px 8px",textAlign:"right"}}>
+                                    <input type="number" step="0.01"
+                                      value={row.conci?.saldo_inicial??""} placeholder={row.saldo_inicial!=null&&row.conci?.saldo_inicial==null?String(row.saldo_inicial):"—"}
+                                      onChange={e=>upsertConciliacion({banco:bancoDef.nombre,moneda:bancoDef.moneda,ano:conciliarAno,mes:row.mes,saldo_inicial:e.target.value===""?null:parseFloat(e.target.value)})}
+                                      style={{width:110,background:"#1A1A1A",border:"1px solid rgba(221,184,99,0.15)",borderRadius:4,color:"#DDB863",fontFamily:"Lora",fontSize:11,padding:"3px 8px",textAlign:"right",outline:"none"}}/>
+                                  </td>
+                                  <td style={{padding:"8px 12px",textAlign:"right",fontFamily:"Lora",fontSize:11,color:"#4CAF82"}}>{row.cobros>0?`${p}${row.cobros.toLocaleString("es-UY",{maximumFractionDigits:0})}`:"—"}</td>
+                                  <td style={{padding:"8px 12px",textAlign:"right",fontFamily:"Lora",fontSize:11,color:"#f06060"}}>{row.pagos>0?`${p}${row.pagos.toLocaleString("es-UY",{maximumFractionDigits:0})}`:"—"}</td>
+                                  <td style={{padding:"8px 12px",textAlign:"right",fontFamily:"Lora",fontSize:12,fontWeight:700,color:"#F8F4E8"}}>{row.saldo_final_calc!=null?`${p}${row.saldo_final_calc.toLocaleString("es-UY",{maximumFractionDigits:0})}`:"—"}</td>
+                                  <td style={{padding:"5px 8px",textAlign:"right"}}>
+                                    <input type="number" step="0.01"
+                                      value={row.saldo_extracto??""} placeholder="—"
+                                      onChange={e=>upsertConciliacion({banco:bancoDef.nombre,moneda:bancoDef.moneda,ano:conciliarAno,mes:row.mes,saldo_extracto:e.target.value===""?null:parseFloat(e.target.value)})}
+                                      style={{width:110,background:"#1A1A1A",border:"1px solid rgba(29,68,92,0.4)",borderRadius:4,color:"#5AAFDF",fontFamily:"Lora",fontSize:11,padding:"3px 8px",textAlign:"right",outline:"none"}}/>
+                                  </td>
+                                  <td style={{padding:"8px 12px",textAlign:"right"}}>
+                                    {row.diferencia==null?<span style={{color:"#5A5A5A"}}>—</span>:ok?
+                                      <span style={{color:"#4CAF82",fontWeight:700}}>✓ OK</span>:
+                                      <span style={{color:"#f06060",fontWeight:700}}>⚠ {row.diferencia>0?"+":""}{row.diferencia.toLocaleString("es-UY",{maximumFractionDigits:0})}</span>
+                                    }
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    );
+                  })}
+                </>
+              );
+            })()}
           </>
         )}
         {/* ── CONFIGURACIÓN ── */}
