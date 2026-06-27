@@ -284,7 +284,7 @@ export default function Moneyland() {
       const pagosPendData = await pagosPendRes.json();
       if(Array.isArray(regsData)) setRegs(regsData.map(r=>({...r, f:r.fecha, m:r.mes, b:r.banco_cob_pag, t:r.tipo, c1:r.concepto1, c2:r.concepto2, cat:r.categoria, d:r.descripcion, fm:r.forma, be:r.banco_emisor, p:r.pesos, tot:r.total, fechaCP:r.fecha_cp||r.fecha})));
       if(Array.isArray(bancosData) && bancosData.length>0) setConfig(prev=>({...prev, bancos:bancosData}));
-      if(Array.isArray(tarjetasData) && tarjetasData.length>0) setConfig(prev=>({...prev, tarjetas:tarjetasData}));
+      if(Array.isArray(tarjetasData) && tarjetasData.length>0) setConfig(prev=>({...prev, tarjetas:tarjetasData.map(t=>({...t, tipoCarta:t.tipoCarta||t.tipo_carta||"crédito"}))}));
       if(Array.isArray(reglasData)) {
         const map = {};
         reglasData.forEach(r=>{ map[r.patron] = {t:r.tipo, c1:r.concepto1, c2:r.concepto2, esPagoTarjeta:r.es_pago_tarjeta}; });
@@ -428,7 +428,7 @@ export default function Moneyland() {
   const saveBancoToDB = async (banco) => {
     if(!session?.access_token) return null;
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/bancos`, {method:"POST", headers:{...authHeaders(),"Prefer":"return=representation"}, body:JSON.stringify({user_id:session.user?.id, nombre:banco.nombre, moneda:banco.moneda, tipo:banco.tipo, activo:banco.activo})});
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/bancos`, {method:"POST", headers:{...authHeaders(),"Prefer":"return=representation"}, body:JSON.stringify({nombre:banco.nombre, moneda:banco.moneda, tipo:banco.tipo, activo:banco.activo})});
       const d = await r.json(); return Array.isArray(d)?d[0]:null;
     } catch(e){console.error("saveBanco",e);return null;}
   };
@@ -439,13 +439,17 @@ export default function Moneyland() {
   const saveTarjetaToDB = async (t) => {
     if(!session?.access_token) return null;
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/tarjetas`, {method:"POST", headers:{...authHeaders(),"Prefer":"return=representation"}, body:JSON.stringify({user_id:session.user?.id, nombre:t.nombre, banco:t.banco, moneda:t.moneda, tipoCarta:t.tipoCarta, tipo:t.tipo, activo:t.activo})});
-      const d = await r.json(); return Array.isArray(d)?d[0]:null;
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/tarjetas`, {method:"POST", headers:{...authHeaders(),"Prefer":"return=representation"}, body:JSON.stringify({nombre:t.nombre, banco:t.banco, moneda:t.moneda, tipo_carta:t.tipoCarta, tipo:t.tipo, activo:t.activo})});
+      const d = await r.json();
+      const row = Array.isArray(d)?d[0]:null;
+      return row ? {...row, tipoCarta: row.tipo_carta} : null;
     } catch(e){console.error("saveTarjeta",e);return null;}
   };
   const updateTarjetaToDB = async (id, upd) => {
     if(!session?.access_token) return;
-    try { await fetch(`${SUPABASE_URL}/rest/v1/tarjetas?id=eq.${id}`, {method:"PATCH", headers:{...authHeaders(),"Prefer":"return=minimal"}, body:JSON.stringify(upd)}); } catch(e){console.error("updateTarjeta",e);}
+    const dbUpd = {...upd};
+    if("tipoCarta" in dbUpd) { dbUpd.tipo_carta = dbUpd.tipoCarta; delete dbUpd.tipoCarta; }
+    try { await fetch(`${SUPABASE_URL}/rest/v1/tarjetas?id=eq.${id}`, {method:"PATCH", headers:{...authHeaders(),"Prefer":"return=minimal"}, body:JSON.stringify(dbUpd)}); } catch(e){console.error("updateTarjeta",e);}
   };
 
   const savePagoPendiente = async (pago) => {
