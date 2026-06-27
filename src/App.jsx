@@ -2226,7 +2226,12 @@ export default function Moneyland() {
                 for(let n=1; n<=12; n++){
                   const mes = String(n);
                   const conci = conciliaciones.find(c=>c.banco===bancoDef.nombre&&c.moneda===bancoDef.moneda&&c.ano===conciliarAno&&c.mes===mes);
-                  const regsDelMes = regs.filter(r=>r.b===bancoDef.nombre&&r.moneda===bancoDef.moneda&&r.m===mes&&r.a===conciliarAno);
+                  const regsDelMes = regs.filter(r=>{
+                    if(r.b!==bancoDef.nombre||r.moneda!==bancoDef.moneda) return false;
+                    const fcp = r.fechaCP||r.f||"";
+                    const d = new Date(fcp+"T00:00:00");
+                    return String(d.getMonth()+1)===mes&&String(d.getFullYear())===conciliarAno;
+                  });
                   const pagosT = pagosPendientes.filter(p=>{
                     if(p.banco!==bancoDef.nombre||p.moneda!==bancoDef.moneda) return false;
                     const d = new Date((p.fecha||"")+"T00:00:00");
