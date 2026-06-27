@@ -194,7 +194,8 @@ export default function Moneyland() {
   const [saldosFinalEdit, setSaldosFinalEdit] = useState({});
   const [conciliaciones, setConciliaciones] = useState([]);
   const [saldoExtractoDetectado, setSaldoExtractoDetectado] = useState(null);
-  const [conciliarAno, setConciliarAno] = useState(String(new Date().getFullYear()));
+  const [conciliarAno, setConciliarAno] = useState("2026");
+  const [conciliarMeses, setConciliarMeses] = useState(["1","2","3","4","5","6","7","8","9","10","11","12"]);
   const [editingId, setEditingId] = useState(null);
   const [editRow, setEditRow] = useState(null);
   const [saved, setSaved] = useState(false);
@@ -2209,104 +2210,161 @@ export default function Moneyland() {
 
             {/* ── CONCILIACIÓN BANCARIA ── */}
             {reportTab==="conciliacion" && (()=>{
-              const pre = (moneda) => moneda==="USD"?"U$S ":"$ ";
-              const fmtConci = (v, moneda) => v==null?"—":`${pre(moneda)}${Math.abs(v).toLocaleString("es-UY",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+              const TODOS_MESES = ["1","2","3","4","5","6","7","8","9","10","11","12"];
+              const mesesVer = TODOS_MESES.filter(m=>conciliarMeses.includes(m));
+              const toggleMes = (m) => setConciliarMeses(p=>p.includes(m)?p.filter(x=>x!==m):[...p,m].sort((a,b)=>+a-+b));
+              const pre = (mon) => mon==="USD"?"U$S ":"$ ";
+              const fmtV = (v, mon) => v==null?"—":`${pre(mon)}${Math.abs(v).toLocaleString("es-UY",{minimumFractionDigits:0,maximumFractionDigits:0})}`;
               const bancosActivos = config.bancos.filter(b=>b.activo!==false);
+              const anosDisp = ["2025","2026","2027"];
+              const stickyCel = {background:"#141414",position:"sticky",left:0,zIndex:1,borderRight:"1px solid rgba(221,184,99,0.1)"};
+              const inpConci = (color) => ({width:120,background:"#111",border:`1px solid ${color}33`,borderRadius:4,color,fontFamily:"Lora",fontSize:12,padding:"4px 8px",textAlign:"right",outline:"none",boxSizing:"border-box"});
+              // Calcula todas las filas para un banco (siempre los 12 meses para propagar saldo_inicial)
               const computar = (bancoDef) => {
-                const rows = [];
+                const byMes = {};
                 let prevSaldoFinal = null;
-                for(let mesN=1; mesN<=12; mesN++){
-                  const mes = String(mesN);
+                for(let n=1; n<=12; n++){
+                  const mes = String(n);
                   const conci = conciliaciones.find(c=>c.banco===bancoDef.nombre&&c.moneda===bancoDef.moneda&&c.ano===conciliarAno&&c.mes===mes);
                   const regsDelMes = regs.filter(r=>r.b===bancoDef.nombre&&r.moneda===bancoDef.moneda&&r.m===mes&&r.a===conciliarAno);
                   const pagosT = pagosPendientes.filter(p=>{
                     if(p.banco!==bancoDef.nombre||p.moneda!==bancoDef.moneda) return false;
-                    const pf = p.fecha||"";
-                    const d = new Date(pf+"T00:00:00");
-                    return String(d.getMonth()+1)===mes && String(d.getFullYear())===conciliarAno;
+                    const d = new Date((p.fecha||"")+"T00:00:00");
+                    return String(d.getMonth()+1)===mes&&String(d.getFullYear())===conciliarAno;
                   });
                   const cobros = regsDelMes.filter(r=>(r.tot||0)>0).reduce((s,r)=>s+(r.tot||0),0);
-                  const pagos = regsDelMes.filter(r=>(r.tot||0)<0).reduce((s,r)=>s+Math.abs(r.tot||0),0) + pagosT.reduce((s,p)=>s+(p.monto||0),0);
-                  const hasData = regsDelMes.length>0||pagosT.length>0||!!conci;
+                  const pagos = regsDelMes.filter(r=>(r.tot||0)<0).reduce((s,r)=>s+Math.abs(r.tot||0),0)+pagosT.reduce((s,p)=>s+(p.monto||0),0);
                   const saldo_inicial = conci?.saldo_inicial??prevSaldoFinal;
                   const saldo_final_calc = saldo_inicial!=null ? saldo_inicial+cobros-pagos : null;
                   const saldo_extracto = conci?.saldo_extracto??null;
                   const diferencia = saldo_final_calc!=null&&saldo_extracto!=null ? saldo_final_calc-saldo_extracto : null;
-                  if(hasData||saldo_inicial!=null) rows.push({mes,cobros,pagos,saldo_inicial,saldo_final_calc,saldo_extracto,diferencia,conci,hasData});
+                  byMes[mes] = {cobros,pagos,saldo_inicial,saldo_final_calc,saldo_extracto,diferencia,conci};
                   if(saldo_final_calc!=null) prevSaldoFinal = saldo_final_calc;
                 }
-                return rows;
+                return byMes;
               };
-              const anosDisp = [...new Set([String(new Date().getFullYear()-1), String(new Date().getFullYear()), String(new Date().getFullYear()+1)])];
               return (
                 <>
-                  <div style={{display:"flex",gap:10,marginBottom:14,alignItems:"center"}}>
-                    <div style={{fontSize:11,color:"#8C8C8C"}}>Año:</div>
-                    {anosDisp.map(y=>(
-                      <button key={y} onClick={()=>setConciliarAno(y)}
-                        style={{background:conciliarAno===y?"rgba(221,184,99,0.12)":"#141414",border:`1px solid ${conciliarAno===y?"rgba(221,184,99,0.45)":"rgba(221,184,99,0.12)"}`,color:conciliarAno===y?"#DDB863":"#8C8C8C",borderRadius:5,padding:"5px 14px",fontFamily:"Roboto",fontSize:11,cursor:"pointer"}}>
-                        {y}
-                      </button>
-                    ))}
-                    <div style={{marginLeft:"auto",fontSize:11,color:"#4A4A4A"}}>Saldo inicial del primer mes: ingresalo manualmente · los siguientes se propagan automáticamente</div>
-                  </div>
-                  {bancosActivos.length===0&&<div style={{...S.card,color:"#8C8C8C",fontSize:12}}>No hay bancos activos. Configurá tus cuentas en ⚙ Configuración.</div>}
-                  {bancosActivos.map(bancoDef=>{
-                    const rows = computar(bancoDef);
-                    if(rows.length===0) return (
-                      <div key={bancoDef.nombre+bancoDef.moneda} style={{...S.card,marginBottom:12,color:"#4A4A4A",fontSize:12}}>
-                        {bancoDef.nombre} ({bancoDef.moneda}) — sin movimientos en {conciliarAno}
+                  {/* Controles */}
+                  <div style={{...S.card,marginBottom:14,padding:"12px 16px"}}>
+                    <div style={{display:"flex",gap:12,alignItems:"center",flexWrap:"wrap"}}>
+                      <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                        <span style={{fontSize:10,color:"#8C8C8C",textTransform:"uppercase",letterSpacing:0.7}}>Año</span>
+                        {anosDisp.map(y=>(
+                          <button key={y} onClick={()=>setConciliarAno(y)}
+                            style={{background:conciliarAno===y?"rgba(221,184,99,0.12)":"transparent",border:`1px solid ${conciliarAno===y?"rgba(221,184,99,0.5)":"rgba(221,184,99,0.15)"}`,color:conciliarAno===y?"#DDB863":"#4A4A4A",borderRadius:4,padding:"3px 12px",fontFamily:"Roboto",fontSize:11,cursor:"pointer"}}>
+                            {y}
+                          </button>
+                        ))}
                       </div>
-                    );
-                    const p = pre(bancoDef.moneda);
+                      <div style={{width:1,height:20,background:"rgba(221,184,99,0.15)"}}/>
+                      <div style={{display:"flex",gap:4,alignItems:"center",flexWrap:"wrap"}}>
+                        <span style={{fontSize:10,color:"#8C8C8C",textTransform:"uppercase",letterSpacing:0.7,marginRight:2}}>Meses</span>
+                        {TODOS_MESES.map(m=>(
+                          <button key={m} onClick={()=>toggleMes(m)}
+                            style={{background:conciliarMeses.includes(m)?"rgba(221,184,99,0.12)":"transparent",border:`1px solid ${conciliarMeses.includes(m)?"rgba(221,184,99,0.5)":"rgba(221,184,99,0.1)"}`,color:conciliarMeses.includes(m)?"#DDB863":"#4A4A4A",borderRadius:4,padding:"2px 9px",fontFamily:"Roboto",fontSize:11,cursor:"pointer"}}>
+                            {MESES_NOM[+m]}
+                          </button>
+                        ))}
+                        <button onClick={()=>setConciliarMeses([...TODOS_MESES])}
+                          style={{background:"transparent",border:"1px solid rgba(221,184,99,0.12)",color:"#4A4A4A",borderRadius:4,padding:"2px 9px",fontFamily:"Roboto",fontSize:10,cursor:"pointer",marginLeft:4}}>
+                          Todos
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {bancosActivos.length===0&&<div style={{...S.card,color:"#8C8C8C",fontSize:12}}>No hay bancos activos. Configurá tus cuentas en ⚙ Configuración.</div>}
+
+                  {bancosActivos.map(bancoDef=>{
+                    const byMes = computar(bancoDef);
+                    const mon = bancoDef.moneda;
                     return (
-                      <div key={bancoDef.nombre+bancoDef.moneda} style={{...S.card,padding:0,marginBottom:16,overflow:"hidden"}}>
+                      <div key={bancoDef.nombre+mon} style={{...S.card,padding:0,marginBottom:16}}>
+                        {/* Header banco */}
                         <div style={{padding:"10px 16px",borderBottom:"1px solid rgba(221,184,99,0.12)",display:"flex",alignItems:"center",gap:10}}>
                           <span style={{fontFamily:"Lora",fontSize:14,fontWeight:800}}>{bancoDef.nombre}</span>
-                          <span style={{fontSize:10,padding:"2px 8px",borderRadius:3,background:bancoDef.moneda==="USD"?"rgba(240,192,96,0.1)":"rgba(29,68,92,0.2)",color:bancoDef.moneda==="USD"?"#f0c060":"#5AAFDF",border:`1px solid ${bancoDef.moneda==="USD"?"rgba(240,192,96,0.25)":"rgba(29,68,92,0.4)"}`}}>{bancoDef.moneda}</span>
+                          <span style={{fontSize:10,padding:"2px 8px",borderRadius:3,background:mon==="USD"?"rgba(240,192,96,0.1)":"rgba(29,68,92,0.2)",color:mon==="USD"?"#f0c060":"#5AAFDF",border:`1px solid ${mon==="USD"?"rgba(240,192,96,0.25)":"rgba(29,68,92,0.4)"}`}}>{mon}</span>
                           <span style={{fontSize:10,color:"#4A4A4A"}}>· {conciliarAno}</span>
+                          <span style={{marginLeft:"auto",fontSize:10,color:"#4A4A4A"}}>Saldo inicial primer mes: ingresarlo manualmente, los siguientes se propagan</span>
                         </div>
-                        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-                          <thead>
-                            <tr style={{borderBottom:"1px solid rgba(221,184,99,0.12)"}}>
-                              {["Mes","Saldo inicial","Cobros","Pagos","Saldo calculado","Saldo extracto","Diferencia"].map((h,i)=>(
-                                <th key={h} style={{padding:"7px 12px",fontSize:10,color:"#4A4A4A",textTransform:"uppercase",letterSpacing:0.5,textAlign:i===0?"left":"right",fontWeight:500,whiteSpace:"nowrap"}}>{h}</th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {rows.map(row=>{
-                              const ok = row.diferencia!=null&&Math.abs(row.diferencia)<1;
-                              const hayDif = row.diferencia!=null&&Math.abs(row.diferencia)>=1;
-                              return (
-                                <tr key={row.mes} style={{borderTop:"1px solid rgba(255,255,255,0.04)",background:hayDif?"rgba(240,96,96,0.05)":ok?"rgba(76,175,130,0.04)":"transparent"}}>
-                                  <td style={{padding:"8px 12px",fontWeight:600,color:"#F8F4E8"}}>{MESES_NOM[+row.mes]}</td>
-                                  <td style={{padding:"5px 8px",textAlign:"right"}}>
-                                    <input type="number" step="0.01"
-                                      value={row.conci?.saldo_inicial??""} placeholder={row.saldo_inicial!=null&&row.conci?.saldo_inicial==null?String(row.saldo_inicial):"—"}
-                                      onChange={e=>upsertConciliacion({banco:bancoDef.nombre,moneda:bancoDef.moneda,ano:conciliarAno,mes:row.mes,saldo_inicial:e.target.value===""?null:parseFloat(e.target.value)})}
-                                      style={{width:110,background:"#1A1A1A",border:"1px solid rgba(221,184,99,0.15)",borderRadius:4,color:"#DDB863",fontFamily:"Lora",fontSize:11,padding:"3px 8px",textAlign:"right",outline:"none"}}/>
-                                  </td>
-                                  <td style={{padding:"8px 12px",textAlign:"right",fontFamily:"Lora",fontSize:11,color:"#4CAF82"}}>{row.cobros>0?`${p}${row.cobros.toLocaleString("es-UY",{maximumFractionDigits:0})}`:"—"}</td>
-                                  <td style={{padding:"8px 12px",textAlign:"right",fontFamily:"Lora",fontSize:11,color:"#f06060"}}>{row.pagos>0?`${p}${row.pagos.toLocaleString("es-UY",{maximumFractionDigits:0})}`:"—"}</td>
-                                  <td style={{padding:"8px 12px",textAlign:"right",fontFamily:"Lora",fontSize:12,fontWeight:700,color:"#F8F4E8"}}>{row.saldo_final_calc!=null?`${p}${row.saldo_final_calc.toLocaleString("es-UY",{maximumFractionDigits:0})}`:"—"}</td>
-                                  <td style={{padding:"5px 8px",textAlign:"right"}}>
-                                    <input type="number" step="0.01"
-                                      value={row.saldo_extracto??""} placeholder="—"
-                                      onChange={e=>upsertConciliacion({banco:bancoDef.nombre,moneda:bancoDef.moneda,ano:conciliarAno,mes:row.mes,saldo_extracto:e.target.value===""?null:parseFloat(e.target.value)})}
-                                      style={{width:110,background:"#1A1A1A",border:"1px solid rgba(29,68,92,0.4)",borderRadius:4,color:"#5AAFDF",fontFamily:"Lora",fontSize:11,padding:"3px 8px",textAlign:"right",outline:"none"}}/>
-                                  </td>
-                                  <td style={{padding:"8px 12px",textAlign:"right"}}>
-                                    {row.diferencia==null?<span style={{color:"#5A5A5A"}}>—</span>:ok?
-                                      <span style={{color:"#4CAF82",fontWeight:700}}>✓ OK</span>:
-                                      <span style={{color:"#f06060",fontWeight:700}}>⚠ {row.diferencia>0?"+":""}{row.diferencia.toLocaleString("es-UY",{maximumFractionDigits:0})}</span>
-                                    }
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
+                        {/* Tabla con scroll horizontal */}
+                        <div style={{overflowX:"auto"}}>
+                          <table style={{borderCollapse:"collapse",fontSize:12,minWidth:mesesVer.length*140+220}}>
+                            <thead>
+                              <tr style={{borderBottom:"1px solid rgba(221,184,99,0.12)"}}>
+                                <th style={{...stickyCel,padding:"7px 16px",fontSize:10,color:"#4A4A4A",textTransform:"uppercase",letterSpacing:0.5,textAlign:"left",fontWeight:500,minWidth:200}}>Concepto</th>
+                                {mesesVer.map(m=><th key={m} style={{padding:"7px 14px",fontSize:10,color:"#8C8C8C",textTransform:"uppercase",letterSpacing:0.5,textAlign:"right",fontWeight:500,minWidth:140,whiteSpace:"nowrap"}}>{MESES_NOM[+m]} {conciliarAno}</th>)}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {/* Saldo inicial */}
+                              <tr style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                                <td style={{...stickyCel,padding:"7px 16px",color:"#8C8C8C"}}>Saldo inicial <span style={{fontSize:9,opacity:0.6}}>· editable</span></td>
+                                {mesesVer.map(m=>{
+                                  const d=byMes[m];
+                                  return (
+                                    <td key={m} style={{padding:"4px 8px",textAlign:"right"}}>
+                                      <input type="number" step="0.01"
+                                        value={d?.conci?.saldo_inicial??""}
+                                        placeholder={d?.saldo_inicial!=null&&d?.conci?.saldo_inicial==null?d.saldo_inicial.toLocaleString("es-UY",{maximumFractionDigits:0}):"—"}
+                                        onChange={e=>upsertConciliacion({banco:bancoDef.nombre,moneda:mon,ano:conciliarAno,mes:m,saldo_inicial:e.target.value===""?null:parseFloat(e.target.value)})}
+                                        style={inpConci("#DDB863")}/>
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                              {/* Cobros */}
+                              <tr style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                                <td style={{...stickyCel,padding:"7px 16px 7px 24px",color:"#4CAF82"}}>+ Cobros</td>
+                                {mesesVer.map(m=>{const v=byMes[m]?.cobros??0;return <td key={m} style={{padding:"7px 14px",textAlign:"right",fontFamily:"Lora",fontSize:11,color:v>0?"#4CAF82":"#3A3A3A"}}>{v>0?fmtV(v,mon):"—"}</td>;})}
+                              </tr>
+                              {/* Pagos */}
+                              <tr style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                                <td style={{...stickyCel,padding:"7px 16px 7px 24px",color:"#f06060"}}>− Pagos</td>
+                                {mesesVer.map(m=>{const v=byMes[m]?.pagos??0;return <td key={m} style={{padding:"7px 14px",textAlign:"right",fontFamily:"Lora",fontSize:11,color:v>0?"#f06060":"#3A3A3A"}}>{v>0?fmtV(v,mon):"—"}</td>;})}
+                              </tr>
+                              {/* Saldo calculado */}
+                              <tr style={{borderBottom:"2px solid rgba(221,184,99,0.15)",background:"rgba(255,255,255,0.015)"}}>
+                                <td style={{...stickyCel,padding:"8px 16px",fontWeight:700,color:"#F8F4E8",background:"rgba(255,255,255,0.015)"}}>= Saldo final calculado</td>
+                                {mesesVer.map(m=>{const v=byMes[m]?.saldo_final_calc;return <td key={m} style={{padding:"8px 14px",textAlign:"right",fontFamily:"Lora",fontSize:12,fontWeight:700,color:"#F8F4E8"}}>{fmtV(v,mon)}</td>;})}
+                              </tr>
+                              {/* Saldo extracto */}
+                              <tr style={{borderBottom:"1px solid rgba(29,68,92,0.3)"}}>
+                                <td style={{...stickyCel,padding:"7px 16px",color:"#5AAFDF"}}>Saldo extracto <span style={{fontSize:9,opacity:0.6}}>· editable / auto</span></td>
+                                {mesesVer.map(m=>{
+                                  const d=byMes[m];
+                                  return (
+                                    <td key={m} style={{padding:"4px 8px",textAlign:"right"}}>
+                                      <input type="number" step="0.01"
+                                        value={d?.saldo_extracto??""}
+                                        placeholder="—"
+                                        onChange={e=>upsertConciliacion({banco:bancoDef.nombre,moneda:mon,ano:conciliarAno,mes:m,saldo_extracto:e.target.value===""?null:parseFloat(e.target.value)})}
+                                        style={inpConci("#5AAFDF")}/>
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                              {/* Diferencia */}
+                              <tr>
+                                <td style={{...stickyCel,padding:"8px 16px",fontWeight:700,color:"#8C8C8C"}}>Diferencia</td>
+                                {mesesVer.map(m=>{
+                                  const diff=byMes[m]?.diferencia;
+                                  const ok=diff!=null&&Math.abs(diff)<1;
+                                  const haydif=diff!=null&&Math.abs(diff)>=1;
+                                  return (
+                                    <td key={m} style={{padding:"8px 14px",textAlign:"right",background:ok?"rgba(76,175,130,0.08)":haydif?"rgba(240,96,96,0.08)":"transparent"}}>
+                                      {diff==null?<span style={{color:"#3A3A3A"}}>—</span>:ok?
+                                        <span style={{color:"#4CAF82",fontWeight:700}}>✓ OK</span>:
+                                        <span style={{color:"#f06060",fontWeight:700}}>⚠ {diff>0?"+":""}{diff.toLocaleString("es-UY",{maximumFractionDigits:0})}</span>
+                                      }
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     );
                   })}
