@@ -1160,10 +1160,16 @@ export default function Moneyland() {
                           {m.confianza==="baja"&&<span style={{fontSize:9,padding:"1px 6px",borderRadius:3,background:"rgba(240,160,96,0.2)",color:"#f0a060"}}>⚠ revisar</span>}
                         </div>
                       </div>
-                      <select value={m.c1||""} onChange={e=>setLoadMovs(p=>p.map(x=>x.id===m.id?{...x,c1:e.target.value}:x))}
-                        style={{background:"#1E1E1E",border:`1px solid ${m.confianza==="baja"?"rgba(240,160,96,0.4)":"rgba(221,184,99,0.15)"}`,borderRadius:4,color:m.confianza==="baja"?"#f0a060":"#F8F4E8",fontFamily:"Roboto",fontSize:10,padding:"3px 6px",cursor:"pointer"}}>
-                        {Object.keys(TX[m.t||"Personal"]||TX.Personal).map(c=><option key={c}>{c}</option>)}
-                      </select>
+                      <div style={{display:"flex",flexDirection:"column",gap:3}}>
+                        <select value={m.c1||""} onChange={e=>{const newC1=e.target.value;setLoadMovs(p=>p.map(x=>x.id===m.id?{...x,c1:newC1,cat:TX[x.t||"Personal"]?.[newC1]?.cat||x.cat}:x));}}
+                          style={{background:"#1E1E1E",border:`1px solid ${m.confianza==="baja"?"rgba(240,160,96,0.4)":"rgba(221,184,99,0.15)"}`,borderRadius:4,color:m.confianza==="baja"?"#f0a060":"#F8F4E8",fontFamily:"Roboto",fontSize:10,padding:"3px 6px",cursor:"pointer"}}>
+                          {Object.keys(TX[m.t||"Personal"]||TX.Personal).map(c=><option key={c}>{c}</option>)}
+                        </select>
+                        <select value={m.cat||""} onChange={e=>setLoadMovs(p=>p.map(x=>x.id===m.id?{...x,cat:e.target.value}:x))}
+                          style={{background:"#151515",border:"1px solid rgba(255,255,255,0.06)",borderRadius:4,color:CAT_C[m.cat]||"#8C8C8C",fontFamily:"Roboto",fontSize:9,padding:"2px 5px",cursor:"pointer"}}>
+                          {Object.keys(CAT_C).map(c=><option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </div>
                       <select value={m.t||"Personal"} onChange={e=>setLoadMovs(p=>p.map(x=>x.id===m.id?{...x,t:e.target.value}:x))}
                         style={{background:"#1E1E1E",border:"1px solid rgba(221,184,99,0.15)",borderRadius:4,color:"#F8F4E8",fontFamily:"Roboto",fontSize:10,padding:"3px 6px",cursor:"pointer"}}>
                         <option>Personal</option><option>Negocio</option>
