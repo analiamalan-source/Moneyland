@@ -423,6 +423,31 @@ export default function Moneyland() {
     } catch(e) { console.error("Error guardando regla de clasificación:", patron, e); }
   };
   // Guarda un pago a tarjeta detectado en un extracto bancario, para conciliarlo luego con el estado de la tarjeta
+  const authHeaders = () => ({"apikey":SUPABASE_KEY,"Authorization":`Bearer ${session.access_token}`,"Content-Type":"application/json"});
+
+  const saveBancoToDB = async (banco) => {
+    if(!session?.access_token) return null;
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/bancos`, {method:"POST", headers:{...authHeaders(),"Prefer":"return=representation"}, body:JSON.stringify({user_id:session.user?.id, nombre:banco.nombre, moneda:banco.moneda, tipo:banco.tipo, activo:banco.activo})});
+      const d = await r.json(); return Array.isArray(d)?d[0]:null;
+    } catch(e){console.error("saveBanco",e);return null;}
+  };
+  const updateBancoToDB = async (id, upd) => {
+    if(!session?.access_token) return;
+    try { await fetch(`${SUPABASE_URL}/rest/v1/bancos?id=eq.${id}`, {method:"PATCH", headers:{...authHeaders(),"Prefer":"return=minimal"}, body:JSON.stringify(upd)}); } catch(e){console.error("updateBanco",e);}
+  };
+  const saveTarjetaToDB = async (t) => {
+    if(!session?.access_token) return null;
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/tarjetas`, {method:"POST", headers:{...authHeaders(),"Prefer":"return=representation"}, body:JSON.stringify({user_id:session.user?.id, nombre:t.nombre, banco:t.banco, moneda:t.moneda, tipoCarta:t.tipoCarta, tipo:t.tipo, activo:t.activo})});
+      const d = await r.json(); return Array.isArray(d)?d[0]:null;
+    } catch(e){console.error("saveTarjeta",e);return null;}
+  };
+  const updateTarjetaToDB = async (id, upd) => {
+    if(!session?.access_token) return;
+    try { await fetch(`${SUPABASE_URL}/rest/v1/tarjetas?id=eq.${id}`, {method:"PATCH", headers:{...authHeaders(),"Prefer":"return=minimal"}, body:JSON.stringify(upd)}); } catch(e){console.error("updateTarjeta",e);}
+  };
+
   const savePagoPendiente = async (pago) => {
     if(!session?.access_token) return;
     try {
@@ -2233,7 +2258,7 @@ export default function Moneyland() {
                             <input type="checkbox" checked={editingConfig.activo} onChange={e=>setEditingConfig(p=>({...p,activo:e.target.checked}))}/>
                           </div>
                           <div style={{display:"flex",gap:4}}>
-                            <button onClick={()=>{setConfig(p=>({...p,bancos:p.bancos.map(x=>x.id===b.id?{...editingConfig}:x)}));setEditingConfig(null);}}
+                            <button onClick={async()=>{await updateBancoToDB(b.id,{nombre:editingConfig.nombre,moneda:editingConfig.moneda,tipo:editingConfig.tipo,activo:editingConfig.activo});setConfig(p=>({...p,bancos:p.bancos.map(x=>x.id===b.id?{...editingConfig}:x)}));setEditingConfig(null);}}
                               style={{background:"#DDB863",border:"none",borderRadius:3,color:"#0A0A0A",fontFamily:"Roboto",fontSize:10,padding:"3px 8px",cursor:"pointer",fontWeight:700}}>✓</button>
                             <button onClick={()=>setEditingConfig(null)}
                               style={{background:"none",border:"1px solid rgba(221,184,99,0.18)",borderRadius:3,color:"#8C8C8C",fontFamily:"Roboto",fontSize:10,padding:"3px 6px",cursor:"pointer"}}>✕</button>
@@ -2250,7 +2275,7 @@ export default function Moneyland() {
                           <div style={{display:"flex",gap:4,justifyContent:"flex-end"}}>
                             <button onClick={()=>setEditingConfig({...b,table:"bancos"})}
                               style={{background:"none",border:"1px solid rgba(221,184,99,0.15)",borderRadius:3,color:"#8C8C8C",fontFamily:"Roboto",fontSize:10,padding:"3px 8px",cursor:"pointer"}}>✎</button>
-                            <button onClick={()=>setConfig(p=>({...p,bancos:p.bancos.map(x=>x.id===b.id?{...x,activo:!x.activo}:x)}))}
+                            <button onClick={async()=>{const a=!b.activo;await updateBancoToDB(b.id,{activo:a});setConfig(p=>({...p,bancos:p.bancos.map(x=>x.id===b.id?{...x,activo:a}:x)}));}}
                               style={{background:"none",border:`1px solid ${b.activo?"rgba(240,96,96,0.3)":"rgba(96,240,160,0.3)"}`,borderRadius:3,color:b.activo?"#f06060":"#4CAF82",fontFamily:"Roboto",fontSize:10,padding:"3px 8px",cursor:"pointer"}}>
                               {b.activo?"Desactivar":"Activar"}
                             </button>
@@ -2282,10 +2307,10 @@ export default function Moneyland() {
                         <option>Personal</option><option>Negocio</option><option>Ambos</option>
                       </select>
                     </div>
-                    <button onClick={()=>{
+                    <button onClick={async()=>{
                       if(!newBanco.nombre.trim()) return;
-                      setConfig(p=>({...p,bancos:[...p.bancos,{...newBanco,id:Date.now(),activo:true}]}));
-                      setNewBanco({nombre:"",moneda:"UYU",tipo:"Ambos",activo:true});
+                      const guardado = await saveBancoToDB({...newBanco,activo:true});
+                      if(guardado) { setConfig(p=>({...p,bancos:[...p.bancos,guardado]})); setNewBanco({nombre:"",moneda:"UYU",tipo:"Ambos",activo:true}); }
                     }} style={{background:"#DDB863",border:"none",borderRadius:6,color:"#0A0A0A",fontFamily:"Lora",fontSize:12,fontWeight:700,padding:"9px 16px",cursor:"pointer",whiteSpace:"nowrap"}}>
                       + Agregar
                     </button>
@@ -2321,7 +2346,7 @@ export default function Moneyland() {
                             <input type="checkbox" checked={editingConfig.activo} onChange={e=>setEditingConfig(p=>({...p,activo:e.target.checked}))}/>
                           </div>
                           <div style={{display:"flex",gap:4}}>
-                            <button onClick={()=>{setConfig(p=>({...p,tarjetas:p.tarjetas.map(x=>x.id===t.id?{...editingConfig}:x)}));setEditingConfig(null);}}
+                            <button onClick={async()=>{await updateTarjetaToDB(t.id,{nombre:editingConfig.nombre,banco:editingConfig.banco,moneda:editingConfig.moneda,tipoCarta:editingConfig.tipoCarta,tipo:editingConfig.tipo,activo:editingConfig.activo});setConfig(p=>({...p,tarjetas:p.tarjetas.map(x=>x.id===t.id?{...editingConfig}:x)}));setEditingConfig(null);}}
                               style={{background:"#DDB863",border:"none",borderRadius:3,color:"#0A0A0A",fontFamily:"Roboto",fontSize:10,padding:"3px 8px",cursor:"pointer",fontWeight:700}}>✓</button>
                             <button onClick={()=>setEditingConfig(null)}
                               style={{background:"none",border:"1px solid rgba(221,184,99,0.18)",borderRadius:3,color:"#8C8C8C",fontFamily:"Roboto",fontSize:10,padding:"3px 6px",cursor:"pointer"}}>✕</button>
@@ -2339,7 +2364,7 @@ export default function Moneyland() {
                           <div style={{display:"flex",gap:4,justifyContent:"flex-end"}}>
                             <button onClick={()=>setEditingConfig({...t,table:"tarjetas"})}
                               style={{background:"none",border:"1px solid rgba(221,184,99,0.15)",borderRadius:3,color:"#8C8C8C",fontFamily:"Roboto",fontSize:10,padding:"3px 8px",cursor:"pointer"}}>✎</button>
-                            <button onClick={()=>setConfig(p=>({...p,tarjetas:p.tarjetas.map(x=>x.id===t.id?{...x,activo:!x.activo}:x)}))}
+                            <button onClick={async()=>{const a=!t.activo;await updateTarjetaToDB(t.id,{activo:a});setConfig(p=>({...p,tarjetas:p.tarjetas.map(x=>x.id===t.id?{...x,activo:a}:x)}));}}
                               style={{background:"none",border:`1px solid ${t.activo?"rgba(240,96,96,0.3)":"rgba(96,240,160,0.3)"}`,borderRadius:3,color:t.activo?"#f06060":"#4CAF82",fontFamily:"Roboto",fontSize:10,padding:"3px 8px",cursor:"pointer"}}>
                               {t.activo?"Desactivar":"Activar"}
                             </button>
@@ -2378,10 +2403,10 @@ export default function Moneyland() {
                         <option>Personal</option><option>Negocio</option><option>Ambos</option>
                       </select>
                     </div>
-                    <button onClick={()=>{
+                    <button onClick={async()=>{
                       if(!newTarjeta.nombre.trim()||!newTarjeta.banco) return;
-                      setConfig(p=>({...p,tarjetas:[...p.tarjetas,{...newTarjeta,id:Date.now(),activo:true}]}));
-                      setNewTarjeta({nombre:"",banco:"",moneda:"UYU",tipoCarta:"crédito",tipo:"Personal",activo:true});
+                      const guardada = await saveTarjetaToDB({...newTarjeta,activo:true});
+                      if(guardada) { setConfig(p=>({...p,tarjetas:[...p.tarjetas,guardada]})); setNewTarjeta({nombre:"",banco:"",moneda:"UYU",tipoCarta:"crédito",tipo:"Personal",activo:true}); }
                     }} style={{background:"#DDB863",border:"none",borderRadius:6,color:"#0A0A0A",fontFamily:"Lora",fontSize:12,fontWeight:700,padding:"9px 16px",cursor:"pointer",whiteSpace:"nowrap"}}>
                       + Agregar
                     </button>
