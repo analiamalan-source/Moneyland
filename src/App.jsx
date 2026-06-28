@@ -2227,8 +2227,10 @@ export default function Moneyland() {
                   const mes = String(n);
                   const conci = conciliaciones.find(c=>c.banco===bancoDef.nombre&&c.moneda===bancoDef.moneda&&c.ano===conciliarAno&&c.mes===mes);
                   const isUSD = bancoDef.moneda==="USD";
+                  const normB = s=>(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").trim();
+                  const bancNorm = normB(bancoDef.nombre);
                   const regsDelMes = regs.filter(r=>{
-                    if(r.b!==bancoDef.nombre) return false;
+                    if(normB(r.b)!==bancNorm) return false;
                     const rMes = parseInt(r.m||r.mes||0);
                     const rAno = parseInt(r.a||r.ano||r.f?.slice(0,4)||0);
                     return rMes===parseInt(mes)&&rAno===parseInt(conciliarAno);
