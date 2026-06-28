@@ -280,7 +280,7 @@ export default function Moneyland() {
         fetch(`${SUPABASE_URL}/rest/v1/tarjetas?select=*`, {headers}),
         fetch(`${SUPABASE_URL}/rest/v1/reglas_categorizacion?select=*`, {headers}),
         fetch(`${SUPABASE_URL}/rest/v1/pagos_tarjeta_pendientes?select=*`, {headers}),
-        fetch(`${SUPABASE_URL}/rest/v1/conciliacion_bancaria?select=*`, {headers}),
+        fetch(`${SUPABASE_URL}/rest/v1/conciliacion_bancaria?select=*&user_id=eq.${session.user?.id}`, {headers}),
       ]);
       const regsData = await regsRes.json();
       const bancosData = await bancosRes.json();
@@ -499,16 +499,17 @@ export default function Moneyland() {
 
   const upsertConciliacion = async ({banco, moneda, ano, mes, ...fields}) => {
     if(!session?.access_token) return;
+    const sAno = String(ano), sMes = String(mes);
     setConciliaciones(prev => {
-      const idx = prev.findIndex(c => c.banco===banco && c.moneda===moneda && c.ano===ano && c.mes===mes);
+      const idx = prev.findIndex(c => c.banco===banco && c.moneda===moneda && String(c.ano)===sAno && String(c.mes)===sMes);
       if(idx>=0){ const n=[...prev]; n[idx]={...n[idx],...fields}; return n; }
-      return [...prev, {banco, moneda, ano, mes, ...fields}];
+      return [...prev, {banco, moneda, ano:sAno, mes:sMes, ...fields}];
     });
     try {
       await fetch(`${SUPABASE_URL}/rest/v1/conciliacion_bancaria`, {
         method: "POST",
         headers: {...authHeaders(), "Prefer": "resolution=merge-duplicates"},
-        body: JSON.stringify({banco, moneda, ano, mes, ...fields})
+        body: JSON.stringify({user_id: session.user?.id, banco, moneda, ano:sAno, mes:sMes, ...fields})
       });
     } catch(e) { console.error("Error guardando conciliacion:", e); }
   };
@@ -2225,7 +2226,7 @@ export default function Moneyland() {
                 let prevSaldoFinal = null;
                 for(let n=1; n<=12; n++){
                   const mes = String(n);
-                  const conci = conciliaciones.find(c=>c.banco===bancoDef.nombre&&c.moneda===bancoDef.moneda&&c.ano===conciliarAno&&c.mes===mes);
+                  const conci = conciliaciones.find(c=>c.banco===bancoDef.nombre&&c.moneda===bancoDef.moneda&&String(c.ano)===conciliarAno&&String(c.mes)===mes);
                   const isUSD = bancoDef.moneda==="USD";
                   const normB = s=>(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").trim();
                   const bancNorm = normB(bancoDef.nombre);
@@ -2284,12 +2285,7 @@ export default function Moneyland() {
 
                   {bancosActivos.length===0&&<div style={{...S.card,color:"#8C8C8C",fontSize:12}}>No hay bancos activos. Configurá tus cuentas en ⚙ Configuración.</div>}
 
-                  {/* DEBUG TEMPORAL */}
-                  <div style={{background:"#1a1a1a",color:"#0f0",fontFamily:"monospace",fontSize:10,padding:8,borderRadius:4,marginBottom:8,whiteSpace:"pre-wrap"}}>
-                    {`Total regs: ${regs.length}\nBancos activos: ${bancosActivos.map(b=>`${b.nombre}(${b.moneda})`).join(" | ")}\nBancos en regs: ${[...new Set(regs.map(r=>r.b))].join(" | ")}\nMuestra regs[0..2]: ${regs.slice(0,3).map(r=>`b="${r.b}" m=${r.m} a=${r.a} ano=${r.ano} tot=${r.tot} usd=${r.usd}`).join("\n")}`}
-                  </div>
-
-                  {bancosActivos.map(bancoDef=>{
+{bancosActivos.map(bancoDef=>{
                     const byMes = computar(bancoDef);
                     const mon = bancoDef.moneda;
                     return (
