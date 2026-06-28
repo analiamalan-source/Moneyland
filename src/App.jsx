@@ -2226,19 +2226,20 @@ export default function Moneyland() {
                 for(let n=1; n<=12; n++){
                   const mes = String(n);
                   const conci = conciliaciones.find(c=>c.banco===bancoDef.nombre&&c.moneda===bancoDef.moneda&&c.ano===conciliarAno&&c.mes===mes);
+                  const isUSD = bancoDef.moneda==="USD";
                   const regsDelMes = regs.filter(r=>{
                     if(r.b!==bancoDef.nombre) return false;
-                    const fcp = r.fechaCP||r.f||"";
-                    const d = new Date(fcp+"T00:00:00");
-                    return String(d.getMonth()+1)===mes&&String(d.getFullYear())===conciliarAno;
+                    const rMes = parseInt(r.m||r.mes||0);
+                    const rAno = parseInt(r.a||r.ano||r.f?.slice(0,4)||0);
+                    return rMes===parseInt(mes)&&rAno===parseInt(conciliarAno);
                   });
                   const pagosT = pagosPendientes.filter(p=>{
                     if(p.banco!==bancoDef.nombre) return false;
                     const d = new Date((p.fecha||"")+"T00:00:00");
                     return String(d.getMonth()+1)===mes&&String(d.getFullYear())===conciliarAno;
                   });
-                  const cobros = regsDelMes.filter(r=>(r.tot||0)>0).reduce((s,r)=>s+(r.tot||0),0);
-                  const pagos = regsDelMes.filter(r=>(r.tot||0)<0).reduce((s,r)=>s+Math.abs(r.tot||0),0)+pagosT.reduce((s,p)=>s+(p.monto||0),0);
+                  const cobros = regsDelMes.filter(r=>(r.tot||0)>0).reduce((s,r)=>s+(isUSD?(r.usd||(r.tot||0)):(r.tot||0)),0);
+                  const pagos = regsDelMes.filter(r=>(r.tot||0)<0).reduce((s,r)=>s+(isUSD?(r.usd||Math.abs(r.tot||0)):Math.abs(r.tot||0)),0)+pagosT.reduce((s,p)=>s+(p.monto||0),0);
                   const saldo_inicial = conci?.saldo_inicial??prevSaldoFinal;
                   const saldo_final_calc = saldo_inicial!=null ? saldo_inicial+cobros-pagos : null;
                   const saldo_extracto = conci?.saldo_extracto??null;
@@ -2280,6 +2281,11 @@ export default function Moneyland() {
                   </div>
 
                   {bancosActivos.length===0&&<div style={{...S.card,color:"#8C8C8C",fontSize:12}}>No hay bancos activos. Configurá tus cuentas en ⚙ Configuración.</div>}
+
+                  {/* DEBUG TEMPORAL */}
+                  <div style={{background:"#1a1a1a",color:"#0f0",fontFamily:"monospace",fontSize:10,padding:8,borderRadius:4,marginBottom:8,whiteSpace:"pre-wrap"}}>
+                    {`Total regs: ${regs.length}\nBancos activos: ${bancosActivos.map(b=>`${b.nombre}(${b.moneda})`).join(" | ")}\nBancos en regs: ${[...new Set(regs.map(r=>r.b))].join(" | ")}\nMuestra regs[0..2]: ${regs.slice(0,3).map(r=>`b="${r.b}" m=${r.m} a=${r.a} ano=${r.ano} tot=${r.tot} usd=${r.usd}`).join("\n")}`}
+                  </div>
 
                   {bancosActivos.map(bancoDef=>{
                     const byMes = computar(bancoDef);
