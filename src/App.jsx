@@ -2225,6 +2225,7 @@ export default function Moneyland() {
               const computar = (bancoDef) => {
                 const byMes = {};
                 let prevSaldoFinal = null;
+                if(bancoDef.moneda==="USD") console.log("DEBUG USD banco:", bancoDef.nombre, "pagosPendientes:", pagosPendientes.map(p=>({b:p.banco,m:p.mes,a:p.ano,monto:p.monto,f:p.fecha})), "regs tot<0:", regs.filter(r=>r.b&&r.b.toUpperCase().includes("USD")&&(r.tot||0)<0).slice(0,5).map(r=>({b:r.b,m:r.m,ano:r.ano,tot:r.tot})));
                 for(let n=1; n<=12; n++){
                   const mes = String(n);
                   const conci = conciliaciones.find(c=>c.banco===bancoDef.nombre&&c.moneda===bancoDef.moneda&&String(c.ano)===conciliarAno&&String(c.mes)===mes);
