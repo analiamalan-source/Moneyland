@@ -2246,9 +2246,8 @@ export default function Moneyland() {
                     const d = new Date((p.fecha||"")+"T00:00:00");
                     return String(d.getMonth()+1)===mes&&String(d.getFullYear())===conciliarAno;
                   });
-                  const cobros = regsDelMes.filter(r=>(r.tot||0)>0).reduce((s,r)=>s+(isUSD?(r.usd||(r.tot||0)):(r.tot||0)),0);
-                  const pagos = regsDelMes.filter(r=>(r.tot||0)<0).reduce((s,r)=>s+(isUSD?(r.usd||Math.abs(r.tot||0)):Math.abs(r.tot||0)),0)+pagosT.reduce((s,p)=>s+(p.monto||0),0);
-                  if(isUSD&&(mes==="4"||mes==="1"))console.log(`DBG ${bancoDef.nombre} mes=${mes}: regsDelMes=${regsDelMes.length} neg=${regsDelMes.filter(r=>(r.tot||0)<0).length} cobros=${cobros} pagos=${pagos} sample:`,regsDelMes.slice(0,3).map(r=>`b=${r.b} m=${r.m} ano=${r.ano} tot=${r.tot} usd=${r.usd}`));
+                  const cobros = regsDelMes.filter(r=>(r.tot||0)>0).reduce((s,r)=>s+(isUSD?Math.abs(r.usd||(r.tot||0)):(r.tot||0)),0);
+                  const pagos = regsDelMes.filter(r=>(r.tot||0)<0).reduce((s,r)=>s+(isUSD?Math.abs(r.usd||(r.tot||0)):Math.abs(r.tot||0)),0)+pagosT.reduce((s,p)=>s+(p.monto||0),0);
                   const saldo_inicial = conci?.saldo_inicial??prevSaldoFinal;
                   const saldo_final_calc = saldo_inicial!=null ? saldo_inicial+cobros-pagos : null;
                   const saldo_extracto = conci?.saldo_extracto??null;
