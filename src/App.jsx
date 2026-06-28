@@ -2224,9 +2224,7 @@ export default function Moneyland() {
               // Calcula todas las filas para un banco (siempre los 12 meses para propagar saldo_inicial)
               const computar = (bancoDef) => {
                 const byMes = {};
-                let prevSaldoFinal = null;
-                if(bancoDef.moneda==="USD"){const normBd=s=>{let t=(s||"").replace(/[Â-ß][-¿]/g,m=>{try{return new TextDecoder("utf-8").decode(new Uint8Array([m.charCodeAt(0),m.charCodeAt(1)]));}catch(e){return m;}});return t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").trim();};const bn=normBd(bancoDef.nombre);console.log("DEBUG",bancoDef.nombre,"bancNorm=",bn,"pagosT matches:",pagosPendientes.filter(p=>normBd(p.banco)===bn).map(p=>`banco="${p.banco}" mes=${p.mes} ano=${p.ano} monto=${p.monto} fecha=${p.fecha}`),"regsNeg matches:",regs.filter(r=>normBd(r.b)===bn&&(r.tot||0)<0).map(r=>`b="${r.b}" m=${r.m} ano=${r.ano} tot=${r.tot}`));}
-                for(let n=1; n<=12; n++){
+                let prevSaldoFinal = null;                for(let n=1; n<=12; n++){
                   const mes = String(n);
                   const conci = conciliaciones.find(c=>c.banco===bancoDef.nombre&&c.moneda===bancoDef.moneda&&String(c.ano)===conciliarAno&&String(c.mes)===mes);
                   const isUSD = bancoDef.moneda==="USD";
@@ -2250,6 +2248,7 @@ export default function Moneyland() {
                   });
                   const cobros = regsDelMes.filter(r=>(r.tot||0)>0).reduce((s,r)=>s+(isUSD?(r.usd||(r.tot||0)):(r.tot||0)),0);
                   const pagos = regsDelMes.filter(r=>(r.tot||0)<0).reduce((s,r)=>s+(isUSD?(r.usd||Math.abs(r.tot||0)):Math.abs(r.tot||0)),0)+pagosT.reduce((s,p)=>s+(p.monto||0),0);
+                  if(isUSD&&(mes==="4"||mes==="1"))console.log(`DBG ${bancoDef.nombre} mes=${mes}: regsDelMes=${regsDelMes.length} neg=${regsDelMes.filter(r=>(r.tot||0)<0).length} cobros=${cobros} pagos=${pagos} sample:`,regsDelMes.slice(0,3).map(r=>`b=${r.b} m=${r.m} ano=${r.ano} tot=${r.tot} usd=${r.usd}`));
                   const saldo_inicial = conci?.saldo_inicial??prevSaldoFinal;
                   const saldo_final_calc = saldo_inicial!=null ? saldo_inicial+cobros-pagos : null;
                   const saldo_extracto = conci?.saldo_extracto??null;
