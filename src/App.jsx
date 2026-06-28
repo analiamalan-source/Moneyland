@@ -506,11 +506,12 @@ export default function Moneyland() {
       return [...prev, {banco, moneda, ano:sAno, mes:sMes, ...fields}];
     });
     try {
-      await fetch(`${SUPABASE_URL}/rest/v1/conciliacion_bancaria`, {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/conciliacion_bancaria`, {
         method: "POST",
-        headers: {...authHeaders(), "Prefer": "resolution=merge-duplicates"},
+        headers: {...authHeaders(), "Prefer": "resolution=merge-duplicates,return=minimal"},
         body: JSON.stringify({user_id: session.user?.id, banco, moneda, ano:sAno, mes:sMes, ...fields})
       });
+      if(!res.ok) { const e = await res.text(); console.error("conciliacion save error:", res.status, e); }
     } catch(e) { console.error("Error guardando conciliacion:", e); }
   };
 
@@ -2315,9 +2316,10 @@ export default function Moneyland() {
                                   return (
                                     <td key={m} style={{padding:"4px 8px",textAlign:"right"}}>
                                       <input type="number" step="0.01"
-                                        value={d?.conci?.saldo_inicial??""}
+                                        key={`si-${bancoDef.nombre}-${mon}-${m}-${d?.conci?.saldo_inicial??""}`}
+                                        defaultValue={d?.conci?.saldo_inicial??""}
                                         placeholder={d?.saldo_inicial!=null&&d?.conci?.saldo_inicial==null?d.saldo_inicial.toLocaleString("es-UY",{maximumFractionDigits:0}):"—"}
-                                        onChange={e=>upsertConciliacion({banco:bancoDef.nombre,moneda:mon,ano:conciliarAno,mes:m,saldo_inicial:e.target.value===""?null:parseFloat(e.target.value)})}
+                                        onBlur={e=>upsertConciliacion({banco:bancoDef.nombre,moneda:mon,ano:conciliarAno,mes:m,saldo_inicial:e.target.value===""?null:parseFloat(e.target.value)})}
                                         style={inpConci("#DDB863")}/>
                                     </td>
                                   );
@@ -2346,9 +2348,10 @@ export default function Moneyland() {
                                   return (
                                     <td key={m} style={{padding:"4px 8px",textAlign:"right"}}>
                                       <input type="number" step="0.01"
-                                        value={d?.saldo_extracto??""}
+                                        key={`se-${bancoDef.nombre}-${mon}-${m}-${d?.conci?.saldo_extracto??""}`}
+                                        defaultValue={d?.conci?.saldo_extracto??""}
                                         placeholder="—"
-                                        onChange={e=>upsertConciliacion({banco:bancoDef.nombre,moneda:mon,ano:conciliarAno,mes:m,saldo_extracto:e.target.value===""?null:parseFloat(e.target.value)})}
+                                        onBlur={e=>upsertConciliacion({banco:bancoDef.nombre,moneda:mon,ano:conciliarAno,mes:m,saldo_extracto:e.target.value===""?null:parseFloat(e.target.value)})}
                                         style={inpConci("#5AAFDF")}/>
                                     </td>
                                   );
