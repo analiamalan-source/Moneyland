@@ -2229,7 +2229,12 @@ export default function Moneyland() {
                   const mes = String(n);
                   const conci = conciliaciones.find(c=>c.banco===bancoDef.nombre&&c.moneda===bancoDef.moneda&&String(c.ano)===conciliarAno&&String(c.mes)===mes);
                   const isUSD = bancoDef.moneda==="USD";
-                  const normB = s=>(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").trim();
+                  const normB = s => {
+                    let t = (s||"").replace(/[Â-ß][-¿]/g, m => {
+                      try { return new TextDecoder("utf-8").decode(new Uint8Array([m.charCodeAt(0),m.charCodeAt(1)])); } catch(e){ return m; }
+                    });
+                    return t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").trim();
+                  };
                   const bancNorm = normB(bancoDef.nombre);
                   const regsDelMes = regs.filter(r=>{
                     if(normB(r.b)!==bancNorm) return false;
@@ -2238,7 +2243,7 @@ export default function Moneyland() {
                     return rMes===parseInt(mes)&&rAno===parseInt(conciliarAno);
                   });
                   const pagosT = pagosPendientes.filter(p=>{
-                    if(p.banco!==bancoDef.nombre) return false;
+                    if(normB(p.banco)!==bancNorm) return false;
                     const d = new Date((p.fecha||"")+"T00:00:00");
                     return String(d.getMonth()+1)===mes&&String(d.getFullYear())===conciliarAno;
                   });
