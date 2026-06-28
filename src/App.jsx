@@ -2352,10 +2352,10 @@ export default function Moneyland() {
                                   return (
                                     <td key={m} style={{padding:"4px 8px",textAlign:"right"}}>
                                       <input type="number" step="0.01"
-                                        key={`se-${bancoDef.nombre}-${mon}-${m}-${d?.conci?.saldo_extracto??""}`}
-                                        defaultValue={d?.conci?.saldo_extracto??""}
+                                        key={`se-${bancoDef.nombre}-${mon}-${m}-${d?.conci?.saldo_extracto!=null?Math.abs(d.conci.saldo_extracto):""}`}
+                                        defaultValue={d?.conci?.saldo_extracto!=null?Math.abs(d.conci.saldo_extracto):""}
                                         placeholder="—"
-                                        onBlur={e=>upsertConciliacion({banco:bancoDef.nombre,moneda:mon,ano:conciliarAno,mes:m,saldo_extracto:e.target.value===""?null:parseFloat(e.target.value)})}
+                                        onBlur={e=>upsertConciliacion({banco:bancoDef.nombre,moneda:mon,ano:conciliarAno,mes:m,saldo_extracto:e.target.value===""?null:Math.abs(parseFloat(e.target.value))})}
                                         style={inpConci("#5AAFDF")}/>
                                     </td>
                                   );
