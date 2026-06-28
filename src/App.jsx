@@ -842,7 +842,7 @@ export default function Moneyland() {
     ]);
     if(loadType==="banco" && saldoExtractoDetectado != null) {
       const monedaBanco = config.bancos.find(b=>b.nombre===bancoCarga)?.moneda || "UYU";
-      await upsertConciliacion({banco:bancoCarga, moneda:monedaBanco, ano:periodoAno, mes:periodoMes, saldo_extracto:saldoExtractoDetectado});
+      await upsertConciliacion({banco:bancoCarga, moneda:monedaBanco, ano:periodoAno, mes:periodoMes, saldo_extracto:Math.abs(saldoExtractoDetectado)});
       setSaldoExtractoDetectado(null);
     }
     setLoadStep("done"); setLoadMovs([]);
@@ -2251,7 +2251,7 @@ export default function Moneyland() {
                   const saldo_inicial = conci?.saldo_inicial??prevSaldoFinal;
                   const saldo_final_calc = saldo_inicial!=null ? saldo_inicial+cobros-pagos : null;
                   const saldo_extracto = conci?.saldo_extracto??null;
-                  const diferencia = saldo_final_calc!=null&&saldo_extracto!=null ? saldo_final_calc-saldo_extracto : null;
+                  const diferencia = saldo_final_calc!=null&&saldo_extracto!=null ? saldo_final_calc-Math.abs(saldo_extracto) : null;
                   byMes[mes] = {cobros,pagos,saldo_inicial,saldo_final_calc,saldo_extracto,diferencia,conci};
                   if(saldo_final_calc!=null) prevSaldoFinal = saldo_final_calc;
                 }
