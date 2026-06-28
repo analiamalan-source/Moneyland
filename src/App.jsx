@@ -506,7 +506,7 @@ export default function Moneyland() {
       return [...prev, {banco, moneda, ano:sAno, mes:sMes, ...fields}];
     });
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/conciliacion_bancaria`, {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/conciliacion_bancaria?on_conflict=user_id,banco,moneda,ano,mes`, {
         method: "POST",
         headers: {...authHeaders(), "Prefer": "resolution=merge-duplicates,return=minimal"},
         body: JSON.stringify({user_id: session.user?.id, banco, moneda, ano:sAno, mes:sMes, ...fields})
