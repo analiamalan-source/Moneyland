@@ -715,11 +715,17 @@ export default function Moneyland() {
         const dy = b.transform[5] - a.transform[5];
         return Math.abs(dy) > 3 ? dy : a.transform[4] - b.transform[4];
       });
-      // Detectar x del encabezado de columna USD para etiquetar montos por columna
+      // Detectar x del encabezado de columna USD para etiquetar montos por columna.
+      // Priorizamos encabezados reales de la tabla de movimientos (ej. "IMPORTE U$S") por sobre
+      // menciones sueltas de "U$S"/"USD" en otras secciones del documento (resúmenes, tasas, etc.),
+      // que suelen aparecer más arriba en la página y hacían que se tomara la columna equivocada.
       let usdColX = null;
       for (const item of items) {
-        if (/U\$S|U\$\$|USD/i.test(item.str.trim()) && usdColX === null) {
-          usdColX = item.transform[4] + (item.width || 0) / 2;
+        if (/IMPORTE.*(U\$S|U\$\$|USD)/i.test(item.str.trim())) { usdColX = item.transform[4] + (item.width || 0) / 2; break; }
+      }
+      if (usdColX === null) {
+        for (const item of items) {
+          if (/U\$S|U\$\$|USD/i.test(item.str.trim())) { usdColX = item.transform[4] + (item.width || 0) / 2; break; }
         }
       }
       let lastY = null;
