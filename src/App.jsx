@@ -2243,12 +2243,14 @@ export default function Moneyland() {
                   const bancNorm = normB(bancoDef.nombre);
                   const regsDelMes = regs.filter(r=>{
                     if(normB(r.b)!==bancNorm) return false;
+                    if((r.moneda||"UYU")!==bancoDef.moneda) return false;
                     const rMes = parseInt(r.m||r.mes||0);
                     const rAno = parseInt(r.a||r.ano||r.f?.slice(0,4)||0);
                     return rMes===parseInt(mes)&&rAno===parseInt(conciliarAno);
                   });
                   const pagosT = pagosPendientes.filter(p=>{
                     if(normB(p.banco)!==bancNorm) return false;
+                    if((p.moneda||"UYU")!==bancoDef.moneda) return false;
                     const d = new Date((p.fecha||"")+"T00:00:00");
                     return String(d.getMonth()+1)===mes&&String(d.getFullYear())===conciliarAno;
                   });
