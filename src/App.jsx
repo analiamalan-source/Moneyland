@@ -269,20 +269,37 @@ export default function Moneyland() {
     loadFromDB();
   },[session]);
 
+  // PostgREST trunca cada request a un máximo de filas (típicamente 1000) — sin paginar,
+  // las tablas grandes pierden silenciosamente los registros más viejos (order=fecha.desc).
+  const fetchAllRows = async (url, headers) => {
+    const PAGE = 1000;
+    let all = [];
+    let offset = 0;
+    while(true) {
+      const sep = url.includes("?") ? "&" : "?";
+      const res = await fetch(`${url}${sep}limit=${PAGE}&offset=${offset}`, {headers});
+      const data = await res.json();
+      if(!Array.isArray(data)) return data;
+      all = all.concat(data);
+      if(data.length < PAGE) break;
+      offset += PAGE;
+    }
+    return all;
+  };
+
   const loadFromDB = async () => {
     if(!session?.access_token) return;
     setDbLoading(true);
     try {
       const headers = {"apikey": SUPABASE_KEY, "Authorization": `Bearer ${session.access_token}`};
-      const [regsRes, bancosRes, tarjetasRes, reglasRes, pagosPendRes, conciRes] = await Promise.all([
-        fetch(`${SUPABASE_URL}/rest/v1/registros?select=*&order=fecha.desc`, {headers}),
+      const [regsData, bancosRes, tarjetasRes, reglasRes, pagosPendRes, conciRes] = await Promise.all([
+        fetchAllRows(`${SUPABASE_URL}/rest/v1/registros?select=*&order=fecha.desc`, headers),
         fetch(`${SUPABASE_URL}/rest/v1/bancos?select=*`, {headers}),
         fetch(`${SUPABASE_URL}/rest/v1/tarjetas?select=*`, {headers}),
         fetch(`${SUPABASE_URL}/rest/v1/reglas_categorizacion?select=*`, {headers}),
         fetch(`${SUPABASE_URL}/rest/v1/pagos_tarjeta_pendientes?select=*`, {headers}),
         fetch(`${SUPABASE_URL}/rest/v1/conciliacion_bancaria?select=*&user_id=eq.${session.user?.id}`, {headers}),
       ]);
-      const regsData = await regsRes.json();
       const bancosData = await bancosRes.json();
       const tarjetasData = await tarjetasRes.json();
       const reglasData = await reglasRes.json();
