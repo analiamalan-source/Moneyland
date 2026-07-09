@@ -1758,7 +1758,7 @@ export default function Moneyland() {
         {mainTab==="informes" && (
           <>
             <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
-              {[["rentabilidad","Rentabilidad negocio"],["flujo","Flujo de fondos"],["personal","Finanzas personales"],["conciliacion","Conciliación bancaria"]].map(([k,l])=>(
+              {[["rentabilidad","Rentabilidad negocio"],["flujo","Flujo de fondos"],["personal","Finanzas personales"],["conciliacion","Conciliación bancaria"],["pendientes","💳 Pagos tarjeta pendientes"]].map(([k,l])=>(
                 <button key={k} onClick={()=>setReportTab(k)}
                   style={{background:reportTab===k?"rgba(221,184,99,0.12)":"#141414",border:`1px solid ${reportTab===k?"rgba(221,184,99,0.45)":"rgba(221,184,99,0.12)"}`,color:reportTab===k?"#DDB863":"#8C8C8C",borderRadius:5,padding:"7px 14px",fontFamily:"Roboto",fontSize:11,cursor:"pointer"}}>
                   {l}
@@ -2386,6 +2386,48 @@ export default function Moneyland() {
                               </tr>
                             </tbody>
                           </table>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </>
+              );
+            })()}
+
+            {/* ── PAGOS TARJETA PENDIENTES ── */}
+            {reportTab==="pendientes" && (()=>{
+              const pendientes = pagosPendientes.filter(p=>!p.conciliado);
+              const porTarjeta = {};
+              pendientes.forEach(p=>{ (porTarjeta[p.tarjeta]=porTarjeta[p.tarjeta]||[]).push(p); });
+              const tarjetasConPendientes = Object.keys(porTarjeta).sort();
+              const fmtM = (v,mon) => `${mon==="USD"?"U$S ":"$ "}${Math.abs(v||0).toLocaleString("es-UY",{minimumFractionDigits:0,maximumFractionDigits:0})}`;
+              return (
+                <>
+                  <div style={{fontSize:11,color:"#8C8C8C",marginBottom:14}}>Pagos a tarjeta detectados en los extractos bancarios que todavía no se vincularon con el estado de esa tarjeta. Si aparece algo acá, falta cargar (o conciliar) el estado correspondiente.</div>
+                  {tarjetasConPendientes.length===0 ? (
+                    <div style={{...S.card,color:"#4CAF82",fontSize:13,fontFamily:"Lora",fontWeight:700}}>✓ No hay pagos pendientes — todas las tarjetas están conciliadas.</div>
+                  ) : tarjetasConPendientes.map(tarjeta=>{
+                    const items = porTarjeta[tarjeta].slice().sort((a,b)=>(a.fecha||"").localeCompare(b.fecha||""));
+                    const porMoneda = {};
+                    items.forEach(p=>{ porMoneda[p.moneda||"UYU"] = (porMoneda[p.moneda||"UYU"]||0) + Math.abs(p.monto||0); });
+                    return (
+                      <div key={tarjeta} style={{...S.card,marginBottom:14,padding:0}}>
+                        <div style={{padding:"10px 16px",borderBottom:"1px solid rgba(200,96,240,0.2)",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                          <span style={{fontFamily:"Lora",fontSize:14,fontWeight:800,color:"#c860f0"}}>💳 {tarjeta}</span>
+                          <span style={{fontSize:10,color:"#4A4A4A"}}>{items.length} pago{items.length!==1?"s":""} sin conciliar</span>
+                          <div style={{marginLeft:"auto",display:"flex",gap:8}}>
+                            {Object.entries(porMoneda).map(([mon,tot])=>(
+                              <span key={mon} style={{fontSize:11,fontFamily:"Lora",fontWeight:700,color:"#DDB863"}}>{fmtM(tot,mon)}</span>
+                            ))}
+                          </div>
+                        </div>
+                        <div style={{display:"flex",flexDirection:"column"}}>
+                          {items.map(p=>(
+                            <div key={p.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,padding:"8px 16px",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                              <div style={{fontSize:11,color:"#F8F4E8"}}>{fmtD(p.fecha)} — {p.descripcion||"—"} <span style={{color:"#4A4A4A"}}>({p.banco})</span></div>
+                              <div style={{fontFamily:"Lora",fontSize:12,fontWeight:700,color:p.moneda==="USD"?"#f0c060":"#5AAFDF"}}>{fmtM(p.monto,p.moneda)}</div>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     );
