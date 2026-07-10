@@ -619,6 +619,18 @@ export default function Moneyland() {
     } catch(e) { console.error("Error conciliando pago pendiente:", id, e); }
   };
 
+  // Borra un pago de tarjeta pendiente (ej. duplicado, o ya conciliado a mano por otra vía)
+  const deletePagoPendiente = async (id) => {
+    if(!session?.access_token || !id) return;
+    setPagosPendientes(prev=>prev.filter(p=>p.id!==id));
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/pagos_tarjeta_pendientes?id=eq.${id}`, {
+        method: "DELETE",
+        headers: {"apikey": SUPABASE_KEY, "Authorization": `Bearer ${session.access_token}`}
+      });
+    } catch(e) { console.error("Error borrando pago pendiente:", id, e); }
+  };
+
   const upsertConciliacion = async ({banco, moneda, ano, mes, ...fields}) => {
     if(!session?.access_token) return;
     const sAno = String(ano), sMes = String(mes);
@@ -2562,7 +2574,12 @@ export default function Moneyland() {
                           {items.map(p=>(
                             <div key={p.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,padding:"8px 16px",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
                               <div style={{fontSize:11,color:"#F8F4E8"}}>{fmtD(p.fecha)} — {p.descripcion||"—"} <span style={{color:"#4A4A4A"}}>({p.banco})</span></div>
-                              <div style={{fontFamily:"Lora",fontSize:12,fontWeight:700,color:p.moneda==="USD"?"#f0c060":"#5AAFDF"}}>{fmtM(p.monto,p.moneda)}</div>
+                              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                                <div style={{fontFamily:"Lora",fontSize:12,fontWeight:700,color:p.moneda==="USD"?"#f0c060":"#5AAFDF"}}>{fmtM(p.monto,p.moneda)}</div>
+                                <button onClick={()=>{ if(window.confirm("¿Borrar este pago pendiente? Esta acción no se puede deshacer.")) deletePagoPendiente(p.id); }}
+                                  title="Borrar"
+                                  style={{background:"none",border:"none",color:"#4A4A4A",fontSize:14,cursor:"pointer",padding:"2px 4px",lineHeight:1}}>✕</button>
+                              </div>
                             </div>
                           ))}
                         </div>
