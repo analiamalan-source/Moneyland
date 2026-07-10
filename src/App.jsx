@@ -136,6 +136,11 @@ const parseFecha = (s) => {
   if(m) return `${m[3]}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`;
   return s;
 };
+// Extrae mes/año de un string "yyyy-mm-dd" sin pasar por Date/huso horario:
+// new Date("2026-05-01").getMonth() interpreta la fecha en UTC y en Uruguay (UTC-3)
+// eso cae en el día anterior a medianoche → el 1° de cada mes se contaba en el mes previo.
+const mesDe = (f) => { const m = String(f||"").slice(5,7); return m ? String(parseInt(m,10)) : ""; };
+const anoDe = (f) => String(f||"").slice(0,4);
 
 const emptyForm = () => ({fecha:today(),bancoCobPag:"",tipo:"Personal",c1:"Ingresos",c2:"Sueldo",cat:"Ingresos",desc:"",forma:"Cobro transferencia",bancoEmisor:"SCOTIABANK UYU",plazo:"",fechaCP:today(),fechaManual:false,usd:"",tc:"",pesos:"",iva:""});
 
@@ -199,6 +204,12 @@ export default function Moneyland() {
   const [editingId, setEditingId] = useState(null);
   const [editRow, setEditRow] = useState(null);
   const [saved, setSaved] = useState(false);
+  const [migrando, setMigrando] = useState(false);
+  const [migracionMsg, setMigracionMsg] = useState("");
+  const [migrando2, setMigrando2] = useState(false);
+  const [migracionMsg2, setMigracionMsg2] = useState("");
+  const [migrando3, setMigrando3] = useState(false);
+  const [migracionMsg3, setMigracionMsg3] = useState("");
   const [loadType, setLoadType] = useState("manual");
   const [loadStep, setLoadStep] = useState("upload");
   const [loadMovs, setLoadMovs] = useState([]);
@@ -366,7 +377,7 @@ export default function Moneyland() {
         categoria: reg.cat, descripcion: reg.d,
         forma: reg.fm, banco_emisor: reg.be,
         plazo: reg.plazo, pesos: reg.p,
-        iva: reg.iva, total: reg.tot
+        iva: reg.iva, total: reg.tot, moneda: reg.moneda||"UYU"
       })
     });
     const data = await r.json();
@@ -404,7 +415,7 @@ export default function Moneyland() {
         categoria: reg.cat, descripcion: reg.d,
         forma: reg.fm, banco_emisor: reg.be,
         plazo: reg.plazo, pesos: reg.p,
-        iva: reg.iva, total: reg.tot
+        iva: reg.iva, total: reg.tot, moneda: reg.moneda||"UYU"
       })
     });
     // best-effort: solo aplica si existen las columnas fecha_cp, usd y tc
@@ -413,6 +424,100 @@ export default function Moneyland() {
       headers,
       body: JSON.stringify({ fecha_cp: reg.fechaCP, usd: reg.usd??null, tc: reg.tc??null })
     }).catch(()=>{});
+  };
+
+  // Migración única: corrige registros viejos de tarjeta donde Banco C/P quedó con el nombre
+  // de la tarjeta en vez de la cuenta bancaria vinculada (bug corregido en la carga de estados de tarjeta)
+  const migrarBancoCPTarjetas = async () => {
+    if(!session?.access_token) return;
+    setMigrando(true);
+    setMigracionMsg("");
+    try {
+      const headers = {"apikey": SUPABASE_KEY, "Authorization": `Bearer ${session.access_token}`, "Content-Type": "application/json", "Prefer": "return=minimal"};
+      const candidatos = regs.map(r=>{
+        const tj = config.tarjetas.find(t=>t.nombre===r.b);
+        return (tj?.banco && tj.banco!==r.b) ? {...r, bancoNuevo:tj.banco} : null;
+      }).filter(Boolean);
+      await Promise.all(candidatos.map(r=>
+        fetch(`${SUPABASE_URL}/rest/v1/registros?id=eq.${r.id}`, {method:"PATCH", headers, body:JSON.stringify({banco_cob_pag:r.bancoNuevo})})
+      ));
+      const idsCorregidos = new Set(candidatos.map(r=>r.id));
+      setRegs(prev=>prev.map(r=>{
+        if(!idsCorregidos.has(r.id)) return r;
+        const c = candidatos.find(x=>x.id===r.id);
+        return {...r, b:c.bancoNuevo};
+      }));
+      setMigracionMsg(`✓ ${candidatos.length} registro(s) corregido(s).`);
+    } catch(e) {
+      console.error("migrarBancoCPTarjetas", e);
+      setMigracionMsg("✗ Error al corregir. Revisá la consola.");
+    } finally {
+      setMigrando(false);
+    }
+  };
+
+  // Migración única: recalcula mes/año de registros viejos guardados con new Date(fecha).getMonth(),
+  // que en Uruguay (UTC-3) corría el 1° de cada mes al mes anterior (bug corregido en el guardado)
+  const migrarMesAnoRegistros = async () => {
+    if(!session?.access_token) return;
+    setMigrando2(true);
+    setMigracionMsg2("");
+    try {
+      const headers = {"apikey": SUPABASE_KEY, "Authorization": `Bearer ${session.access_token}`, "Content-Type": "application/json", "Prefer": "return=minimal"};
+      const candidatos = regs.map(r=>{
+        if(!r.f) return null;
+        const mesReal = mesDe(r.f), anoReal = anoDe(r.f);
+        return (mesReal!==String(r.m||"") || anoReal!==String(r.a||"")) ? {...r, mesNuevo:mesReal, anoNuevo:anoReal} : null;
+      }).filter(Boolean);
+      await Promise.all(candidatos.map(r=>
+        fetch(`${SUPABASE_URL}/rest/v1/registros?id=eq.${r.id}`, {method:"PATCH", headers, body:JSON.stringify({mes:r.mesNuevo, ano:r.anoNuevo})})
+      ));
+      const idsCorregidos = new Set(candidatos.map(r=>r.id));
+      setRegs(prev=>prev.map(r=>{
+        if(!idsCorregidos.has(r.id)) return r;
+        const c = candidatos.find(x=>x.id===r.id);
+        return {...r, m:c.mesNuevo, a:c.anoNuevo};
+      }));
+      setMigracionMsg2(`✓ ${candidatos.length} registro(s) corregido(s).`);
+    } catch(e) {
+      console.error("migrarMesAnoRegistros", e);
+      setMigracionMsg2("✗ Error al corregir. Revisá la consola.");
+    } finally {
+      setMigrando2(false);
+    }
+  };
+
+  // Migración única: completa la moneda de registros viejos guardados antes de que existiera la columna
+  // (la moneda nunca se persistía en Supabase, así que todos volvían con moneda vacía → default "UYU").
+  // Se asigna según la cuenta bancaria a la que pertenece cada registro.
+  const migrarMonedaRegistros = async () => {
+    if(!session?.access_token) return;
+    setMigrando3(true);
+    setMigracionMsg3("");
+    try {
+      const headers = {"apikey": SUPABASE_KEY, "Authorization": `Bearer ${session.access_token}`, "Content-Type": "application/json", "Prefer": "return=minimal"};
+      const normB = s => (s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").trim();
+      const candidatos = regs.map(r=>{
+        const banco = config.bancos.find(bk=>normB(bk.nombre)===normB(r.b));
+        if(!banco) return null;
+        return banco.moneda!==(r.moneda||"UYU") ? {...r, monedaNueva:banco.moneda} : null;
+      }).filter(Boolean);
+      await Promise.all(candidatos.map(r=>
+        fetch(`${SUPABASE_URL}/rest/v1/registros?id=eq.${r.id}`, {method:"PATCH", headers, body:JSON.stringify({moneda:r.monedaNueva})})
+      ));
+      const idsCorregidos = new Set(candidatos.map(r=>r.id));
+      setRegs(prev=>prev.map(r=>{
+        if(!idsCorregidos.has(r.id)) return r;
+        const c = candidatos.find(x=>x.id===r.id);
+        return {...r, moneda:c.monedaNueva};
+      }));
+      setMigracionMsg3(`✓ ${candidatos.length} registro(s) corregido(s).`);
+    } catch(e) {
+      console.error("migrarMonedaRegistros", e);
+      setMigracionMsg3("✗ Error al corregir. Revisá la consola.");
+    } finally {
+      setMigrando3(false);
+    }
   };
 
   // Borra varios registros (por id) de Supabase y del estado local
@@ -553,8 +658,8 @@ export default function Moneyland() {
   const ivaNum = parseFloat(form.iva)||0;
   const totalCalc = pesosCalc + ivaNum;
   const fechaCPCalc = form.plazo&&!form.fechaManual ? addDays(form.fecha,form.plazo) : form.fechaCP;
-  const anoF = form.fecha ? new Date(form.fecha).getFullYear() : "";
-  const mesF = form.fecha ? MESES_NOM[new Date(form.fecha).getMonth()+1] : "";
+  const anoF = form.fecha ? anoDe(form.fecha) : "";
+  const mesF = form.fecha ? MESES_NOM[+mesDe(form.fecha)] : "";
 
   function setF(field,val){
     setForm(prev=>{
@@ -568,8 +673,9 @@ export default function Moneyland() {
   }
 
   async function submit(){
-    const mes=form.fecha?String(new Date(form.fecha).getMonth()+1):"";
-    const reg={id:Date.now(),f:form.fecha,m:mes,a:form.fecha?String(new Date(form.fecha).getFullYear()):"",b:form.bancoCobPag,t:form.tipo,c1:form.c1,c2:form.c2,cat:catAuto,d:form.desc,fm:form.forma,be:form.bancoEmisor,plazo:form.plazo,fechaCP:fechaCPCalc,usd:usdN||null,tc:tcN||null,p:pesosCalc,iva:ivaNum||null,tot:totalCalc};
+    const mes=mesDe(form.fecha);
+    const monedaCuenta = config.bancos.find(bk=>bk.nombre===form.bancoCobPag)?.moneda || "UYU";
+    const reg={id:Date.now(),f:form.fecha,m:mes,a:anoDe(form.fecha),b:form.bancoCobPag,t:form.tipo,c1:form.c1,c2:form.c2,cat:catAuto,d:form.desc,fm:form.forma,be:form.bancoEmisor,plazo:form.plazo,fechaCP:fechaCPCalc,usd:usdN||null,tc:tcN||null,p:pesosCalc,iva:ivaNum||null,tot:totalCalc,moneda:monedaCuenta};
     const id = await saveRegToDB(reg);
     setRegs(p=>[{...reg,id:id||reg.id},...p]);
     setForm(emptyForm());
@@ -697,6 +803,8 @@ export default function Moneyland() {
       // Para extractos bancarios, la moneda es la de la cuenta elegida (cada cuenta es de una sola moneda) —
       // no se confía en lo que la IA detecte por movimiento, que puede ser inconsistente.
       const monedaCuenta = tipo==="banco" ? (config.bancos.find(b=>b.nombre===bancoCarga)?.moneda || "UYU") : null;
+      // Banco cobra/paga siempre es la cuenta bancaria real; Banco emisor es la tarjeta (o el banco, si es transferencia/débito directo)
+      const bancoLigado = tipo==="tarjeta" ? (config.tarjetas.find(tj=>tj.nombre===bancoCarga)?.banco || bancoCarga) : bancoCarga;
       const movs = (parsed.movimientos||[]).map((m,i)=>{
         const desc = (m.descripcion||"").toUpperCase();
         const regla = reglas[normalizarDesc(m.descripcion)];
@@ -708,7 +816,7 @@ export default function Moneyland() {
         const fecha = (tipo==="tarjeta" && fechaPagoTarjeta) ? fechaPagoTarjeta : m.fecha;
         const fm = tipo==="banco" ? "Pago transferencia" : "Pago tarjeta de crédito";
         const moneda = tipo==="banco" ? monedaCuenta : (m.moneda||"UYU");
-        return {id:i+1,f:fecha,m:String(new Date(fecha||"2026-01-01").getMonth()+1),b:bancoCarga,t,c1,c2,cat:TX[t]?.[c1]?.cat||"",d:m.descripcion,fm,be:bancoCarga,plazo:"0",fechaCP:fecha,usd:null,tc:null,p:Math.abs(m.monto||0)*(m.monto<0?-1:1),iva:null,tot:m.monto||0,moneda,esPagoTarjeta,confianza:regla?"alta":(m.confianza||"alta"),pendiente:esPagoTarjeta};
+        return {id:i+1,f:fecha,m:mesDe(fecha||"2026-01-01"),b:bancoLigado,t,c1,c2,cat:TX[t]?.[c1]?.cat||"",d:m.descripcion,fm,be:bancoCarga,plazo:"0",fechaCP:fecha,usd:null,tc:null,p:Math.abs(m.monto||0)*(m.monto<0?-1:1),iva:null,tot:m.monto||0,moneda,esPagoTarjeta,confianza:regla?"alta":(m.confianza||"alta"),pendiente:esPagoTarjeta};
       });
       if(tipo==="banco" && typeof parsed.saldoFinal === "number" && parsed.saldoFinal !== 0) {
         setSaldoExtractoDetectado(parsed.saldoFinal);
@@ -811,7 +919,11 @@ export default function Moneyland() {
         const tot = totalCSV ? parseNum(totalCSV) : p+(iva||0);
         const cat = get("categoria") || TX[t]?.[c1]?.cat || "";
         const fechaCP = parseFecha(get("fechadecobro/pago")) || (plazo?addDays(f,plazo):f);
-        movs.push({id:i,f,m:String(new Date(f).getMonth()+1),b:get("bancocobra/paga"),t,c1,c2:get("concepto2"),cat,d:get("descripcion"),fm:get("formacobro/pago"),be:get("bancoemisor"),plazo,fechaCP,usd:usd||null,tc:tc||null,p,iva,tot,pendiente:false,confianza:"alta"});
+        const bancoFila = get("bancocobra/paga");
+        // La moneda del movimiento es la de la cuenta bancaria a la que pertenece (cada cuenta es de una sola moneda),
+        // no algo a inferir columna por columna — así un extracto de una cuenta en USD carga sus montos como USD.
+        const monedaFila = config.bancos.find(bk=>bk.nombre===bancoFila)?.moneda || "UYU";
+        movs.push({id:i,f,m:mesDe(f),b:bancoFila,t,c1,c2:get("concepto2"),cat,d:get("descripcion"),fm:get("formacobro/pago"),be:get("bancoemisor"),plazo,fechaCP,usd:usd||null,tc:tc||null,p,iva,tot,moneda:monedaFila,pendiente:false,confianza:"alta"});
       }
       setLoadMovs(movs); setLoadStep("review");
     } else await procesarConIA(text, tipo);
@@ -820,8 +932,8 @@ export default function Moneyland() {
   const confirmar = async () => {
     const tcVal = parseFloat(tcCarga)||0;
     const toSave = loadMovs.filter(m=>!m.pendiente).map(m=>{
-      const base = {...m, a: m.f ? String(new Date(m.f).getFullYear()) : ""};
-      if(m.moneda==="USD" && tcVal) {
+      const base = {...m, a: anoDe(m.f)};
+      if(loadType==="tarjeta" && m.moneda==="USD" && tcVal) {
         const usdAmt = Math.abs(m.tot||0);
         const sign = (m.tot||0)<0 ? -1 : 1;
         const pesos = usdAmt * tcVal * sign;
@@ -840,6 +952,7 @@ export default function Moneyland() {
     });
     const diffRegs = [];
     if(loadType==="tarjeta") {
+      const bancoLigadoDiff = config.tarjetas.find(tj=>tj.nombre===bancoCarga)?.banco || bancoCarga;
       const monedasUsadas = [...new Set(loadMovs.map(m=>m.moneda||"UYU"))];
       for(const moneda of monedasUsadas) {
         const pendId = moneda==="USD" ? pendienteSelUSD : pendienteSelUYU;
@@ -850,7 +963,7 @@ export default function Moneyland() {
         const diff = Math.abs(totalCalc) - Math.abs(pend.monto);
         if(Math.abs(diff)>=1) {
           const fechaDiff = fechaPagoTarjeta || today();
-          diffRegs.push({id:Date.now()+Math.random(), f:fechaDiff, m:String(new Date(fechaDiff).getMonth()+1), a:String(new Date(fechaDiff).getFullYear()), b:bancoCarga, t:"Personal", c1:"Otros gastos", c2:"Otros gastos", cat:TX.Personal["Otros gastos"].cat, d:`Diferencia de conciliación con pago bancario (${moneda})`, fm:"Ajuste", be:bancoCarga, plazo:"0", fechaCP:fechaDiff, usd:null, tc:null, p:diff, iva:null, tot:diff, moneda});
+          diffRegs.push({id:Date.now()+Math.random(), f:fechaDiff, m:mesDe(fechaDiff), a:anoDe(fechaDiff), b:bancoLigadoDiff, t:"Personal", c1:"Otros gastos", c2:"Otros gastos", cat:TX.Personal["Otros gastos"].cat, d:`Diferencia de conciliación con pago bancario (${moneda})`, fm:"Ajuste", be:bancoCarga, plazo:"0", fechaCP:fechaDiff, usd:null, tc:null, p:diff, iva:null, tot:diff, moneda});
         }
       }
       if(pendienteSelUYU) marcarPendienteConciliado(pendienteSelUYU);
@@ -1159,8 +1272,10 @@ export default function Moneyland() {
                     </div>
                   </div>
                 )}
-                {/* Panel tipo de cambio para movimientos en USD */}
-                {loadMovs.some(m=>m.moneda==="USD")&&(
+                {/* Panel tipo de cambio para movimientos en USD — solo aplica a tarjeta: un resumen de tarjeta en
+                    pesos puede traer compras en dólares que hay que convertir para sumarlas al total en pesos.
+                    Un extracto bancario de una cuenta en USD ya viene en USD y no se convierte. */}
+                {loadType==="tarjeta" && loadMovs.some(m=>m.moneda==="USD")&&(
                   <div style={{...S.card,background:"rgba(221,184,99,0.06)",border:"1px solid rgba(221,184,99,0.3)",marginBottom:12,padding:"12px 16px"}}>
                     <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
                       <span style={{fontSize:16}}>💱</span>
@@ -1220,7 +1335,7 @@ export default function Moneyland() {
                   {loadMovs.map(m=>{
                     const tcVal = parseFloat(tcCarga)||0;
                     const isUSD = m.moneda==="USD";
-                    const montoDisplay = isUSD && tcVal ? Math.abs(m.tot||0)*tcVal : Math.abs(m.tot||0);
+                    const montoDisplay = loadType==="tarjeta" && isUSD && tcVal ? Math.abs(m.tot||0)*tcVal : Math.abs(m.tot||0);
                     const sign = (m.tot||0)>=0;
                     const editing = montoEdit?.id === m.id;
                     return (
@@ -1307,7 +1422,7 @@ export default function Moneyland() {
                   })}
                 </div>
                 {(()=>{
-                  const hasUSD = loadMovs.some(m=>m.moneda==="USD");
+                  const hasUSD = loadType==="tarjeta" && loadMovs.some(m=>m.moneda==="USD");
                   const tcMissing = hasUSD && !parseFloat(tcCarga);
                   const tarjetaFaltante = loadType==="banco" && loadMovs.some(m=>m.esPagoTarjeta && !m.tarjetaDestino);
                   const blocked = tcMissing || tarjetaFaltante;
@@ -1507,7 +1622,7 @@ export default function Moneyland() {
             ];
             data.forEach(r=>{
               rows.push([
-                r.f||"", r.a||(r.f?String(new Date(r.f).getFullYear()):""), r.m||"",
+                r.f||"", r.a||anoDe(r.f), r.m||"",
                 r.b||"", r.t||"", r.c1||"", r.c2||"", r.cat||"", (r.d||"").replace(/[;\r\n]/g," "),
                 r.fm||"", r.be||"", r.plazo??"", r.fechaCP||"",
                 csvNum(r.usd), csvNum(r.tc), csvNum(r.p), csvNum(r.iva), csvNum(r.tot)
@@ -1532,18 +1647,20 @@ export default function Moneyland() {
 
           const startEdit = (r) => {
             setEditingId(r.id);
-            setEditRow({f:r.f||"",t:r.t||"Personal",b:r.b||"",c1:r.c1||"",c2:r.c2||"",cat:r.cat||"",d:r.d||"",fm:r.fm||"",be:r.be||"",plazo:r.plazo??"",fechaCP:r.fechaCP||r.f||"",usd:r.usd??"",tc:r.tc??"",p:r.p??"",iva:r.iva??""});
+            setEditRow({f:r.f||"",t:r.t||"Personal",b:r.b||"",c1:r.c1||"",c2:r.c2||"",cat:r.cat||"",d:r.d||"",fm:r.fm||"",be:r.be||"",plazo:r.plazo??"",fechaCP:r.fechaCP||r.f||"",usd:r.usd??"",tc:r.tc??"",p:r.p??"",iva:r.iva??"",moneda:r.moneda||""});
           };
           const cancelEdit = () => { setEditingId(null); setEditRow(null); };
           const saveEdit = async (id) => {
-            const mes = editRow.f?String(new Date(editRow.f).getMonth()+1):"";
-            const ano = editRow.f?String(new Date(editRow.f).getFullYear()):"";
+            const mes = mesDe(editRow.f);
+            const ano = anoDe(editRow.f);
             const cat = editRow.cat||TX[editRow.t]?.[editRow.c1]?.cat||"";
             const p = parseFloat(editRow.p)||0;
             const iva = editRow.iva===""?null:parseFloat(editRow.iva)||0;
             const usd = editRow.usd===""?null:parseFloat(editRow.usd)||0;
             const tc = editRow.tc===""?null:parseFloat(editRow.tc)||0;
-            const updated = {f:editRow.f,m:mes,a:ano,b:editRow.b,t:editRow.t,c1:editRow.c1,c2:editRow.c2,cat,d:editRow.d,fm:editRow.fm,be:editRow.be,plazo:editRow.plazo,fechaCP:editRow.fechaCP,usd,tc,p,iva,tot:p+(iva||0)};
+            // La moneda sigue a la cuenta bancaria elegida; si esa cuenta no está en Config (ej. banco emisor libre), se conserva la que tenía el registro.
+            const monedaCuenta = config.bancos.find(bk=>bk.nombre===editRow.b)?.moneda || editRow.moneda || "UYU";
+            const updated = {f:editRow.f,m:mes,a:ano,b:editRow.b,t:editRow.t,c1:editRow.c1,c2:editRow.c2,cat,d:editRow.d,fm:editRow.fm,be:editRow.be,plazo:editRow.plazo,fechaCP:editRow.fechaCP,usd,tc,p,iva,tot:p+(iva||0),moneda:monedaCuenta};
             await updateRegInDB(id, updated);
             const patron = normalizarDesc(updated.d);
             if(patron) saveReglaToDB(patron, {t:updated.t, c1:updated.c1, c2:updated.c2, esPagoTarjeta:false});
@@ -2261,6 +2378,7 @@ export default function Moneyland() {
                   const regsDelMes = regs.filter(r=>{
                     if(normB(r.b)!==bancNorm) return false;
                     if((r.moneda||"UYU")!==bancoDef.moneda) return false;
+                    if(r.fm==="Pago tarjeta de crédito"||r.fm==="Ajuste") return false;
                     const rMes = parseInt(r.m||r.mes||0);
                     const rAno = parseInt(r.a||r.ano||r.f?.slice(0,4)||0);
                     return rMes===parseInt(mes)&&rAno===parseInt(conciliarAno);
@@ -2653,6 +2771,45 @@ export default function Moneyland() {
                       + Agregar
                     </button>
                   </div>
+                </div>
+
+                {/* Migración única: Banco C/P histórico de movimientos de tarjeta */}
+                <div style={{...S.card,marginTop:16,border:"1px solid rgba(96,200,240,0.25)"}}>
+                  <div style={{...S.secT,color:"#5AAFDF"}}>Corregir Banco C/P histórico</div>
+                  <div style={{color:"#8C8C8C",fontSize:12,marginBottom:10}}>
+                    Corrige movimientos de tarjeta ya guardados donde "Banco C/P" quedó con el nombre de la tarjeta en vez de la cuenta bancaria vinculada. Es seguro ejecutarlo más de una vez.
+                  </div>
+                  <button disabled={migrando} onClick={migrarBancoCPTarjetas}
+                    style={{background:"none",border:"1px solid rgba(96,200,240,0.4)",borderRadius:6,color:"#5AAFDF",fontFamily:"Lora",fontSize:12,fontWeight:700,padding:"9px 16px",cursor:migrando?"default":"pointer",opacity:migrando?0.6:1}}>
+                    {migrando?"Corrigiendo...":"Corregir registros históricos"}
+                  </button>
+                  {migracionMsg && <div style={{fontSize:11,color:migracionMsg.startsWith("✓")?"#4CAF82":"#f06060",marginTop:8}}>{migracionMsg}</div>}
+                </div>
+
+                {/* Migración única: mes/año histórico de registros afectados por el bug de huso horario */}
+                <div style={{...S.card,marginTop:16,border:"1px solid rgba(96,200,240,0.25)"}}>
+                  <div style={{...S.secT,color:"#5AAFDF"}}>Corregir mes/año histórico</div>
+                  <div style={{color:"#8C8C8C",fontSize:12,marginBottom:10}}>
+                    Corrige registros donde el mes/año quedó mal calculado a partir de la fecha (afectaba sobre todo movimientos del día 1° de cada mes, que quedaban contados en el mes anterior). Es seguro ejecutarlo más de una vez.
+                  </div>
+                  <button disabled={migrando2} onClick={migrarMesAnoRegistros}
+                    style={{background:"none",border:"1px solid rgba(96,200,240,0.4)",borderRadius:6,color:"#5AAFDF",fontFamily:"Lora",fontSize:12,fontWeight:700,padding:"9px 16px",cursor:migrando2?"default":"pointer",opacity:migrando2?0.6:1}}>
+                    {migrando2?"Corrigiendo...":"Corregir registros históricos"}
+                  </button>
+                  {migracionMsg2 && <div style={{fontSize:11,color:migracionMsg2.startsWith("✓")?"#4CAF82":"#f06060",marginTop:8}}>{migracionMsg2}</div>}
+                </div>
+
+                {/* Migración única: moneda histórica de registros (la columna no existía, todo volvía como UYU) */}
+                <div style={{...S.card,marginTop:16,border:"1px solid rgba(96,200,240,0.25)"}}>
+                  <div style={{...S.secT,color:"#5AAFDF"}}>Corregir moneda histórica</div>
+                  <div style={{color:"#8C8C8C",fontSize:12,marginBottom:10}}>
+                    Completa la moneda de registros viejos según la cuenta bancaria a la que pertenecen (la columna moneda no existía en la base, así que todo volvía como UYU). Corrige movimientos de extractos bancarios; no puede recuperar compras en USD sueltas dentro de un resumen de tarjeta en pesos, esas quedan como estaban. Es seguro ejecutarlo más de una vez.
+                  </div>
+                  <button disabled={migrando3} onClick={migrarMonedaRegistros}
+                    style={{background:"none",border:"1px solid rgba(96,200,240,0.4)",borderRadius:6,color:"#5AAFDF",fontFamily:"Lora",fontSize:12,fontWeight:700,padding:"9px 16px",cursor:migrando3?"default":"pointer",opacity:migrando3?0.6:1}}>
+                    {migrando3?"Corrigiendo...":"Corregir registros históricos"}
+                  </button>
+                  {migracionMsg3 && <div style={{fontSize:11,color:migracionMsg3.startsWith("✓")?"#4CAF82":"#f06060",marginTop:8}}>{migracionMsg3}</div>}
                 </div>
               </>
             )}
