@@ -1146,6 +1146,7 @@ export default function Moneyland() {
   return (
     <div style={S.page}>
       <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&family=Lora:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet"/>
+      <style>{`.ml-scroll::-webkit-scrollbar{width:9px;height:9px}.ml-scroll::-webkit-scrollbar-track{background:rgba(255,255,255,0.03)}.ml-scroll::-webkit-scrollbar-thumb{background:rgba(221,184,99,0.4);border-radius:5px}.ml-scroll::-webkit-scrollbar-thumb:hover{background:rgba(221,184,99,0.65)}.ml-scroll{scrollbar-width:thin;scrollbar-color:rgba(221,184,99,0.4) rgba(255,255,255,0.03)}`}</style>
 
       {/* TOPBAR */}
       <div style={S.bar}>
@@ -1725,13 +1726,12 @@ export default function Moneyland() {
             }
             return true;
           });
-          let filteredRegs = filteredAll.slice(0,80);
+          let filteredRegs = filteredAll;
           // Si venimos de un salto "ver registro original" desde el reporte, garantizamos que
-          // ese registro se muestre arriba de todo aunque no pase los filtros/búsqueda activos
-          // o quede fuera del límite de 80 filas.
+          // ese registro se muestre arriba de todo aunque no pase los filtros/búsqueda activos.
           if(editingId && !filteredRegs.some(r=>r.id===editingId)){
             const target = regs.find(r=>r.id===editingId);
-            if(target) filteredRegs = [target, ...filteredRegs.slice(0,79)];
+            if(target) filteredRegs = [target, ...filteredRegs];
           }
 
           // Exporta los registros filtrados a CSV (mismo formato que la plantilla de carga masiva)
@@ -1844,25 +1844,25 @@ export default function Moneyland() {
                 )}
 
                 <span style={{marginLeft:"auto",fontSize:11,color:"#8C8C8C"}}>
-                  {filteredAll.length>filteredRegs.length
-                    ? `Mostrando ${filteredRegs.length} de ${filteredAll.length} registros — afiná la búsqueda para ver más`
+                  {(searchQ || activeFilterCount>0)
+                    ? `${filteredRegs.length} de ${regs.length} registros`
                     : `${filteredRegs.length} registros`}
                 </span>
               </div>
 
-              {/* Tabla con scroll horizontal */}
-              <div style={{...S.card,padding:0,overflowX:"auto"}}>
+              {/* Tabla con scroll propio (vertical y horizontal) */}
+              <div className="ml-scroll" style={{...S.card,padding:0,overflow:"auto",maxHeight:"calc(100vh - 230px)"}}>
                 <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:400}}>
                   <thead>
                     <tr style={{borderBottom:"1px solid rgba(221,184,99,0.15)"}}>
-                      <th style={{padding:"7px 8px",background:"#141414",width:28}}>
+                      <th style={{padding:"7px 8px",background:"#141414",width:28,position:"sticky",top:0,zIndex:2}}>
                         <input type="checkbox" checked={allFilteredSelected} onChange={toggleSelectAll} style={{cursor:"pointer"}}/>
                       </th>
                       {ALL_COLS.filter(c=>vc.includes(c.id)).map(c=>{
                         const filterActive = !!colFilters[c.id];
                         const isOpen = filterDropOpen===c.id;
                         return (
-                        <th key={c.id} style={{textAlign:c.id==="total"?"right":"left",padding:"7px 10px",fontSize:10,color:"#8C8C8C",textTransform:"uppercase",letterSpacing:0.5,whiteSpace:"nowrap",background:"#141414",position:c.id==="fecha"?"sticky":"relative",left:c.id==="fecha"?28:undefined,zIndex:isOpen?1001:(c.id==="fecha"?1:undefined)}}>
+                        <th key={c.id} style={{textAlign:c.id==="total"?"right":"left",padding:"7px 10px",fontSize:10,color:"#8C8C8C",textTransform:"uppercase",letterSpacing:0.5,whiteSpace:"nowrap",background:"#141414",position:"sticky",top:0,left:c.id==="fecha"?28:undefined,zIndex:isOpen?1001:(c.id==="fecha"?2:2)}}>
                           <div style={{display:"flex",alignItems:"center",gap:4,cursor:"pointer",justifyContent:c.id==="total"?"flex-end":"flex-start"}}
                             onClick={()=>{setFilterDropOpen(o=>o===c.id?null:c.id); setColFilterSearch("");}}>
                             {c.label}
