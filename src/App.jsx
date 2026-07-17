@@ -84,7 +84,7 @@ const BANCOS_LIST = ["ITAU UYU","ITAU USD","SCOTIABANK UYU","SCOTIABANK USD","BR
 const FORMAS = ["Cobro efectivo","Cobro transferencia","Cobro crédito","Pago efectivo","Pago transferencia","Pago crédito","Pago tarjeta de crédito"];
 const MESES_NOM = ["","Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 const CAT_C = {"Ingresos":"#4CAF82","Gasto Fijo":"#f06060","Gasto Variable":"#f0a060","Cobros":"#DDB863","Pagos":"#c860f0","Necesidad":"#8888ee","Deseos":"#cc88cc","Transferencias":"#1D445C","Inversiones":"#1D445C","Variable":"#f0a060","Fijo":"#f06060"};
-const MESES_DISP = ["1","2","3","4"];
+const MESES_DISP = ["1","2","3","4","5","6","7","8","9","10","11","12"];
 
 // Patrones de descripción que indican un pago/traspaso para saldar una tarjeta de crédito
 // (quedan pendientes de conciliación con el extracto de la tarjeta). Se chequean en mayúsculas.
@@ -192,7 +192,8 @@ export default function Moneyland() {
   },[filterDropOpen]);
   const [dashFiltro, setDashFiltro] = useState("todos");
   const [persDesde, setPersDesde] = useState("1");
-  const [persHasta, setPersHasta] = useState("4");
+  const [persHasta, setPersHasta] = useState(String(new Date().getMonth()+1));
+  const [reportAno, setReportAno] = useState(String(new Date().getFullYear()));
   const [persBancos, setPersBancos] = useState([]);
   const [bancoDropOpen, setBancoDropOpen] = useState(false);
   const [saldosInicialEdit, setSaldosInicialEdit] = useState({});
@@ -701,16 +702,60 @@ export default function Moneyland() {
   const totalIng = Object.values(monthly).reduce((s,v)=>s+v.ing,0);
   const totalEgr = Object.values(monthly).reduce((s,v)=>s+v.egr,0);
 
+  // Pivots en vivo desde regs: agrupa por c1 (o por cat) y mes, filtrando tipo/año/bancos.
+  // Reemplaza los objetos AGG.* hardcodeados (foto fija de cuando se armó la app, solo hasta abril).
+  // Normaliza nombre de banco para comparar sin tildes/mayúsculas — registros viejos pueden traer
+  // el nombre guardado con distinta grafía que la cuenta configurada actualmente (ej. "ITAU UYU" vs "Itaú UYU").
+  const normBanco = s => (s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").trim();
+  const buildPivot = (tipo, groupField, ano, bancos, mapGroup) => {
+    const p = {};
+    const bancosNorm = bancos && bancos.length ? bancos.map(normBanco) : null;
+    regs.forEach(r=>{
+      if(r.t!==tipo) return;
+      if(ano && String(r.a||r.f?.slice(0,4)||"")!==String(ano)) return;
+      if(bancosNorm && !bancosNorm.includes(normBanco(r.b))) return;
+      let g = r[groupField]||"";
+      if(mapGroup) g = mapGroup(g)||"";
+      if(!g) return;
+      if(!p[g]) p[g] = {};
+      p[g][r.m] = (p[g][r.m]||0) + (r.tot||0);
+    });
+    return p;
+  };
+  // El campo cat de un registro personal viene en singular/variantes ("Necesidad","Fijo","Variable"...) —
+  // se normaliza a los grupos de display ("Necesidades","Deseos", etc.) antes de agrupar.
+  const CAT_GRUPO = {'Necesidad':'Necesidades','Deseos':'Deseos','Inversiones':'Inversiones','Transferencias':'Transferencias','Ingresos':'Ingresos','Fijo':'Necesidades','Variable':'Necesidades'};
+
   // Finanzas personales
-  const pivot_pers = AGG.pivot_pers;
-  const kpi_mes = AGG.kpi_mes;
+  const pivot_pers = buildPivot("Personal", "c1", reportAno, persBancos);
+  const kpi_mes = buildPivot("Personal", "cat", reportAno, persBancos, g=>CAT_GRUPO[g]);
   const mesesFiltrados = MESES_DISP.filter(m=>+m>=+persDesde&&+m<=+persHasta);
-  const bancosPersList = ["ITAU UYU","ITAU USD","SCOTIABANK UYU","SCOTIABANK USD"];
+  const bancosPersList = config.bancos.map(b=>b.nombre);
 
   const pvGet = (c1,m) => (pivot_pers[c1]?.[m]||0);
   const rowTot = (c1) => mesesFiltrados.reduce((s,m)=>s+pvGet(c1,m),0);
   const colTot = (m) => Object.keys(pivot_pers).reduce((s,c1)=>s+pvGet(c1,m),0);
   const grandTot = mesesFiltrados.reduce((s,m)=>s+colTot(m),0);
+
+  // Un mismo c1 (ej. "Educación") puede estar listado tanto en Necesidades como en Deseos —
+  // la fila dentro de cada grupo debe mostrar solo lo que se etiquetó con ese cat, no el total del c1
+  // (que duplicaría el mismo monto en las dos secciones). Se pivotea por (grupo, c1, mes) según el cat real de cada movimiento.
+  const pivotPersG = {};
+  {
+    const bancosNorm = persBancos && persBancos.length ? persBancos.map(normBanco) : null;
+    regs.forEach(r=>{
+      if(r.t!=="Personal") return;
+      if(reportAno && String(r.a||r.f?.slice(0,4)||"")!==String(reportAno)) return;
+      if(bancosNorm && !bancosNorm.includes(normBanco(r.b))) return;
+      const grupo = CAT_GRUPO[r.cat];
+      if(!grupo || grupo==="Ingresos") return;
+      if(!pivotPersG[grupo]) pivotPersG[grupo] = {};
+      if(!pivotPersG[grupo][r.c1]) pivotPersG[grupo][r.c1] = {};
+      pivotPersG[grupo][r.c1][r.m] = (pivotPersG[grupo][r.c1][r.m]||0) + (r.tot||0);
+    });
+  }
+  const pvGetRow = (grupo,c1,m) => pivotPersG[grupo]?.[c1]?.[m]||0;
+  const rowTotRow = (grupo,c1) => mesesFiltrados.reduce((s,m)=>s+pvGetRow(grupo,c1,m),0);
 
   const kpiGet = (grp) => mesesFiltrados.reduce((s,m)=>s+(kpi_mes[grp]?.[m]||0),0);
   const persIng = kpiGet("Ingresos");
@@ -718,8 +763,6 @@ export default function Moneyland() {
   const persNec = kpiGet("Necesidades");
   const persInv = kpiGet("Inversiones");
 
-  // CAT_GRUPO for pivot subtotals
-  const CAT_GRUPO = {'Necesidad':'Necesidades','Deseos':'Deseos','Inversiones':'Inversiones','Transferencias':'Transferencias','Ingresos':'Ingresos','Fijo':'Necesidades','Variable':'Necesidades'};
   const pivotCat = {};
   mesesFiltrados.forEach(m=>{
     pivotCat[m]={Necesidades:0,Deseos:0,Inversiones:0,Transferencias:0,Ingresos:0};
@@ -1912,31 +1955,21 @@ export default function Moneyland() {
               ))}
             </div>
 
+            {["rentabilidad","flujo","personal"].includes(reportTab) && (
+              <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:14}}>
+                <span style={{fontSize:10,color:"#8C8C8C",textTransform:"uppercase",letterSpacing:0.7,marginRight:2}}>Año</span>
+                {["2025","2026","2027"].map(y=>(
+                  <button key={y} onClick={()=>setReportAno(y)}
+                    style={{background:reportAno===y?"rgba(221,184,99,0.12)":"transparent",border:`1px solid ${reportAno===y?"rgba(221,184,99,0.5)":"rgba(221,184,99,0.15)"}`,color:reportAno===y?"#DDB863":"#4A4A4A",borderRadius:4,padding:"3px 12px",fontFamily:"Roboto",fontSize:11,cursor:"pointer"}}>
+                    {y}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* ── RENTABILIDAD ── */}
             {reportTab==="rentabilidad" && (()=>{
-              const PIVOT_RENT = {
-                // Ingresos
-                "Ventas":                    {},
-                "Ingresos":                  {"4":37670.9},
-                // Gastos variables
-                "Costos":                    {},
-                "Comisiones":                {},
-                "Transporte":                {},
-                "Marketing":                 {"1":-11700.0,"2":-46800.0,"4":-29403.0},
-                // Gastos fijos
-                "Personal":                  {},
-                "Servicios":                 {"2":-1402.05},
-                "Licencias / suscripciones": {"4":-4680.53},
-                "Alquileres":                {},
-                "Mantenimiento":             {},
-                "Honorarios":                {},
-                "Capacitación":              {},
-                "Otros gastos":              {},
-                // Intereses
-                "Intereses":                 {},
-                // Impuestos
-                "Impuestos":                 {},
-              };
+              const PIVOT_RENT = buildPivot("Negocio", "c1", reportAno);
 
               const GRUPOS_RENT = {
                 "Ingresos":        ["Ventas","Ingresos"],
@@ -2065,34 +2098,7 @@ export default function Moneyland() {
 
             {/* ── FLUJO DE FONDOS ── */}
             {reportTab==="flujo" && (()=>{
-              // Datos negocio por C1 y mes (reales + nuevos conceptos en 0)
-              const PIVOT_NEG = {
-                // Cobros
-                "Ventas":          {},
-                "Ingresos":        {"4":37670.9},
-                // Gastos variables
-                "Costos":          {},
-                "Comisiones":      {},
-                "Transporte":      {},
-                "Marketing":       {"1":-11700.0,"2":-46800.0,"4":-29403.0},
-                "Impuestos":       {},
-                // Gastos fijos
-                "Personal":        {},
-                "Servicios":       {"2":-1402.05},
-                "Licencias / suscripciones": {"4":-4680.53},
-                "Alquileres":      {},
-                "Mantenimiento":   {},
-                "Honorarios":      {},
-                "Capacitación":    {},
-                "Otros gastos":    {},
-                // Inversiones
-                "Inversiones":     {},
-                // Financiamiento
-                "Distribución de dividendos": {},
-                "Préstamo recibido":          {},
-                "Préstamo pagado":            {},
-                "Intereses pagados":          {},
-              };
+              const PIVOT_NEG = buildPivot("Negocio", "c1", reportAno);
 
               const GRUPOS_NEG = {
                 Cobros:             ["Ventas","Ingresos"],
@@ -2318,7 +2324,7 @@ export default function Moneyland() {
                       })()}
 
                       {Object.entries(GRUPOS).map(([grupo,filasGrupo])=>{
-                        const filasOrd=[...filasGrupo].sort((a,b)=>Math.abs(rowTot(b))-Math.abs(rowTot(a)));
+                        const filasOrd=[...filasGrupo].sort((a,b)=>Math.abs(rowTotRow(grupo,b))-Math.abs(rowTotRow(grupo,a)));
                         const gTotM=(m)=>grupoTotMes(grupo,m);
                         const gTot=grupoTot(grupo);
                         const color=GRUPO_COLOR[grupo];
@@ -2330,14 +2336,14 @@ export default function Moneyland() {
                             </td>
                           </tr>,
                           ...filasOrd.map((fila,i)=>{
-                            const rt=rowTot(fila);
-                            const hasData=mesesFiltrados.some(m=>pvGet(fila,m)!==0);
+                            const rt=rowTotRow(grupo,fila);
+                            const hasData=mesesFiltrados.some(m=>pvGetRow(grupo,fila,m)!==0);
                             return (
                               <tr key={fila} style={{borderBottom:"1px solid rgba(255,255,255,0.03)",background:i%2===0?"transparent":"rgba(255,255,255,0.01)"}}
                                 onMouseEnter={e=>e.currentTarget.style.background="rgba(200,240,96,0.04)"}
                                 onMouseLeave={e=>e.currentTarget.style.background=i%2===0?"transparent":"rgba(255,255,255,0.01)"}>
                                 <td style={{padding:"5px 12px 5px 20px",fontSize:12,color:hasData?"#F8F4E8":"#333",background:"#141414",position:"sticky",left:0,borderRight:"1px solid rgba(221,184,99,0.12)"}}>{fila}</td>
-                                {mesesFiltrados.map(m=>{const v=pvGet(fila,m);return <td key={m} style={{...cellSt(v),fontSize:11}}>{fmtCell(v)}</td>;})}
+                                {mesesFiltrados.map(m=>{const v=pvGetRow(grupo,fila,m);return <td key={m} style={{...cellSt(v),fontSize:11}}>{fmtCell(v)}</td>;})}
                                 <td style={{...cellSt(rt),borderLeft:"1px solid rgba(221,184,99,0.15)",background:"rgba(255,255,255,0.02)",fontWeight:700,fontSize:11}}>{fmtCell(rt)}</td>
                               </tr>
                             );
