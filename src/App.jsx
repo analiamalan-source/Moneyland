@@ -777,6 +777,13 @@ export default function Moneyland() {
     }).sort((a,b)=>(b.f||"").localeCompare(a.f||""));
   };
   const clickCellSt = (v) => v!==0 ? {cursor:"pointer"} : {};
+  // Salta a la pestaña Registros y abre el formulario de edición del movimiento clickeado
+  // (para corregir clasificaciones detectadas como erroneas desde el drill-down del reporte).
+  const goToRegistro = (r) => {
+    setMainTab("registros");
+    setEditingId(r.id);
+    setEditRow({f:r.f||"",t:r.t||"Personal",b:r.b||"",c1:r.c1||"",c2:r.c2||"",cat:r.cat||"",d:r.d||"",fm:r.fm||"",be:r.be||"",plazo:r.plazo??"",fechaCP:r.fechaCP||r.f||"",usd:r.usd??"",tc:r.tc??"",p:r.p??"",iva:r.iva??"",moneda:r.moneda||""});
+  };
   const DrillPanel = ({grupo,fila,m,colSpan}) => {
     const list = drillRegs(grupo,fila,m);
     const total = list.reduce((s,r)=>s+(r.tot||0),0);
@@ -792,7 +799,10 @@ export default function Moneyland() {
             <div className="ml-drill-scroll" style={{display:"flex",flexDirection:"column",gap:3,width:730,maxWidth:"100%",maxHeight:240,overflowY:"auto",scrollbarWidth:"thin",scrollbarColor:"rgba(221,184,99,0.4) rgba(255,255,255,0.04)"}}>
               <style>{`.ml-drill-scroll::-webkit-scrollbar{width:8px}.ml-drill-scroll::-webkit-scrollbar-track{background:rgba(255,255,255,0.04);border-radius:4px}.ml-drill-scroll::-webkit-scrollbar-thumb{background:rgba(221,184,99,0.4);border-radius:4px}.ml-drill-scroll::-webkit-scrollbar-thumb:hover{background:rgba(221,184,99,0.65)}`}</style>
               {list.map(r=>(
-                <div key={r.id} style={{display:"grid",gridTemplateColumns:"70px minmax(0,380px) 130px 100px",gap:10,alignItems:"center",fontSize:11,padding:"3px 0",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                <div key={r.id} onClick={()=>goToRegistro(r)} title="Ver / editar registro original"
+                  style={{display:"grid",gridTemplateColumns:"70px minmax(0,380px) 130px 100px",gap:10,alignItems:"center",fontSize:11,padding:"3px 4px",borderRadius:4,cursor:"pointer",borderBottom:"1px solid rgba(255,255,255,0.04)"}}
+                  onMouseEnter={e=>e.currentTarget.style.background="rgba(221,184,99,0.08)"}
+                  onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                   <span style={{color:"#8C8C8C"}}>{r.f?fmtD(r.f):"—"}</span>
                   <span style={{color:"#F8F4E8",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.c1}{r.c2?` · ${r.c2}`:""}{r.d?` — ${r.d}`:""}</span>
                   <span style={{color:"#4A4A4A",textAlign:"right",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.b||"—"}</span>
@@ -1715,7 +1725,14 @@ export default function Moneyland() {
             }
             return true;
           });
-          const filteredRegs = filteredAll.slice(0,80);
+          let filteredRegs = filteredAll.slice(0,80);
+          // Si venimos de un salto "ver registro original" desde el reporte, garantizamos que
+          // ese registro se muestre arriba de todo aunque no pase los filtros/búsqueda activos
+          // o quede fuera del límite de 80 filas.
+          if(editingId && !filteredRegs.some(r=>r.id===editingId)){
+            const target = regs.find(r=>r.id===editingId);
+            if(target) filteredRegs = [target, ...filteredRegs.slice(0,79)];
+          }
 
           // Exporta los registros filtrados a CSV (mismo formato que la plantilla de carga masiva)
           const exportToCSV = (data) => {
