@@ -708,6 +708,35 @@ export default function Moneyland() {
   // Normaliza nombre de banco para comparar sin tildes/mayúsculas — registros viejos pueden traer
   // el nombre guardado con distinta grafía que la cuenta configurada actualmente (ej. "ITAU UYU" vs "Itaú UYU").
   const normBanco = s => (s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").trim();
+  // Normalización "fuerte" (repara mojibake UTF-8/Latin-1) usada por Conciliación bancaria —
+  // se comparte con el cruce Personal/Negocio para que ambas pestañas matcheen los mismos nombres de banco.
+  const normBancoM = s => {
+    let t = (s||"").replace(/[Â-ß][-¿]/g, m => {
+      try { return new TextDecoder("utf-8").decode(new Uint8Array([m.charCodeAt(0),m.charCodeAt(1)])); } catch(e){ return m; }
+    });
+    return t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").trim();
+  };
+  // Cobros/pagos reales de un banco en un mes, separados por tipo Personal/Negocio (excluye pagos
+  // de tarjeta pendientes de conciliar y ajustes, igual que Conciliación bancaria). Usado en esa
+  // pestaña y en la comparación de Finanzas personales contra la conciliación.
+  const bancoTipoTotales = (bancoDef, mes, ano) => {
+    const bancNorm = normBancoM(bancoDef.nombre);
+    const isUSD = bancoDef.moneda==="USD";
+    const regsDelMes = regs.filter(r=>{
+      if(normBancoM(r.b)!==bancNorm) return false;
+      if((r.moneda||"UYU")!==bancoDef.moneda) return false;
+      if(r.fm==="Pago tarjeta de crédito"||r.fm==="Ajuste") return false;
+      const rMes = parseInt(r.m||r.mes||0);
+      const rAno = parseInt(r.a||r.ano||r.f?.slice(0,4)||0);
+      return rMes===parseInt(mes)&&rAno===parseInt(ano);
+    });
+    const montoAbs = r => isUSD?Math.abs(r.usd||(r.tot||0)):Math.abs(r.tot||0);
+    const cobrosPersonal = regsDelMes.filter(r=>r.t==="Personal"&&(r.tot||0)>0).reduce((s,r)=>s+montoAbs(r),0);
+    const cobrosNegocio = regsDelMes.filter(r=>r.t!=="Personal"&&(r.tot||0)>0).reduce((s,r)=>s+montoAbs(r),0);
+    const pagosPersonal = regsDelMes.filter(r=>r.t==="Personal"&&(r.tot||0)<0).reduce((s,r)=>s+montoAbs(r),0);
+    const pagosNegocio = regsDelMes.filter(r=>r.t!=="Personal"&&(r.tot||0)<0).reduce((s,r)=>s+montoAbs(r),0);
+    return {cobrosPersonal,cobrosNegocio,pagosPersonal,pagosNegocio};
+  };
   const buildPivot = (tipo, groupField, ano, bancos, mapGroup) => {
     const p = {};
     const bancosNorm = bancos && bancos.length ? bancos.map(normBanco) : null;
@@ -2434,6 +2463,78 @@ export default function Moneyland() {
                     </tfoot>
                   </table>
                 </div>
+
+                {/* Verificación cruzada contra Conciliación bancaria */}
+                {(()=>{
+                  const bancosComp = persBancos && persBancos.length ? config.bancos.filter(b=>persBancos.includes(b.nombre)) : config.bancos;
+                  const compByMes = {};
+                  mesesFiltrados.forEach(m=>{
+                    let cobrosBanco=0, pagosBanco=0;
+                    bancosComp.forEach(b=>{
+                      const t = bancoTipoTotales(b, m, reportAno);
+                      cobrosBanco += t.cobrosPersonal;
+                      pagosBanco += t.pagosPersonal;
+                    });
+                    const cobrosFP = pvGet("Ingresos", m);
+                    const pagosFP = -(grupoTotMes("Necesidades",m)+grupoTotMes("Deseos",m)+grupoTotMes("Inversiones",m));
+                    compByMes[m] = {cobrosFP, cobrosBanco, pagosFP, pagosBanco};
+                  });
+                  const sum = (key) => mesesFiltrados.reduce((s,m)=>s+compByMes[m][key],0);
+                  const totCobrosFP = sum("cobrosFP"), totCobrosBanco = sum("cobrosBanco"), totPagosFP = sum("pagosFP"), totPagosBanco = sum("pagosBanco");
+                  const diffContent = (fp,banco) => {
+                    const d = fp-banco, ok = Math.abs(d)<1;
+                    return ok?<span style={{color:"#4CAF82",fontWeight:700}}>✓</span>:<span style={{color:"#f06060",fontWeight:700}}>{d>0?"+":"-"}{fmtN(d)}</span>;
+                  };
+                  return (
+                    <div style={{...S.card,padding:0,overflowX:"auto",marginTop:16}}>
+                      <div style={{padding:"10px 16px",borderBottom:"1px solid rgba(221,184,99,0.12)"}}>
+                        <div style={{fontFamily:"Lora",fontSize:13,fontWeight:800}}>Verificación vs. Conciliación bancaria</div>
+                        <div style={{fontSize:10,color:"#8C8C8C",marginTop:2}}>Cobros y pagos Personal de los bancos seleccionados arriba, según Conciliación bancaria. Si no cierra, revisá pagos de tarjeta pendientes de conciliar o registros con banco/moneda mal cargados.</div>
+                      </div>
+                      <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:400}}>
+                        <thead>
+                          <tr style={{borderBottom:"1px solid rgba(221,184,99,0.18)"}}>
+                            <th style={{textAlign:"left",padding:"8px 12px",fontSize:10,color:"#8C8C8C",textTransform:"uppercase",letterSpacing:0.7,background:"#141414",position:"sticky",left:0,minWidth:220}}>Concepto</th>
+                            {mesesFiltrados.map(m=><th key={m} style={{textAlign:"right",padding:"8px 10px",fontSize:10,color:"#8C8C8C",textTransform:"uppercase",minWidth:110,whiteSpace:"nowrap"}}>{MESES_NOM[+m]}</th>)}
+                            <th style={{textAlign:"right",padding:"8px 10px",fontSize:10,color:"#8C8C8C",textTransform:"uppercase",minWidth:110,fontWeight:700,borderLeft:"1px solid rgba(221,184,99,0.15)"}}>Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr style={{borderBottom:"1px solid rgba(255,255,255,0.03)"}}>
+                            <td style={{padding:"6px 12px",fontSize:12,color:"#4CAF82",background:"#141414",position:"sticky",left:0}}>Cobros · Finanzas personales</td>
+                            {mesesFiltrados.map(m=><td key={m} style={{...cellSt(compByMes[m].cobrosFP),fontSize:11}}>{fmtCell(compByMes[m].cobrosFP)}</td>)}
+                            <td style={{...cellSt(totCobrosFP),borderLeft:"1px solid rgba(221,184,99,0.15)",fontWeight:800,fontSize:11}}>{fmtCell(totCobrosFP)}</td>
+                          </tr>
+                          <tr style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                            <td style={{padding:"6px 12px",fontSize:12,color:"#4CAF82",opacity:0.75,background:"#141414",position:"sticky",left:0}}>Cobros · Conciliación (Personal)</td>
+                            {mesesFiltrados.map(m=><td key={m} style={{...cellSt(compByMes[m].cobrosBanco),fontSize:11}}>{fmtCell(compByMes[m].cobrosBanco)}</td>)}
+                            <td style={{...cellSt(totCobrosBanco),borderLeft:"1px solid rgba(221,184,99,0.15)",fontWeight:800,fontSize:11}}>{fmtCell(totCobrosBanco)}</td>
+                          </tr>
+                          <tr style={{borderBottom:"2px solid rgba(221,184,99,0.12)",background:"rgba(255,255,255,0.015)"}}>
+                            <td style={{padding:"6px 12px",fontSize:11,fontWeight:700,color:"#8C8C8C",background:"rgba(255,255,255,0.015)",position:"sticky",left:0}}>Diferencia cobros</td>
+                            {mesesFiltrados.map(m=><td key={m} style={{padding:"6px 10px",textAlign:"right"}}>{diffContent(compByMes[m].cobrosFP,compByMes[m].cobrosBanco)}</td>)}
+                            <td style={{padding:"6px 10px",textAlign:"right",borderLeft:"1px solid rgba(221,184,99,0.15)"}}>{diffContent(totCobrosFP,totCobrosBanco)}</td>
+                          </tr>
+                          <tr style={{borderBottom:"1px solid rgba(255,255,255,0.03)",borderTop:"1px solid rgba(221,184,99,0.1)"}}>
+                            <td style={{padding:"6px 12px",fontSize:12,color:"#f06060",background:"#141414",position:"sticky",left:0}}>Pagos · Finanzas personales</td>
+                            {mesesFiltrados.map(m=><td key={m} style={{...cellSt(-compByMes[m].pagosFP),fontSize:11}}>{fmtCell(-compByMes[m].pagosFP)}</td>)}
+                            <td style={{...cellSt(-totPagosFP),borderLeft:"1px solid rgba(221,184,99,0.15)",fontWeight:800,fontSize:11}}>{fmtCell(-totPagosFP)}</td>
+                          </tr>
+                          <tr style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                            <td style={{padding:"6px 12px",fontSize:12,color:"#f06060",opacity:0.75,background:"#141414",position:"sticky",left:0}}>Pagos · Conciliación (Personal)</td>
+                            {mesesFiltrados.map(m=><td key={m} style={{...cellSt(-compByMes[m].pagosBanco),fontSize:11}}>{fmtCell(-compByMes[m].pagosBanco)}</td>)}
+                            <td style={{...cellSt(-totPagosBanco),borderLeft:"1px solid rgba(221,184,99,0.15)",fontWeight:800,fontSize:11}}>{fmtCell(-totPagosBanco)}</td>
+                          </tr>
+                          <tr style={{background:"rgba(255,255,255,0.015)"}}>
+                            <td style={{padding:"6px 12px",fontSize:11,fontWeight:700,color:"#8C8C8C",background:"rgba(255,255,255,0.015)",position:"sticky",left:0}}>Diferencia pagos</td>
+                            {mesesFiltrados.map(m=><td key={m} style={{padding:"6px 10px",textAlign:"right"}}>{diffContent(compByMes[m].pagosFP,compByMes[m].pagosBanco)}</td>)}
+                            <td style={{padding:"6px 10px",textAlign:"right",borderLeft:"1px solid rgba(221,184,99,0.15)"}}>{diffContent(totPagosFP,totPagosBanco)}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                })()}
               </>
             )}
 
@@ -2454,7 +2555,6 @@ export default function Moneyland() {
                 let prevSaldoFinal = null;                for(let n=1; n<=12; n++){
                   const mes = String(n);
                   const conci = conciliaciones.find(c=>c.banco===bancoDef.nombre&&c.moneda===bancoDef.moneda&&String(c.ano)===conciliarAno&&String(c.mes)===mes);
-                  const isUSD = bancoDef.moneda==="USD";
                   const normB = s => {
                     let t = (s||"").replace(/[Â-ß][-¿]/g, m => {
                       try { return new TextDecoder("utf-8").decode(new Uint8Array([m.charCodeAt(0),m.charCodeAt(1)])); } catch(e){ return m; }
@@ -2462,27 +2562,22 @@ export default function Moneyland() {
                     return t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").trim();
                   };
                   const bancNorm = normB(bancoDef.nombre);
-                  const regsDelMes = regs.filter(r=>{
-                    if(normB(r.b)!==bancNorm) return false;
-                    if((r.moneda||"UYU")!==bancoDef.moneda) return false;
-                    if(r.fm==="Pago tarjeta de crédito"||r.fm==="Ajuste") return false;
-                    const rMes = parseInt(r.m||r.mes||0);
-                    const rAno = parseInt(r.a||r.ano||r.f?.slice(0,4)||0);
-                    return rMes===parseInt(mes)&&rAno===parseInt(conciliarAno);
-                  });
                   const pagosT = pagosPendientes.filter(p=>{
                     if(normB(p.banco)!==bancNorm) return false;
                     if((p.moneda||"UYU")!==bancoDef.moneda) return false;
                     const d = new Date((p.fecha||"")+"T00:00:00");
                     return String(d.getMonth()+1)===mes&&String(d.getFullYear())===conciliarAno;
                   });
-                  const cobros = regsDelMes.filter(r=>(r.tot||0)>0).reduce((s,r)=>s+(isUSD?Math.abs(r.usd||(r.tot||0)):(r.tot||0)),0);
-                  const pagos = regsDelMes.filter(r=>(r.tot||0)<0).reduce((s,r)=>s+(isUSD?Math.abs(r.usd||(r.tot||0)):Math.abs(r.tot||0)),0)+pagosT.reduce((s,p)=>s+(p.monto||0),0);
+                  const {cobrosPersonal,cobrosNegocio,pagosPersonal,pagosNegocio:pagosNegocioRegs} = bancoTipoTotales(bancoDef, mes, conciliarAno);
+                  const pagosTarjeta = pagosT.reduce((s,p)=>s+(p.monto||0),0);
+                  const pagosNegocio = pagosNegocioRegs + pagosTarjeta;
+                  const cobros = cobrosPersonal + cobrosNegocio;
+                  const pagos = pagosPersonal + pagosNegocio;
                   const saldo_inicial = conci?.saldo_inicial??prevSaldoFinal;
                   const saldo_final_calc = saldo_inicial!=null ? saldo_inicial+cobros-pagos : null;
                   const saldo_extracto = conci?.saldo_extracto??null;
                   const diferencia = saldo_final_calc!=null&&saldo_extracto!=null ? saldo_final_calc-Math.abs(saldo_extracto) : null;
-                  byMes[mes] = {cobros,pagos,saldo_inicial,saldo_final_calc,saldo_extracto,diferencia,conci};
+                  byMes[mes] = {cobros,cobrosPersonal,cobrosNegocio,pagos,pagosPersonal,pagosNegocio,saldo_inicial,saldo_final_calc,saldo_extracto,diferencia,conci};
                   if(saldo_final_calc!=null) prevSaldoFinal = saldo_final_calc;
                 }
                 return byMes;
@@ -2559,15 +2654,23 @@ export default function Moneyland() {
                                   );
                                 })}
                               </tr>
-                              {/* Cobros */}
+                              {/* Cobros Personal / Negocio */}
                               <tr style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
-                                <td style={{...stickyCel,padding:"7px 16px 7px 24px",color:"#4CAF82"}}>+ Cobros</td>
-                                {mesesVer.map(m=>{const v=byMes[m]?.cobros??0;return <td key={m} style={{padding:"7px 14px",textAlign:"right",fontFamily:"Lora",fontSize:11,color:v>0?"#4CAF82":"#3A3A3A"}}>{v>0?fmtV(v,mon):"—"}</td>;})}
+                                <td style={{...stickyCel,padding:"7px 16px 7px 24px",color:"#4CAF82"}}>+ Cobros Personal</td>
+                                {mesesVer.map(m=>{const v=byMes[m]?.cobrosPersonal??0;return <td key={m} style={{padding:"7px 14px",textAlign:"right",fontFamily:"Lora",fontSize:11,color:v>0?"#4CAF82":"#3A3A3A"}}>{v>0?fmtV(v,mon):"—"}</td>;})}
                               </tr>
-                              {/* Pagos */}
                               <tr style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
-                                <td style={{...stickyCel,padding:"7px 16px 7px 24px",color:"#f06060"}}>− Pagos</td>
-                                {mesesVer.map(m=>{const v=byMes[m]?.pagos??0;return <td key={m} style={{padding:"7px 14px",textAlign:"right",fontFamily:"Lora",fontSize:11,color:v>0?"#f06060":"#3A3A3A"}}>{v>0?fmtV(v,mon):"—"}</td>;})}
+                                <td style={{...stickyCel,padding:"7px 16px 7px 24px",color:"#4CAF82",opacity:0.7}}>+ Cobros Negocio</td>
+                                {mesesVer.map(m=>{const v=byMes[m]?.cobrosNegocio??0;return <td key={m} style={{padding:"7px 14px",textAlign:"right",fontFamily:"Lora",fontSize:11,color:v>0?"#4CAF82":"#3A3A3A",opacity:v>0?0.7:1}}>{v>0?fmtV(v,mon):"—"}</td>;})}
+                              </tr>
+                              {/* Pagos Personal / Negocio */}
+                              <tr style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                                <td style={{...stickyCel,padding:"7px 16px 7px 24px",color:"#f06060"}}>− Pagos Personal</td>
+                                {mesesVer.map(m=>{const v=byMes[m]?.pagosPersonal??0;return <td key={m} style={{padding:"7px 14px",textAlign:"right",fontFamily:"Lora",fontSize:11,color:v>0?"#f06060":"#3A3A3A"}}>{v>0?fmtV(v,mon):"—"}</td>;})}
+                              </tr>
+                              <tr style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                                <td style={{...stickyCel,padding:"7px 16px 7px 24px",color:"#f06060",opacity:0.7}} title="Incluye pagos de tarjeta pendientes de conciliar no atribuidos a un tipo">− Pagos Negocio</td>
+                                {mesesVer.map(m=>{const v=byMes[m]?.pagosNegocio??0;return <td key={m} style={{padding:"7px 14px",textAlign:"right",fontFamily:"Lora",fontSize:11,color:v>0?"#f06060":"#3A3A3A",opacity:v>0?0.7:1}}>{v>0?fmtV(v,mon):"—"}</td>;})}
                               </tr>
                               {/* Saldo calculado */}
                               <tr style={{borderBottom:"2px solid rgba(221,184,99,0.15)",background:"rgba(255,255,255,0.015)"}}>
