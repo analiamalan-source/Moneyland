@@ -144,6 +144,40 @@ const anoDe = (f) => String(f||"").slice(0,4);
 
 const emptyForm = () => ({fecha:today(),bancoCobPag:"",tipo:"Personal",c1:"Ingresos",c2:"Sueldo",cat:"Ingresos",desc:"",forma:"Cobro transferencia",bancoEmisor:"SCOTIABANK UYU",plazo:"",fechaCP:today(),fechaManual:false,usd:"",tc:"",pesos:"",iva:""});
 
+// Envuelve una tabla ancha con scroll horizontal: agrega una segunda barra de scroll "flotante"
+// pegada abajo de la pantalla (position:sticky) que se mantiene visible mientras la tabla está
+// en vista, sin tener que bajar hasta el final de filas para encontrar la barra nativa.
+function HScroll({style,children}){
+  const realRef = useRef(null), proxyRef = useRef(null);
+  const [scrollW,setScrollW] = useState(0);
+  const [needsScroll,setNeedsScroll] = useState(false);
+  const syncing = useRef(false);
+  useEffect(()=>{
+    const el = realRef.current;
+    if(!el) return;
+    const update = () => { setScrollW(el.scrollWidth); setNeedsScroll(el.scrollWidth > el.clientWidth + 1); };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    if(el.firstElementChild) ro.observe(el.firstElementChild);
+    window.addEventListener("resize",update);
+    return () => { ro.disconnect(); window.removeEventListener("resize",update); };
+  });
+  const fromReal = () => { if(syncing.current){syncing.current=false;return;} if(proxyRef.current){syncing.current=true;proxyRef.current.scrollLeft=realRef.current.scrollLeft;} };
+  const fromProxy = () => { if(syncing.current){syncing.current=false;return;} if(realRef.current){syncing.current=true;realRef.current.scrollLeft=proxyRef.current.scrollLeft;} };
+  return (
+    <div style={{position:"relative"}}>
+      <div ref={realRef} onScroll={fromReal} style={{...style,overflowX:"auto"}}>{children}</div>
+      {needsScroll && (
+        <div ref={proxyRef} onScroll={fromProxy} className="ml-hscroll-proxy"
+          style={{position:"sticky",bottom:0,overflowX:"auto",overflowY:"hidden",height:12,zIndex:5}}>
+          <div style={{width:scrollW,height:1}}/>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Moneyland() {
   const [regs, setRegs] = useState(DISP_REGS);
   const [form, setForm] = useState(emptyForm());
@@ -1203,7 +1237,8 @@ export default function Moneyland() {
   return (
     <div style={S.page}>
       <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&family=Lora:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet"/>
-      <style>{`.ml-scroll::-webkit-scrollbar{width:9px;height:9px}.ml-scroll::-webkit-scrollbar-track{background:rgba(255,255,255,0.03)}.ml-scroll::-webkit-scrollbar-thumb{background:rgba(221,184,99,0.4);border-radius:5px}.ml-scroll::-webkit-scrollbar-thumb:hover{background:rgba(221,184,99,0.65)}.ml-scroll{scrollbar-width:thin;scrollbar-color:rgba(221,184,99,0.4) rgba(255,255,255,0.03)}`}</style>
+      <style>{`.ml-scroll::-webkit-scrollbar{width:9px;height:9px}.ml-scroll::-webkit-scrollbar-track{background:rgba(255,255,255,0.03)}.ml-scroll::-webkit-scrollbar-thumb{background:rgba(221,184,99,0.4);border-radius:5px}.ml-scroll::-webkit-scrollbar-thumb:hover{background:rgba(221,184,99,0.65)}.ml-scroll{scrollbar-width:thin;scrollbar-color:rgba(221,184,99,0.4) rgba(255,255,255,0.03)}
+      .ml-hscroll-proxy{background:#141414;border-top:1px solid rgba(221,184,99,0.15)}.ml-hscroll-proxy::-webkit-scrollbar{height:10px}.ml-hscroll-proxy::-webkit-scrollbar-track{background:#141414}.ml-hscroll-proxy::-webkit-scrollbar-thumb{background:rgba(221,184,99,0.45);border-radius:5px}.ml-hscroll-proxy::-webkit-scrollbar-thumb:hover{background:rgba(221,184,99,0.7)}.ml-hscroll-proxy{scrollbar-width:thin;scrollbar-color:rgba(221,184,99,0.45) #141414}`}</style>
 
       {/* TOPBAR */}
       <div style={S.bar}>
@@ -2175,7 +2210,7 @@ export default function Moneyland() {
                   </div>
 
                   {/* Tabla pivot */}
-                  <div style={{...S.card,padding:0,overflowX:"auto"}}>
+                  <HScroll style={{...S.card,padding:0}}>
                     <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:400}}>
                       <thead>
                         <tr style={{borderBottom:"1px solid rgba(221,184,99,0.18)"}}>
@@ -2238,7 +2273,7 @@ export default function Moneyland() {
                         </tr>
                       </tfoot>
                     </table>
-                  </div>
+                  </HScroll>
                 </>
               );
             })()}
@@ -2300,7 +2335,7 @@ export default function Moneyland() {
                   </div>
 
                   {/* Tabla pivot */}
-                  <div style={{...S.card,padding:0,overflowX:"auto"}}>
+                  <HScroll style={{...S.card,padding:0}}>
                     <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:400}}>
                       <thead>
                         <tr style={{borderBottom:"1px solid rgba(221,184,99,0.18)"}}>
@@ -2356,7 +2391,7 @@ export default function Moneyland() {
                         </tr>
                       </tfoot>
                     </table>
-                  </div>
+                  </HScroll>
                 </>
               );
             })()}
@@ -2450,7 +2485,7 @@ export default function Moneyland() {
                 </div>
 
                 {/* Pivot table */}
-                <div style={{...S.card,padding:0,overflowX:"auto"}}>
+                <HScroll style={{...S.card,padding:0}}>
                   <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:400}}>
                     <thead>
                       <tr style={{borderBottom:"1px solid rgba(221,184,99,0.18)"}}>
@@ -2516,7 +2551,7 @@ export default function Moneyland() {
                       </tr>
                     </tfoot>
                   </table>
-                </div>
+                </HScroll>
 
                 {/* Verificación cruzada contra Conciliación bancaria */}
                 {(()=>{
@@ -2540,7 +2575,7 @@ export default function Moneyland() {
                     return ok?<span style={{color:"#4CAF82",fontWeight:700}}>✓</span>:<span style={{color:"#f06060",fontWeight:700}}>{d>0?"+":"-"}{fmtN(d)}</span>;
                   };
                   return (
-                    <div style={{...S.card,padding:0,overflowX:"auto",marginTop:16}}>
+                    <HScroll style={{...S.card,padding:0,marginTop:16}}>
                       <div style={{padding:"10px 16px",borderBottom:"1px solid rgba(221,184,99,0.12)"}}>
                         <div style={{fontFamily:"Lora",fontSize:13,fontWeight:800}}>Verificación vs. Conciliación bancaria</div>
                         <div style={{fontSize:10,color:"#8C8C8C",marginTop:2}}>Cobros y pagos Personal de los bancos seleccionados arriba, según Conciliación bancaria. Si no cierra, revisá pagos de tarjeta pendientes de conciliar o registros con banco/moneda mal cargados.</div>
@@ -2586,7 +2621,7 @@ export default function Moneyland() {
                           </tr>
                         </tbody>
                       </table>
-                    </div>
+                    </HScroll>
                   );
                 })()}
               </>
@@ -2682,7 +2717,7 @@ export default function Moneyland() {
                           <span style={{marginLeft:"auto",fontSize:10,color:"#4A4A4A"}}>Saldo inicial primer mes: ingresarlo manualmente, los siguientes se propagan</span>
                         </div>
                         {/* Tabla con scroll horizontal */}
-                        <div style={{overflowX:"auto"}}>
+                        <HScroll style={{}}>
                           <table style={{borderCollapse:"collapse",fontSize:12,minWidth:mesesVer.length*140+220}}>
                             <thead>
                               <tr style={{borderBottom:"1px solid rgba(221,184,99,0.12)"}}>
@@ -2767,7 +2802,7 @@ export default function Moneyland() {
                               </tr>
                             </tbody>
                           </table>
-                        </div>
+                        </HScroll>
                       </div>
                     );
                   })}
