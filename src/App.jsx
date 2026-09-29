@@ -1508,7 +1508,13 @@ export default function Moneyland() {
                       <div style={{fontSize:11,color:"#8C8C8C"}}>{m.f}</div>
                       <div><div style={{fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.d}</div>
                         <div style={{display:"flex",gap:4,marginTop:2}}>
-                          {isUSD&&<span style={{fontSize:9,padding:"1px 6px",borderRadius:3,background:"rgba(29,68,92,0.4)",color:"#5AAFDF"}}>USD</span>}
+                          {loadType==="tarjeta" ? (
+                            <button type="button" title="La IA a veces confunde la moneda — clic para corregir"
+                              onClick={()=>setLoadMovs(p=>p.map(x=>x.id===m.id?{...x,moneda:x.moneda==="USD"?"UYU":"USD"}:x))}
+                              style={{fontSize:9,padding:"1px 6px",borderRadius:3,border:"none",cursor:"pointer",fontWeight:700,background:isUSD?"rgba(29,68,92,0.4)":"rgba(76,175,130,0.15)",color:isUSD?"#5AAFDF":"#4CAF82"}}>
+                              {isUSD?"USD":"UYU"}
+                            </button>
+                          ) : (isUSD&&<span style={{fontSize:9,padding:"1px 6px",borderRadius:3,background:"rgba(29,68,92,0.4)",color:"#5AAFDF"}}>USD</span>)}
                           {m.esPagoTarjeta&&<span style={{fontSize:9,padding:"1px 6px",borderRadius:3,background:"rgba(200,96,240,0.2)",color:"#c860f0"}}>💳 pendiente</span>}
                           {m.confianza==="baja"&&<span style={{fontSize:9,padding:"1px 6px",borderRadius:3,background:"rgba(240,160,96,0.2)",color:"#f0a060"}}>⚠ revisar</span>}
                         </div>
