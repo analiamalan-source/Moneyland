@@ -828,35 +828,43 @@ export default function Moneyland() {
     setEditingId(r.id);
     setEditRow({f:r.f||"",t:r.t||"Personal",b:r.b||"",c1:r.c1||"",c2:r.c2||"",cat:r.cat||"",d:r.d||"",fm:r.fm||"",be:r.be||"",plazo:r.plazo??"",fechaCP:r.fechaCP||r.f||"",usd:r.usd??"",tc:r.tc??"",p:r.p??"",iva:r.iva??"",moneda:r.moneda||""});
   };
-  const DrillPanel = ({tipo,grupo,fila,m,filas,colSpan}) => {
+  // El detalle se dibuja como filas reales de la MISMA tabla (una columna por mes + Total),
+  // no como un bloque aparte: así la descripción queda fija a la izquierda igual que "Concepto 1"
+  // (position:sticky,left:0) y el monto de cada movimiento cae justo debajo de su mes real,
+  // aunque se esté viendo un rango de varios meses o se haya scrolleado a la derecha.
+  const DrillPanel = ({tipo,grupo,fila,m,filas,meses,colSpan}) => {
     const list = drillRegs(tipo,grupo,fila,m,filas);
     const total = list.reduce((s,r)=>s+(r.tot||0),0);
+    const stickyCel = {position:"sticky",left:0,zIndex:1,background:"#0d0d10",padding:"4px 12px 4px 28px",borderRight:"1px solid rgba(221,184,99,0.12)",borderBottom:"1px solid rgba(255,255,255,0.04)"};
     return (
-      <tr>
-        <td colSpan={colSpan} style={{padding:"10px 16px 14px 28px",background:"#0d0d10"}}>
-          <div style={{fontSize:10,color:"#8C8C8C",marginBottom:6,textTransform:"uppercase",letterSpacing:0.6}}>
+      <>
+        <tr>
+          <td colSpan={colSpan} style={{...stickyCel,padding:"8px 12px 6px 28px",fontSize:10,color:"#8C8C8C",textTransform:"uppercase",letterSpacing:0.6}}>
             {list.length} movimiento{list.length!==1?"s":""} · {fmtCell(total)}
-          </div>
-          {list.length===0 ? (
-            <div style={{fontSize:11,color:"#4A4A4A"}}>Sin movimientos</div>
-          ) : (
-            <div className="ml-drill-scroll" style={{display:"flex",flexDirection:"column",gap:3,width:730,maxWidth:"100%",maxHeight:240,overflowY:"auto",scrollbarWidth:"thin",scrollbarColor:"rgba(221,184,99,0.4) rgba(255,255,255,0.04)"}}>
-              <style>{`.ml-drill-scroll::-webkit-scrollbar{width:8px}.ml-drill-scroll::-webkit-scrollbar-track{background:rgba(255,255,255,0.04);border-radius:4px}.ml-drill-scroll::-webkit-scrollbar-thumb{background:rgba(221,184,99,0.4);border-radius:4px}.ml-drill-scroll::-webkit-scrollbar-thumb:hover{background:rgba(221,184,99,0.65)}`}</style>
-              {list.map(r=>(
-                <div key={r.id} onClick={()=>goToRegistro(r)} title="Ver / editar registro original"
-                  style={{display:"grid",gridTemplateColumns:"70px minmax(0,380px) 130px 100px",gap:10,alignItems:"center",fontSize:11,padding:"3px 4px",borderRadius:4,cursor:"pointer",borderBottom:"1px solid rgba(255,255,255,0.04)"}}
-                  onMouseEnter={e=>e.currentTarget.style.background="rgba(221,184,99,0.08)"}
-                  onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                  <span style={{color:"#8C8C8C"}}>{r.f?fmtD(r.f):"—"}</span>
-                  <span style={{color:"#F8F4E8",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.c1}{r.c2?` · ${r.c2}`:""}{r.d?` — ${r.d}`:""}</span>
-                  <span style={{color:"#4A4A4A",textAlign:"right",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.b||"—"}</span>
-                  <span style={{fontFamily:"Lora",fontWeight:700,textAlign:"right",color:(r.tot||0)>=0?"#4CAF82":"#f06060"}}>{fmtCell(r.tot)}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </td>
-      </tr>
+          </td>
+        </tr>
+        {list.length===0 ? (
+          <tr><td colSpan={colSpan} style={{...stickyCel,fontSize:11,color:"#4A4A4A"}}>Sin movimientos</td></tr>
+        ) : list.map(r=>(
+          <tr key={r.id} onClick={()=>goToRegistro(r)} title="Ver / editar registro original" style={{cursor:"pointer"}}
+            onMouseEnter={e=>e.currentTarget.querySelectorAll("td").forEach(td=>td.style.background="rgba(221,184,99,0.08)")}
+            onMouseLeave={e=>e.currentTarget.querySelectorAll("td").forEach(td=>td.style.background="#0d0d10")}>
+            <td style={{...stickyCel,fontSize:11,maxWidth:380,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={`${r.c1}${r.c2?` · ${r.c2}`:""}${r.d?` — ${r.d}`:""}${r.b?` (${r.b})`:""}`}>
+              <span style={{color:"#8C8C8C"}}>{r.f?fmtD(r.f):"—"}</span>{"  "}
+              <span style={{color:"#F8F4E8"}}>{r.c1}{r.c2?` · ${r.c2}`:""}{r.d?` — ${r.d}`:""}</span>
+              {r.b&&<span style={{color:"#4A4A4A"}}> ({r.b})</span>}
+            </td>
+            {meses.map(mm=>(
+              <td key={mm} style={{padding:"4px 10px",textAlign:"right",fontFamily:"Lora",fontSize:11,fontWeight:700,background:"#0d0d10",borderBottom:"1px solid rgba(255,255,255,0.04)",color:(r.tot||0)>=0?"#4CAF82":"#f06060"}}>
+                {r.m===mm?fmtCell(r.tot):""}
+              </td>
+            ))}
+            <td style={{padding:"4px 10px",textAlign:"right",fontFamily:"Lora",fontSize:11,fontWeight:700,background:"#0d0d10",borderLeft:"1px solid rgba(221,184,99,0.15)",borderBottom:"1px solid rgba(255,255,255,0.04)",color:(r.tot||0)>=0?"#4CAF82":"#f06060"}}>
+              {fmtCell(r.tot)}
+            </td>
+          </tr>
+        ))}
+      </>
     );
   };
 
@@ -2202,7 +2210,7 @@ export default function Moneyland() {
                                   <td onClick={()=>rt!==0&&toggleDrill("rentabilidad",grupo,c1,null)} style={{...cellSt(rt),...clickCellSt(rt),borderLeft:"1px solid rgba(221,184,99,0.15)",background:"rgba(255,255,255,0.02)",fontWeight:700}}>{fmtCell(rt)}</td>
                                 </tr>
                               );
-                              return isDrillRow("rentabilidad",grupo,c1) ? [row, <DrillPanel key={`${c1}-drill`} tipo="rentabilidad" grupo={grupo} fila={c1} m={drill.m} colSpan={MESES_DISP.length+2}/>] : [row];
+                              return isDrillRow("rentabilidad",grupo,c1) ? [row, <DrillPanel key={`${c1}-drill`} tipo="rentabilidad" grupo={grupo} fila={c1} m={drill.m} meses={MESES_DISP} colSpan={MESES_DISP.length+2}/>] : [row];
                             }),
                             // Subtotal grupo
                             <tr key={`sub-${grupo}`} style={{borderTop:"1px solid rgba(221,184,99,0.15)",borderBottom:"1px solid rgba(255,255,255,0.04)",background:bg}}>
@@ -2210,7 +2218,7 @@ export default function Moneyland() {
                               {MESES_DISP.map(m=>{const v=grupoTotRMes(grupo,m);return <td key={m} onClick={()=>v!==0&&toggleDrill("rentabilidad",grupo,null,m,filas)} style={{...cellSt(v),...clickCellSt(v),fontFamily:"Lora",fontWeight:700,color:v!==0?color:"#333"}}>{fmtCell(v)}</td>;})}
                               <td onClick={()=>gTot!==0&&toggleDrill("rentabilidad",grupo,null,null,filas)} style={{...cellSt(gTot),...clickCellSt(gTot),fontFamily:"Lora",fontWeight:800,borderLeft:"1px solid rgba(221,184,99,0.15)",background:bg,color:gTot!==0?color:"#333"}}>{fmtCell(gTot)}</td>
                             </tr>,
-                            isDrillRow("rentabilidad",grupo,null) && <DrillPanel key={`sub-${grupo}-drill`} tipo="rentabilidad" grupo={grupo} fila={null} m={drill.m} filas={drill.filas} colSpan={MESES_DISP.length+2}/>,
+                            isDrillRow("rentabilidad",grupo,null) && <DrillPanel key={`sub-${grupo}-drill`} tipo="rentabilidad" grupo={grupo} fila={null} m={drill.m} filas={drill.filas} meses={MESES_DISP} colSpan={MESES_DISP.length+2}/>,
                             // Subtotal resultado antes de impuesto (después de Intereses)
                             grupo==="Intereses" ? (
                               <tr key="res-antes" style={{borderTop:"2px solid rgba(221,184,99,0.2)",borderBottom:"1px solid rgba(221,184,99,0.15)",background:"rgba(255,255,255,0.02)"}}>
@@ -2328,7 +2336,7 @@ export default function Moneyland() {
                                   <td onClick={()=>rt!==0&&toggleDrill("flujo",grupo,c1,null)} style={{...cellSt(rt),...clickCellSt(rt),borderLeft:"1px solid rgba(221,184,99,0.15)",background:"rgba(255,255,255,0.02)",fontWeight:700}}>{fmtCell(rt)}</td>
                                 </tr>
                               );
-                              return isDrillRow("flujo",grupo,c1) ? [row, <DrillPanel key={`${c1}-drill`} tipo="flujo" grupo={grupo} fila={c1} m={drill.m} colSpan={MESES_DISP.length+2}/>] : [row];
+                              return isDrillRow("flujo",grupo,c1) ? [row, <DrillPanel key={`${c1}-drill`} tipo="flujo" grupo={grupo} fila={c1} m={drill.m} meses={MESES_DISP} colSpan={MESES_DISP.length+2}/>] : [row];
                             }),
                             // Subtotal grupo
                             <tr key={`sub-${grupo}`} style={{borderTop:"1px solid rgba(221,184,99,0.15)",borderBottom:"1px solid rgba(255,255,255,0.04)",background:bg}}>
@@ -2336,7 +2344,7 @@ export default function Moneyland() {
                               {MESES_DISP.map(m=>{const v=grupoTotNegMes(grupo,m);return <td key={m} onClick={()=>v!==0&&toggleDrill("flujo",grupo,null,m,filas)} style={{...cellSt(v),...clickCellSt(v),fontFamily:"Lora",fontWeight:700,color:v!==0?color:"#333"}}>{fmtCell(v)}</td>;})}
                               <td onClick={()=>gTot!==0&&toggleDrill("flujo",grupo,null,null,filas)} style={{...cellSt(gTot),...clickCellSt(gTot),fontFamily:"Lora",fontWeight:800,borderLeft:"1px solid rgba(221,184,99,0.15)",background:bg,color:gTot!==0?color:"#333"}}>{fmtCell(gTot)}</td>
                             </tr>,
-                            isDrillRow("flujo",grupo,null) && <DrillPanel key={`sub-${grupo}-drill`} tipo="flujo" grupo={grupo} fila={null} m={drill.m} filas={drill.filas} colSpan={MESES_DISP.length+2}/>
+                            isDrillRow("flujo",grupo,null) && <DrillPanel key={`sub-${grupo}-drill`} tipo="flujo" grupo={grupo} fila={null} m={drill.m} filas={drill.filas} meses={MESES_DISP} colSpan={MESES_DISP.length+2}/>
                           ];
                         })}
                       </tbody>
@@ -2461,7 +2469,7 @@ export default function Moneyland() {
                             {mesesFiltrados.map(m=>{const v=pvGet("Ingresos",m);return <td key={m} onClick={()=>v!==0&&toggleDrill("personal","Ingresos",null,m)} style={{...cellSt(v),...clickCellSt(v)}}>{fmtCell(v)}</td>;})}
                             <td onClick={()=>rt!==0&&toggleDrill("personal","Ingresos",null,null)} style={{...cellSt(rt),...clickCellSt(rt),borderLeft:"1px solid rgba(221,184,99,0.15)",fontWeight:800}}>{fmtCell(rt)}</td>
                           </tr>,
-                          isDrillRow("personal","Ingresos",null) && <DrillPanel key="ing-drill" tipo="personal" grupo="Ingresos" fila={null} m={drill.m} colSpan={mesesFiltrados.length+2}/>
+                          isDrillRow("personal","Ingresos",null) && <DrillPanel key="ing-drill" tipo="personal" grupo="Ingresos" fila={null} m={drill.m} meses={mesesFiltrados} colSpan={mesesFiltrados.length+2}/>
                         ];
                       })()}
 
@@ -2489,14 +2497,14 @@ export default function Moneyland() {
                                 <td onClick={()=>rt!==0&&toggleDrill("personal",grupo,fila,null)} style={{...cellSt(rt),...clickCellSt(rt),borderLeft:"1px solid rgba(221,184,99,0.15)",background:"rgba(255,255,255,0.02)",fontWeight:700,fontSize:11}}>{fmtCell(rt)}</td>
                               </tr>
                             );
-                            return isDrillRow("personal",grupo,fila) ? [row, <DrillPanel key={`${fila}-drill`} tipo="personal" grupo={grupo} fila={fila} m={drill.m} colSpan={mesesFiltrados.length+2}/>] : [row];
+                            return isDrillRow("personal",grupo,fila) ? [row, <DrillPanel key={`${fila}-drill`} tipo="personal" grupo={grupo} fila={fila} m={drill.m} meses={mesesFiltrados} colSpan={mesesFiltrados.length+2}/>] : [row];
                           }),
                           <tr key={`sub-${grupo}`} style={{borderTop:"1px solid rgba(221,184,99,0.15)",borderBottom:"1px solid rgba(255,255,255,0.04)",background:bg}}>
                             <td style={{padding:"6px 12px",fontSize:11,fontWeight:700,color,background:bg,position:"sticky",left:0,borderRight:"1px solid rgba(221,184,99,0.12)"}}>Total {GRUPO_LABEL[grupo]||grupo}</td>
                             {mesesFiltrados.map(m=>{const v=gTotM(m);return <td key={m} onClick={()=>v!==0&&toggleDrill("personal",grupo,null,m)} style={{...cellSt(v),...clickCellSt(v),fontFamily:"Lora",fontWeight:700,color:v!==0?color:"#333"}}>{fmtCell(v)}</td>;})}
                             <td onClick={()=>gTot!==0&&toggleDrill("personal",grupo,null,null)} style={{...cellSt(gTot),...clickCellSt(gTot),fontFamily:"Lora",fontWeight:800,borderLeft:"1px solid rgba(221,184,99,0.15)",background:bg,color:gTot!==0?color:"#333"}}>{fmtCell(gTot)}</td>
                           </tr>,
-                          isDrillRow("personal",grupo,null) && <DrillPanel key={`sub-${grupo}-drill`} tipo="personal" grupo={grupo} fila={null} m={drill.m} colSpan={mesesFiltrados.length+2}/>
+                          isDrillRow("personal",grupo,null) && <DrillPanel key={`sub-${grupo}-drill`} tipo="personal" grupo={grupo} fila={null} m={drill.m} meses={mesesFiltrados} colSpan={mesesFiltrados.length+2}/>
                         ];
                       })}
                     </tbody>
