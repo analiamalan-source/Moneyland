@@ -225,6 +225,10 @@ export default function Moneyland() {
     return ()=>document.removeEventListener("mousedown",h);
   },[filterDropOpen]);
   const [dashFiltro, setDashFiltro] = useState("todos");
+  const [dashDesde, setDashDesde] = useState("1");
+  const [dashHasta, setDashHasta] = useState(String(new Date().getMonth()+1));
+  const [dashBancos, setDashBancos] = useState([]);
+  const [dashBancoDropOpen, setDashBancoDropOpen] = useState(false);
   const [persDesde, setPersDesde] = useState("1");
   const [persHasta, setPersHasta] = useState(String(new Date().getMonth()+1));
   const [reportAno, setReportAno] = useState(String(new Date().getFullYear()));
@@ -694,6 +698,15 @@ export default function Moneyland() {
     return ()=>document.removeEventListener("mousedown",h);
   },[bancoDropOpen]);
 
+  const dashBancoDropRef = useRef(null);
+
+  useEffect(()=>{
+    if(!dashBancoDropOpen) return;
+    const h = (e)=>{ if(dashBancoDropRef.current&&!dashBancoDropRef.current.contains(e.target)) setDashBancoDropOpen(false); };
+    document.addEventListener("mousedown",h);
+    return ()=>document.removeEventListener("mousedown",h);
+  },[dashBancoDropOpen]);
+
   const bancosActivos = config.bancos.filter(b=>b.activo).map(b=>b.nombre);
   const tarjetasActivas = config.tarjetas.filter(t=>t.activo).map(t=>t.nombre);
   const mediosPago = [...bancosActivos, ...tarjetasActivas];
@@ -730,12 +743,6 @@ export default function Moneyland() {
     setSaved(true);
     setTimeout(()=>setSaved(false),2000);
   }
-
-  // Dashboard data from AGG
-  const monthly = AGG.monthly;
-  const maxBar = Math.max(...Object.values(monthly).map(v=>Math.max(v.ing,v.egr)),1);
-  const totalIng = Object.values(monthly).reduce((s,v)=>s+v.ing,0);
-  const totalEgr = Object.values(monthly).reduce((s,v)=>s+v.egr,0);
 
   // Pivots en vivo desde regs: agrupa por c1 (o por cat) y mes, filtrando tipo/año/bancos.
   // Reemplaza los objetos AGG.* hardcodeados (foto fija de cuando se armó la app, solo hasta abril).
@@ -795,6 +802,58 @@ export default function Moneyland() {
   const kpi_mes = buildPivot("Personal", "cat", reportAno, persBancos, g=>CAT_GRUPO[g]);
   const mesesFiltrados = MESES_DISP.filter(m=>+m>=+persDesde&&+m<=+persHasta);
   const bancosPersList = config.bancos.map(b=>b.nombre);
+
+  // ── Dashboard: todo calculado en vivo desde regs, con sus propios filtros (Tipo/Fecha/Banco) ──
+  const dashMeses = MESES_DISP.filter(m=>+m>=+dashDesde&&+m<=+dashHasta);
+  const dashBancosNorm = dashBancos.length ? dashBancos.map(normBanco) : null;
+  // Filtrado por tipo/año/banco pero SIN el rango de meses (se usa también para el mes anterior al filtro, ej. saldo inicial)
+  const dashRegsAno = regs.filter(r=>{
+    if(dashFiltro!=="todos" && r.t!==dashFiltro) return false;
+    if(reportAno && String(r.a||r.f?.slice(0,4)||"")!==String(reportAno)) return false;
+    if(dashBancosNorm && !dashBancosNorm.includes(normBanco(r.b))) return false;
+    return true;
+  });
+  const dashRegs = dashRegsAno.filter(r=>dashMeses.includes(r.m));
+
+  const dashCatSum = (grupo) => dashRegs.filter(r=>CAT_GRUPO[r.cat]===grupo).reduce((s,r)=>s+(r.tot||0),0);
+  const dashIngresos = dashCatSum("Ingresos");
+  const dashNecesidades = dashCatSum("Necesidades");
+  const dashDeseos = dashCatSum("Deseos");
+  const dashInversion = dashCatSum("Inversiones");
+  const dashResultado = dashRegs.reduce((s,r)=>s+(r.tot||0),0);
+  const dashPct = (v) => dashIngresos>0 ? (Math.abs(v)/dashIngresos*100).toFixed(1)+"%" : "—";
+
+  // Cobros/Pagos/Resultado por mes — base del gráfico, la tabla de resultados y el flujo de fondos.
+  // El saldo inicial/final de "Detalle de flujo de fondos" es un acumulado relativo al período
+  // filtrado (arranca en $0 el primer mes mostrado), igual criterio que el informe Flujo de fondos.
+  const dashMesData = {};
+  dashMeses.forEach(m=>{
+    const regsMes = dashRegsAno.filter(r=>r.m===m);
+    const cobros = regsMes.filter(r=>(r.tot||0)>0).reduce((s,r)=>s+(r.tot||0),0);
+    const pagos = regsMes.filter(r=>(r.tot||0)<0).reduce((s,r)=>s+Math.abs(r.tot||0),0);
+    dashMesData[m] = {cobros,pagos,resultado:cobros-pagos};
+  });
+  { let acum=0; dashMeses.forEach(m=>{ const d=dashMesData[m]; d.si=acum; d.sf=acum+d.cobros-d.pagos; acum=d.sf; }); }
+  const dashMaxIng = Math.max(...dashMeses.map(m=>dashMesData[m].cobros),1);
+
+  // Gastos que componen el 80% del total (Necesidades + Deseos), ranking por categoría (c1) con acumulado
+  const dashGastosPorCat = {};
+  dashRegs.forEach(r=>{
+    const grupo = CAT_GRUPO[r.cat];
+    if(grupo!=="Necesidades"&&grupo!=="Deseos") return;
+    dashGastosPorCat[r.c1] = (dashGastosPorCat[r.c1]||0) + (r.tot||0);
+  });
+  const dashGastosTotal = Object.values(dashGastosPorCat).reduce((s,v)=>s+Math.abs(v),0);
+  const dashPareto = [];
+  {
+    const ordenado = Object.entries(dashGastosPorCat).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1]));
+    let acum = 0;
+    for(const [cat,val] of ordenado){
+      acum += Math.abs(val);
+      dashPareto.push({cat, acum, pct: dashGastosTotal>0?(acum/dashGastosTotal*100):0});
+      if(dashGastosTotal>0 && acum/dashGastosTotal>=0.8) break;
+    }
+  }
 
   const pvGet = (c1,m) => (pivot_pers[c1]?.[m]||0);
   const rowTot = (c1) => mesesFiltrados.reduce((s,m)=>s+pvGet(c1,m),0);
@@ -1263,39 +1322,118 @@ export default function Moneyland() {
         {/* ── DASHBOARD ── */}
         {mainTab==="dashboard" && (
           <>
-            <div style={{display:"flex",gap:6,marginBottom:14,alignItems:"center"}}>
-              {["todos","Personal","Negocio"].map(f=>(
-                <button key={f} onClick={()=>setDashFiltro(f)}
-                  style={{background:dashFiltro===f?"rgba(221,184,99,0.14)":"#141414",border:`1px solid ${dashFiltro===f?"rgba(221,184,99,0.5)":"rgba(221,184,99,0.12)"}`,color:dashFiltro===f?"#DDB863":"#8C8C8C",borderRadius:5,padding:"5px 14px",fontFamily:"Roboto",fontSize:11,cursor:"pointer"}}>
-                  {f==="todos"?"Todo":f}
-                </button>
-              ))}
-            </div>
-            <div style={{...S.g4,marginBottom:12}}>
+            {/* KPIs */}
+            <div style={{...S.g5,marginBottom:14}}>
               {[
-                {label:"Ingresos",val:fmtN(totalIng),color:"#4CAF82",sub:"Ene–Abr 2026"},
-                {label:"Egresos",val:fmtN(totalEgr),color:"#f06060",sub:"Ene–Abr 2026"},
-                {label:"Resultado neto",val:fmtN(totalIng-totalEgr),color:(totalIng-totalEgr)>=0?"#DDB863":"#f06060",sub:"Ene–Abr 2026"},
-                {label:"Registros",val:"671",color:"#1D445C",sub:"16 negocio · 655 personal"},
+                {label:"Ingresos",val:fmtN(dashIngresos),color:"#4CAF82",pct:null},
+                {label:"Necesidades",val:fmtN(dashNecesidades),color:"#1D445C",pct:dashPct(dashNecesidades)},
+                {label:"Deseos",val:fmtN(dashDeseos),color:"#cc88cc",pct:dashPct(dashDeseos)},
+                {label:"Inversión",val:fmtN(dashInversion),color:"#f0c060",pct:dashPct(dashInversion)},
+                {label:"Resultado",val:(dashResultado>=0?"+":"-")+fmtN(dashResultado),color:dashResultado>=0?"#DDB863":"#f06060",pct:null},
               ].map(k=>(
                 <div key={k.label} style={S.card}>
                   <div style={{...S.lbl,marginBottom:6}}>{k.label}</div>
-                  <div style={{fontFamily:"Lora",fontSize:20,fontWeight:800,color:k.color,marginBottom:3}}>{k.val}</div>
-                  <div style={{fontSize:10,color:"#4A4A4A"}}>{k.sub}</div>
+                  <div style={{fontFamily:"Lora",fontSize:18,fontWeight:800,color:k.color}}>{k.val}</div>
+                  {k.pct&&<div style={{fontSize:10,color:"#8C8C8C",marginTop:4}}>{k.pct} <span style={{opacity:.6}}>sobre ingresos</span></div>}
                 </div>
               ))}
             </div>
-            <div style={{...S.g2,marginBottom:12}}>
+
+            <div style={{display:"grid",gridTemplateColumns:"200px 1fr 1fr",gap:12,alignItems:"start"}}>
+              {/* Filtros */}
+              <div style={{...S.card,gridRow:"1 / 3",overflow:"visible"}}>
+                <div style={S.secT}>Filtros</div>
+                <div style={{marginBottom:14}}>
+                  <div style={S.lbl}>Tipo</div>
+                  <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                    {["todos","Personal","Negocio"].map(f=>(
+                      <button key={f} onClick={()=>setDashFiltro(f)}
+                        style={{background:dashFiltro===f?"rgba(221,184,99,0.14)":"#1E1E1E",border:`1px solid ${dashFiltro===f?"rgba(221,184,99,0.5)":"rgba(221,184,99,0.12)"}`,color:dashFiltro===f?"#DDB863":"#8C8C8C",borderRadius:5,padding:"6px 10px",fontFamily:"Roboto",fontSize:11,cursor:"pointer",textAlign:"left"}}>
+                        {f==="todos"?"Todo":f}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div style={{marginBottom:14}}>
+                  <div style={S.lbl}>Año</div>
+                  <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                    {["2025","2026","2027"].map(y=>(
+                      <button key={y} onClick={()=>setReportAno(y)}
+                        style={{background:reportAno===y?"rgba(221,184,99,0.12)":"transparent",border:`1px solid ${reportAno===y?"rgba(221,184,99,0.5)":"rgba(221,184,99,0.15)"}`,color:reportAno===y?"#DDB863":"#4A4A4A",borderRadius:4,padding:"3px 9px",fontFamily:"Roboto",fontSize:11,cursor:"pointer"}}>
+                        {y}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div style={{marginBottom:14}}>
+                  <div style={S.lbl}>Fecha</div>
+                  <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <label style={{fontSize:10,color:"#4A4A4A",width:36}}>Desde</label>
+                      <select value={dashDesde} onChange={e=>{setDashDesde(e.target.value);if(+e.target.value>+dashHasta)setDashHasta(e.target.value);}} style={{...selStyle,flex:1}}>
+                        {MESES_DISP.map(m=><option key={m} value={m}>{MESES_NOM[+m]}</option>)}
+                      </select>
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <label style={{fontSize:10,color:"#4A4A4A",width:36}}>Hasta</label>
+                      <select value={dashHasta} onChange={e=>{setDashHasta(e.target.value);if(+e.target.value<+dashDesde)setDashDesde(e.target.value);}} style={{...selStyle,flex:1}}>
+                        {MESES_DISP.map(m=><option key={m} value={m}>{MESES_NOM[+m]}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <div style={S.lbl}>Medios de pago</div>
+                  <div style={{position:"relative"}} ref={dashBancoDropRef}>
+                    <button onClick={()=>setDashBancoDropOpen(o=>!o)}
+                      style={{width:"100%",background:"#1E1E1E",border:`1px solid ${dashBancos.length>0?"rgba(221,184,99,0.5)":"rgba(221,184,99,0.18)"}`,borderRadius:5,color:dashBancos.length>0?"#DDB863":"#4A4A4A",fontFamily:"Roboto",fontSize:11,padding:"6px 10px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between",gap:6}}>
+                      <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{dashBancos.length===0?"Todos":dashBancos.length===1?dashBancos[0]:`${dashBancos.length} bancos`}</span>
+                      <span style={{fontSize:9,opacity:0.6,flexShrink:0}}>{dashBancoDropOpen?"▲":"▼"}</span>
+                    </button>
+                    {dashBancoDropOpen&&(
+                      <div style={{position:"absolute",top:"calc(100% + 6px)",left:0,background:"#1E1E1E",border:"1px solid rgba(221,184,99,0.22)",borderRadius:6,zIndex:999,minWidth:200,padding:"6px 0",boxShadow:"0 12px 32px rgba(0,0,0,0.7)"}}>
+                        <div onClick={()=>{setDashBancos([]);setDashBancoDropOpen(false);}}
+                          style={{display:"flex",alignItems:"center",gap:8,padding:"7px 12px",cursor:"pointer",fontSize:11,color:dashBancos.length===0?"#DDB863":"#8C8C8C",borderBottom:"1px solid rgba(221,184,99,0.12)"}}
+                          onMouseEnter={e=>e.currentTarget.style.background="rgba(221,184,99,0.1)"}
+                          onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                          <span style={{width:12,height:12,borderRadius:2,border:`1px solid ${dashBancos.length===0?"#DDB863":"rgba(255,255,255,0.2)"}`,background:dashBancos.length===0?"#DDB863":"transparent",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:8,color:"#0d0d10",flexShrink:0}}>{dashBancos.length===0?"✓":""}</span>
+                          Todos
+                        </div>
+                        {bancosPersList.map(b=>{
+                          const chk=dashBancos.includes(b);
+                          return (
+                            <div key={b} onClick={()=>setDashBancos(p=>chk?p.filter(x=>x!==b):[...p,b])}
+                              style={{display:"flex",alignItems:"center",gap:8,padding:"7px 12px",cursor:"pointer",fontSize:11,color:chk?"#DDB863":"#8C8C8C"}}
+                              onMouseEnter={e=>e.currentTarget.style.background="rgba(221,184,99,0.1)"}
+                              onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                              <span style={{width:12,height:12,borderRadius:2,border:`1px solid ${chk?"#DDB863":"rgba(255,255,255,0.2)"}`,background:chk?"#DDB863":"transparent",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:8,color:"#0d0d10",flexShrink:0}}>{chk?"✓":""}</span>
+                              {b}
+                            </div>
+                          );
+                        })}
+                        <div style={{borderTop:"1px solid rgba(221,184,99,0.12)",padding:"6px 12px"}}>
+                          <button onClick={()=>setDashBancoDropOpen(false)} style={{width:"100%",background:"rgba(221,184,99,0.12)",border:"1px solid rgba(221,184,99,0.35)",borderRadius:4,color:"#DDB863",fontFamily:"Roboto",fontSize:11,padding:"5px",cursor:"pointer"}}>Aplicar →</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Columna central: gráfico + detalle de resultados */}
               <div style={S.card}>
-                <div style={S.secT}>Flujo mensual</div>
-                <div style={{display:"flex",alignItems:"flex-end",gap:8,height:80}}>
-                  {MESES_DISP.map(m=>{
-                    const v=monthly[m]||{ing:0,egr:0};
+                <div style={S.secT}>Resultado por mes</div>
+                <div style={{display:"flex",alignItems:"flex-end",gap:6,height:110}}>
+                  {dashMeses.map(m=>{
+                    const d=dashMesData[m];
+                    const barH=Math.max(Math.round((d.cobros/dashMaxIng)*100),d.cobros>0?2:0);
+                    const goldH=d.resultado>0?Math.min(Math.max(Math.round((d.resultado/dashMaxIng)*100),2),barH):0;
                     return (
                       <div key={m} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center"}}>
-                        <div style={{width:"100%",display:"flex",gap:2,alignItems:"flex-end",height:72}}>
-                          <div style={{flex:1,height:Math.max(Math.round((v.ing/maxBar)*72),2),background:"#4CAF82",borderRadius:"3px 3px 0 0",opacity:.8}} title={fmtN(v.ing)}/>
-                          <div style={{flex:1,height:Math.max(Math.round((v.egr/maxBar)*72),2),background:"#f06060",borderRadius:"3px 3px 0 0",opacity:.7}} title={fmtN(v.egr)}/>
+                        <div title={`${MESES_NOM[+m]}: Ingresos ${fmtN(d.cobros)} · Resultado ${d.resultado>=0?"+":"-"}${fmtN(d.resultado)}`}
+                          style={{width:"100%",maxWidth:34,height:barH,display:"flex",flexDirection:"column",borderRadius:"3px 3px 0 0",overflow:"hidden"}}>
+                          {goldH>0&&<div style={{height:goldH,background:"#DDB863"}}/>}
+                          <div style={{flex:1,background:"#4CAF82",opacity:.8}}/>
                         </div>
                         <div style={{fontSize:9,color:"#4A4A4A",marginTop:4}}>{MESES_NOM[+m]}</div>
                       </div>
@@ -1303,43 +1441,120 @@ export default function Moneyland() {
                   })}
                 </div>
                 <div style={{display:"flex",gap:14,marginTop:10}}>
-                  {[["#4CAF82","Ingresos"],["#f06060","Egresos"]].map(([c,l])=>(
+                  {[["#4CAF82","Total ingresos"],["#DDB863","Resultado"]].map(([c,l])=>(
                     <div key={l} style={{display:"flex",alignItems:"center",gap:5,fontSize:10,color:"#8C8C8C"}}>
                       <div style={{width:8,height:8,background:c,borderRadius:2}}/>{l}
                     </div>
                   ))}
                 </div>
               </div>
+
               <div style={S.card}>
-                <div style={S.secT}>Top gastos</div>
-                {Object.entries(AGG.top_gastos).slice(0,6).map(([cat,val])=>(
-                  <div key={cat} style={{marginBottom:8}}>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
-                      <span style={{fontSize:11,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"60%"}}>{cat}</span>
-                      <span style={{fontFamily:"Lora",fontSize:11,fontWeight:700,color:"#f06060"}}>{fmtN(val)}</span>
-                    </div>
-                    <div style={{height:3,background:"#1E1E1E",borderRadius:2}}>
-                      <div style={{height:3,width:`${(val/Object.values(AGG.top_gastos)[0])*100}%`,background:"#f06060",borderRadius:2,opacity:.5}}/>
-                    </div>
-                  </div>
-                ))}
+                <div style={S.secT}>Gastos que componen el 80% del total</div>
+                <div style={{fontSize:10,color:"#8C8C8C",marginBottom:8}}>Necesidades + Deseos, de mayor a menor</div>
+                {dashPareto.length===0?(
+                  <div style={{fontSize:11,color:"#4A4A4A"}}>Sin gastos en el período</div>
+                ):(
+                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+                    <thead>
+                      <tr style={{borderBottom:"1px solid rgba(221,184,99,0.15)"}}>
+                        <th style={{textAlign:"left",padding:"4px 6px",fontSize:9,color:"#8C8C8C",textTransform:"uppercase"}}>Categoría</th>
+                        <th style={{textAlign:"right",padding:"4px 6px",fontSize:9,color:"#8C8C8C",textTransform:"uppercase"}}>Monto acum.</th>
+                        <th style={{textAlign:"right",padding:"4px 6px",fontSize:9,color:"#8C8C8C",textTransform:"uppercase"}}>% gastos</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dashPareto.map(row=>(
+                        <tr key={row.cat} style={{borderBottom:"1px solid rgba(255,255,255,0.03)"}}>
+                          <td style={{padding:"4px 6px",fontSize:11}}>{row.cat}</td>
+                          <td style={{padding:"4px 6px",fontSize:11,textAlign:"right",fontFamily:"Lora",fontWeight:700,color:"#f06060"}}>{fmtN(row.acum)}</td>
+                          <td style={{padding:"4px 6px",fontSize:11,textAlign:"right",color:"#8C8C8C"}}>{row.pct.toFixed(1)}%</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
-            </div>
-            <div style={S.card}>
-              <div style={S.secT}>Últimos movimientos</div>
-              {AGG.recent.map((r,i)=>(
-                <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 0",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
-                  <div style={{width:6,height:6,borderRadius:"50%",background:(r.tot||0)>0?"#4CAF82":"#f06060",flexShrink:0}}/>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.c1} · {r.c2||r.d}</div>
-                    <div style={{fontSize:10,color:"#4A4A4A"}}>{r.b} · {fmtD(r.f)}</div>
-                  </div>
-                  <span style={S.badge(r.cat)}>{r.cat}</span>
-                  <div style={{fontFamily:"Lora",fontSize:13,fontWeight:700,color:(r.tot||0)>0?"#4CAF82":"#f06060",minWidth:80,textAlign:"right"}}>
-                    {(r.tot||0)>0?"+":"-"}{fmtN(r.tot).replace("$ ","")}
-                  </div>
-                </div>
-              ))}
+
+              <div style={{...S.card,padding:0}}>
+                <div style={{padding:"12px 16px 6px"}}><div style={S.secT}>Detalle de resultados</div></div>
+                <HScroll style={{}}>
+                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:340}}>
+                    <thead>
+                      <tr style={{borderBottom:"1px solid rgba(221,184,99,0.15)"}}>
+                        <th style={{textAlign:"left",padding:"6px 12px",fontSize:9,color:"#8C8C8C",textTransform:"uppercase"}}>Mes</th>
+                        <th style={{textAlign:"right",padding:"6px 10px",fontSize:9,color:"#8C8C8C",textTransform:"uppercase"}}>Ingresos</th>
+                        <th style={{textAlign:"right",padding:"6px 10px",fontSize:9,color:"#8C8C8C",textTransform:"uppercase"}}>Gastos</th>
+                        <th style={{textAlign:"right",padding:"6px 10px",fontSize:9,color:"#8C8C8C",textTransform:"uppercase"}}>Resultado</th>
+                        <th style={{textAlign:"right",padding:"6px 12px",fontSize:9,color:"#8C8C8C",textTransform:"uppercase"}}>Margen</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dashMeses.map(m=>{
+                        const d=dashMesData[m];
+                        const margen = d.cobros>0 ? (d.resultado/d.cobros*100) : 0;
+                        return (
+                          <tr key={m} style={{borderBottom:"1px solid rgba(255,255,255,0.03)"}}>
+                            <td style={{padding:"5px 12px",fontSize:11}}>{MESES_NOM[+m]}</td>
+                            <td style={{padding:"5px 10px",fontSize:11,textAlign:"right",fontFamily:"Lora",color:"#4CAF82"}}>{fmtN(d.cobros)}</td>
+                            <td style={{padding:"5px 10px",fontSize:11,textAlign:"right",fontFamily:"Lora",color:"#f06060"}}>{fmtN(d.pagos)}</td>
+                            <td style={{padding:"5px 10px",fontSize:11,textAlign:"right",fontFamily:"Lora",fontWeight:700,color:d.resultado>=0?"#DDB863":"#f06060"}}>{d.resultado>=0?"+":"-"}{fmtN(d.resultado)}</td>
+                            <td style={{padding:"5px 12px",fontSize:11,textAlign:"right",color:"#8C8C8C"}}>{margen.toLocaleString("es-UY",{minimumFractionDigits:1,maximumFractionDigits:1})}%</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      {(()=>{
+                        const totIng=dashMeses.reduce((s,m)=>s+dashMesData[m].cobros,0);
+                        const totPag=dashMeses.reduce((s,m)=>s+dashMesData[m].pagos,0);
+                        const totRes=totIng-totPag;
+                        const totMargen=totIng>0?(totRes/totIng*100):0;
+                        return (
+                          <tr style={{borderTop:"2px solid rgba(221,184,99,0.2)",background:"rgba(255,255,255,0.02)"}}>
+                            <td style={{padding:"6px 12px",fontSize:11,fontWeight:800,color:"#DDB863"}}>Total</td>
+                            <td style={{padding:"6px 10px",fontSize:11,textAlign:"right",fontFamily:"Lora",fontWeight:800,color:"#4CAF82"}}>{fmtN(totIng)}</td>
+                            <td style={{padding:"6px 10px",fontSize:11,textAlign:"right",fontFamily:"Lora",fontWeight:800,color:"#f06060"}}>{fmtN(totPag)}</td>
+                            <td style={{padding:"6px 10px",fontSize:11,textAlign:"right",fontFamily:"Lora",fontWeight:800,color:totRes>=0?"#DDB863":"#f06060"}}>{totRes>=0?"+":"-"}{fmtN(totRes)}</td>
+                            <td style={{padding:"6px 12px",fontSize:11,textAlign:"right",fontWeight:700,color:"#8C8C8C"}}>{totMargen.toLocaleString("es-UY",{minimumFractionDigits:1,maximumFractionDigits:1})}%</td>
+                          </tr>
+                        );
+                      })()}
+                    </tfoot>
+                  </table>
+                </HScroll>
+              </div>
+
+              <div style={{...S.card,padding:0}}>
+                <div style={{padding:"12px 16px 6px"}}><div style={S.secT}>Detalle de flujo de fondos</div></div>
+                <HScroll style={{}}>
+                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:340}}>
+                    <thead>
+                      <tr style={{borderBottom:"1px solid rgba(221,184,99,0.15)"}}>
+                        <th style={{textAlign:"left",padding:"6px 12px",fontSize:9,color:"#8C8C8C",textTransform:"uppercase"}}>Mes</th>
+                        <th style={{textAlign:"right",padding:"6px 10px",fontSize:9,color:"#8C8C8C",textTransform:"uppercase"}}>Saldo inicial</th>
+                        <th style={{textAlign:"right",padding:"6px 10px",fontSize:9,color:"#8C8C8C",textTransform:"uppercase"}}>Cobros</th>
+                        <th style={{textAlign:"right",padding:"6px 10px",fontSize:9,color:"#8C8C8C",textTransform:"uppercase"}}>Pagos</th>
+                        <th style={{textAlign:"right",padding:"6px 12px",fontSize:9,color:"#8C8C8C",textTransform:"uppercase"}}>Saldo final</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dashMeses.map(m=>{
+                        const d=dashMesData[m];
+                        return (
+                          <tr key={m} style={{borderBottom:"1px solid rgba(255,255,255,0.03)"}}>
+                            <td style={{padding:"5px 12px",fontSize:11}}>{MESES_NOM[+m]}</td>
+                            <td style={{padding:"5px 10px",fontSize:11,textAlign:"right",fontFamily:"Lora",color:d.si>=0?"#F8F4E8":"#f06060"}}>{d.si>=0?"":"-"}{fmtN(d.si)}</td>
+                            <td style={{padding:"5px 10px",fontSize:11,textAlign:"right",fontFamily:"Lora",color:"#4CAF82"}}>{fmtN(d.cobros)}</td>
+                            <td style={{padding:"5px 10px",fontSize:11,textAlign:"right",fontFamily:"Lora",color:"#f06060"}}>{fmtN(d.pagos)}</td>
+                            <td style={{padding:"5px 12px",fontSize:11,textAlign:"right",fontFamily:"Lora",fontWeight:700,color:d.sf>=0?"#DDB863":"#f06060"}}>{d.sf>=0?"":"-"}{fmtN(d.sf)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </HScroll>
+              </div>
             </div>
           </>
         )}
