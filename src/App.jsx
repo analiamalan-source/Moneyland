@@ -1489,31 +1489,49 @@ export default function Moneyland() {
               {/* Columna central: gráfico + detalle de resultados */}
               <div style={S.card}>
                 <div style={S.secT}>Resultado por mes</div>
-                <div style={{display:"flex",alignItems:"flex-end",gap:8,height:128}}>
-                  {dashChartMes.map(d=>{
-                    const gastosH=Math.max(Math.round((d.gastos/dashMaxVal)*100),d.gastos>0?2:0);
-                    const ingresosH=Math.max(Math.round((d.ingresos/dashMaxVal)*100),d.ingresos>0?2:0);
-                    const supera=d.gastos>d.ingresos;
-                    return (
-                      <div key={d.m} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center"}}>
-                        <div style={{height:14,display:"flex",alignItems:"flex-end"}}>
-                          {supera&&<span title={`${MESES_NOM[+d.m]}: los gastos (${fmtN(d.gastos)}) superan a los ingresos (${fmtN(d.ingresos)})`} style={{fontSize:11,color:"#f06060",cursor:"default"}}>⚠</span>}
-                        </div>
-                        <div style={{display:"flex",alignItems:"flex-end",gap:3,height:100}}>
-                          <div title={`${MESES_NOM[+d.m]} — ${d.segs.map(s=>`${s.label}: ${fmtN(s.val)}`).join(" · ")}`}
-                            style={{width:17,height:gastosH,display:"flex",flexDirection:"column",borderRadius:"2px 2px 0 0",overflow:"hidden"}}>
-                            {d.segs.map(s=>{
-                              const h=Math.round((s.val/dashMaxVal)*100);
-                              return h>0 ? <div key={s.label} style={{height:h,background:s.color}}/> : null;
-                            })}
-                          </div>
-                          <div title={`${MESES_NOM[+d.m]} — Ingresos: ${fmtN(d.ingresos)}`}
-                            style={{width:8,height:ingresosH,background:"#4CAF82",opacity:.85,borderRadius:"2px 2px 0 0"}}/>
-                        </div>
-                        <div style={{fontSize:9,color:"#4A4A4A",marginTop:4}}>{MESES_NOM[+d.m]}</div>
+                <div style={{display:"flex"}}>
+                  {/* Eje Y */}
+                  <div style={{position:"relative",width:52,height:100,marginTop:14,flexShrink:0}}>
+                    {[0,1,2,3,4].map(i=>(
+                      <div key={i} style={{position:"absolute",bottom:`${i/4*100}%`,right:8,transform:"translateY(50%)",fontSize:9,color:"#4A4A4A",whiteSpace:"nowrap"}}>
+                        {fmtN(dashMaxVal*i/4)}
                       </div>
-                    );
-                  })}
+                    ))}
+                  </div>
+                  <div style={{flex:1,position:"relative"}}>
+                    {/* Líneas guía del eje Y */}
+                    <div style={{position:"absolute",left:0,right:0,top:14,height:100,pointerEvents:"none"}}>
+                      {[0,1,2,3,4].map(i=>(
+                        <div key={i} style={{position:"absolute",left:0,right:0,bottom:`${i/4*100}%`,borderTop:"1px dashed rgba(255,255,255,0.07)"}}/>
+                      ))}
+                    </div>
+                    <div style={{display:"flex",alignItems:"flex-end",gap:8,position:"relative"}}>
+                      {dashChartMes.map(d=>{
+                        const gastosH=Math.max(Math.round((d.gastos/dashMaxVal)*100),d.gastos>0?2:0);
+                        const ingresosH=Math.max(Math.round((d.ingresos/dashMaxVal)*100),d.ingresos>0?2:0);
+                        const supera=d.gastos>d.ingresos;
+                        return (
+                          <div key={d.m} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center"}}>
+                            <div style={{height:14,display:"flex",alignItems:"flex-end"}}>
+                              {supera&&<span title={`${MESES_NOM[+d.m]}: los gastos (${fmtN(d.gastos)}) superan a los ingresos (${fmtN(d.ingresos)})`} style={{fontSize:11,color:"#f06060",cursor:"default"}}>⚠</span>}
+                            </div>
+                            <div style={{display:"flex",alignItems:"flex-end",gap:3,height:100}}>
+                              <div title={`${MESES_NOM[+d.m]} — ${d.segs.map(s=>`${s.label}: ${fmtN(s.val)}`).join(" · ")}`}
+                                style={{width:17,height:gastosH,display:"flex",flexDirection:"column",borderRadius:"2px 2px 0 0",overflow:"hidden"}}>
+                                {d.segs.map(s=>{
+                                  const h=Math.round((s.val/dashMaxVal)*100);
+                                  return h>0 ? <div key={s.label} style={{height:h,background:s.color}}/> : null;
+                                })}
+                              </div>
+                              <div title={`${MESES_NOM[+d.m]} — Ingresos: ${fmtN(d.ingresos)}`}
+                                style={{width:8,height:ingresosH,background:"#4CAF82",opacity:.85,borderRadius:"2px 2px 0 0"}}/>
+                            </div>
+                            <div style={{fontSize:9,color:"#4A4A4A",marginTop:4}}>{MESES_NOM[+d.m]}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
                 <div style={{display:"flex",gap:14,marginTop:10,flexWrap:"wrap"}}>
                   {(dashIsNeg?[
