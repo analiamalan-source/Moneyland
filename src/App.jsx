@@ -1383,13 +1383,14 @@ export default function Moneyland() {
         {mainTab==="dashboard" && (
           <>
             {/* KPIs */}
-            <div style={{...S.g5,marginBottom:14}}>
+            <div style={{...S.g5,gridTemplateColumns:dashIsNeg?"repeat(6,1fr)":"repeat(5,1fr)",marginBottom:14}}>
               {(dashIsNeg?[
                 {label:"Ingresos",val:fmtN(dashRentIngresos),color:"#4CAF82",pct:null},
                 {label:"Gastos variables",val:fmtN(dashRentGV),color:"#f0a060",pct:dashRentPct(dashRentGV)},
                 {label:"Gastos fijos",val:fmtN(dashRentGF),color:"#f06060",pct:dashRentPct(dashRentGF)},
                 {label:"Intereses",val:fmtN(dashRentInt),color:"#f06090",pct:dashRentPct(dashRentInt)},
                 {label:"Impuesto a la renta",val:fmtN(dashRentImp),color:"#cc6060",pct:dashRentPct(dashRentImp)},
+                {label:"Resultado",val:(dashRentResultado>=0?"+":"-")+fmtN(dashRentResultado),color:dashRentResultado>=0?"#DDB863":"#f06060",pct:null},
               ]:[
                 {label:"Ingresos",val:fmtN(dashIngresos),color:"#4CAF82",pct:null},
                 {label:"Necesidades",val:fmtN(dashNecesidades),color:"#1D445C",pct:dashPct(dashNecesidades)},
