@@ -902,12 +902,15 @@ export default function Moneyland() {
   const dashGastosTotal = Object.values(dashGastosPorCat).reduce((s,v)=>s+Math.abs(v),0);
   const dashPareto = [];
   {
+    // Orden de mayor a menor peso individual. El corte en 80% se decide con el acumulado,
+    // pero cada fila muestra su propio monto/% (no el acumulado) para que se lea de mayor a menor.
     const ordenado = Object.entries(dashGastosPorCat).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1]));
     let acum = 0;
     for(const [cat,val] of ordenado){
-      acum += Math.abs(val);
+      const monto = Math.abs(val);
+      acum += monto;
       const tipo = dashIsNeg ? (TX.Negocio[cat]?.cat==="Gasto Fijo"?"Fijo":"Variable") : null;
-      dashPareto.push({cat, tipo, acum, pct: dashGastosTotal>0?(acum/dashGastosTotal*100):0});
+      dashPareto.push({cat, tipo, monto, pct: dashGastosTotal>0?(monto/dashGastosTotal*100):0});
       if(dashGastosTotal>0 && acum/dashGastosTotal>=0.8) break;
     }
   }
@@ -1539,7 +1542,7 @@ export default function Moneyland() {
                       <tr style={{borderBottom:"1px solid rgba(221,184,99,0.15)"}}>
                         <th style={{textAlign:"left",padding:"4px 6px",fontSize:9,color:"#8C8C8C",textTransform:"uppercase"}}>Categoría</th>
                         {dashIsNeg&&<th style={{textAlign:"left",padding:"4px 6px",fontSize:9,color:"#8C8C8C",textTransform:"uppercase"}}>Tipo</th>}
-                        <th style={{textAlign:"right",padding:"4px 6px",fontSize:9,color:"#8C8C8C",textTransform:"uppercase"}}>Monto acum.</th>
+                        <th style={{textAlign:"right",padding:"4px 6px",fontSize:9,color:"#8C8C8C",textTransform:"uppercase"}}>Monto</th>
                         <th style={{textAlign:"right",padding:"4px 6px",fontSize:9,color:"#8C8C8C",textTransform:"uppercase"}}>% gastos</th>
                       </tr>
                     </thead>
@@ -1548,7 +1551,7 @@ export default function Moneyland() {
                         <tr key={row.cat} style={{borderBottom:"1px solid rgba(255,255,255,0.03)"}}>
                           <td style={{padding:"4px 6px",fontSize:11}}>{row.cat}</td>
                           {dashIsNeg&&<td style={{padding:"4px 6px",fontSize:10,color:row.tipo==="Fijo"?"#f06060":"#f0a060"}}>{row.tipo}</td>}
-                          <td style={{padding:"4px 6px",fontSize:11,textAlign:"right",fontFamily:"Lora",fontWeight:700,color:"#f06060"}}>{fmtN(row.acum)}</td>
+                          <td style={{padding:"4px 6px",fontSize:11,textAlign:"right",fontFamily:"Lora",fontWeight:700,color:"#f06060"}}>{fmtN(row.monto)}</td>
                           <td style={{padding:"4px 6px",fontSize:11,textAlign:"right",color:"#8C8C8C"}}>{row.pct.toFixed(1)}%</td>
                         </tr>
                       ))}
