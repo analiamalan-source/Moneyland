@@ -1305,6 +1305,17 @@ export default function Moneyland() {
     if(loadType==="banco" && regs.length>0) {
       const toSavePreview = loadMovs.filter(m=>!m.pendiente);
       const bancoNorm = (bancoCarga||"").trim().toLowerCase();
+      // DEBUG TEMPORAL — ver qué se compara
+      const bancosEnRegs = [...new Set(regs.map(r=>(r.b||"").trim().toLowerCase()))];
+      console.log("[DUP DEBUG] bancoCarga:", bancoCarga, "→ norm:", bancoNorm);
+      console.log("[DUP DEBUG] bancos en regs:", bancosEnRegs);
+      console.log("[DUP DEBUG] toSavePreview count:", toSavePreview.length, "regs count:", regs.length);
+      if(toSavePreview.length>0 && regs.length>0) {
+        const muestra = toSavePreview[0]; const muestraReg = regs.find(r=>(r.b||"").trim().toLowerCase()===bancoNorm);
+        console.log("[DUP DEBUG] primer mov a subir:", {f:muestra.f, tot:muestra.tot, d:muestra.d?.slice(0,30)});
+        if(muestraReg) console.log("[DUP DEBUG] primer reg mismo banco:", {f:muestraReg.f, tot:muestraReg.tot, d:(muestraReg.d||"").slice(0,30)});
+        else console.log("[DUP DEBUG] NO hay registros con ese banco en regs");
+      }
       const duplicados = toSavePreview.filter(m=>
         regs.some(r=>
           (r.b||"").trim().toLowerCase() === bancoNorm &&
@@ -1313,6 +1324,7 @@ export default function Moneyland() {
           (r.d||"").trim().toLowerCase() === (m.d||"").trim().toLowerCase()
         )
       );
+      console.log("[DUP DEBUG] duplicados encontrados:", duplicados.length);
       if(duplicados.length>0) {
         const nuevos = toSavePreview.filter(m=>!duplicados.includes(m));
         setDupModal({duplicados, nuevos, total: toSavePreview.length});
