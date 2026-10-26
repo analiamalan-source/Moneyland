@@ -278,12 +278,19 @@ export default function Moneyland() {
   const [dupModal, setDupModal] = useState(null); // { duplicados: [], nuevos: [], total: n } — modal de duplicados
   const [tarjetaSinVincularWarn, setTarjetaSinVincularWarn] = useState(false); // alerta tarjeta sin pago vinculado
 
+  // Desloguea limpiando sesión y mostrando mensaje
+  const forceLogout = (msg="Tu sesión expiró. Ingresá de nuevo.") => {
+    localStorage.removeItem("ml_session");
+    setSession(null);
+    setAuthError(msg);
+  };
+
   // Load session from localStorage on mount, renovando el token si ya venció o está por vencer
   useEffect(()=>{
     const saved = localStorage.getItem("ml_session");
     if(!saved) return;
     let sess;
-    try { sess = JSON.parse(saved); } catch(e){ return; }
+    try { sess = JSON.parse(saved); } catch(e){ localStorage.removeItem("ml_session"); return; }
     const expSoon = !sess.expires_at || (sess.expires_at*1000 - Date.now() < 60000);
     if(expSoon && sess.refresh_token) {
       sb.auth.refresh(sess.refresh_token).then(data=>{
@@ -292,7 +299,8 @@ export default function Moneyland() {
           setSession(newSess);
           localStorage.setItem("ml_session", JSON.stringify(newSess));
         } else {
-          setSession(sess);
+          // Refresh falló (token inválido o expirado definitivamente) → pedir login
+          forceLogout();
         }
       });
     } else {
@@ -311,6 +319,9 @@ export default function Moneyland() {
           const newSess = {...session, ...data};
           setSession(newSess);
           localStorage.setItem("ml_session", JSON.stringify(newSess));
+        } else {
+          // Refresh falló en background → desloguear con aviso
+          forceLogout();
         }
       });
     }, 4*60000);
@@ -332,6 +343,7 @@ export default function Moneyland() {
     while(true) {
       const sep = url.includes("?") ? "&" : "?";
       const res = await fetch(`${url}${sep}limit=${PAGE}&offset=${offset}`, {headers});
+      if(res.status === 401) throw new Error("UNAUTHORIZED");
       const data = await res.json();
       if(!Array.isArray(data)) return data;
       all = all.concat(data);
@@ -354,6 +366,10 @@ export default function Moneyland() {
         fetch(`${SUPABASE_URL}/rest/v1/pagos_tarjeta_pendientes?select=*`, {headers}),
         fetch(`${SUPABASE_URL}/rest/v1/conciliacion_bancaria?select=*&user_id=eq.${session.user?.id}`, {headers}),
       ]);
+      // Verificar 401 en cualquiera de las respuestas individuales
+      if([bancosRes, tarjetasRes, reglasRes, pagosPendRes, conciRes].some(r=>r.status===401)) {
+        throw new Error("UNAUTHORIZED");
+      }
       const bancosData = await bancosRes.json();
       const tarjetasData = await tarjetasRes.json();
       const reglasData = await reglasRes.json();
@@ -372,7 +388,13 @@ export default function Moneyland() {
       else console.error("Error cargando pagos_tarjeta_pendientes:", pagosPendData);
       const conciData = await conciRes.json();
       if(Array.isArray(conciData)) setConciliaciones(conciData);
-    } catch(e){ console.error(e); }
+    } catch(e){
+      if(e.message === "UNAUTHORIZED") {
+        forceLogout();
+      } else {
+        console.error(e);
+      }
+    }
     setDbLoading(false);
   };
 
