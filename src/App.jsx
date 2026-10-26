@@ -272,8 +272,8 @@ export default function Moneyland() {
   const [dbLoading, setDbLoading] = useState(false);
   const [reglas, setReglas] = useState({});
   const [pagosPendientes, setPagosPendientes] = useState([]);
-  const [pendienteSelUYU, setPendienteSelUYU] = useState(null);
-  const [pendienteSelUSD, setPendienteSelUSD] = useState(null);
+  const [pendientesSelUYU, setPendientesSelUYU] = useState([]); // array de IDs — permite vincular múltiples pagos por moneda
+  const [pendientesSelUSD, setPendientesSelUSD] = useState([]);
 
   // Load session from localStorage on mount, renovando el token si ya venció o está por vencer
   useEffect(()=>{
@@ -1274,25 +1274,29 @@ export default function Moneyland() {
       const bancoLigadoDiff = config.tarjetas.find(tj=>tj.nombre===bancoCarga)?.banco || bancoCarga;
       const monedasUsadas = [...new Set(loadMovs.map(m=>m.moneda||"UYU"))];
       for(const moneda of monedasUsadas) {
-        const pendId = moneda==="USD" ? pendienteSelUSD : pendienteSelUYU;
-        if(!pendId) continue;
-        const pend = pagosPendientes.find(p=>p.id===pendId);
-        if(!pend) continue;
+        const pendIds = moneda==="USD" ? pendientesSelUSD : pendientesSelUYU;
+        if(!pendIds.length) continue;
+        const pends = pendIds.map(id=>pagosPendientes.find(p=>p.id===id)).filter(Boolean);
+        if(!pends.length) continue;
+        // Usamos el primero como referencia de moneda (todos deberían ser de la misma moneda)
+        const pend = pends[0];
         const totalCalc = loadMovs.filter(m=>(m.moneda||"UYU")===moneda).reduce((s,m)=>s+(m.tot||0),0);
         // El lado de la tarjeta puede haberse pagado en otra moneda (ej. lado USD pagado con pesos) —
         // convertir al tipo de cambio de la carga antes de comparar contra el pago bancario real.
         const totalComparable = pend.moneda===moneda ? totalCalc
           : (moneda==="USD" ? totalCalc*tcVal : (tcVal ? totalCalc/tcVal : totalCalc));
-        const diff = Math.abs(totalComparable) - Math.abs(pend.monto);
+        // Suma de todos los pagos bancarios seleccionados para esta moneda
+        const totalPendsMonto = pends.reduce((s,p)=>s+Math.abs(p.monto),0);
+        const diff = Math.abs(totalComparable) - totalPendsMonto;
         if(Math.abs(diff)>=1) {
           const fechaDiff = fechaPagoTarjeta || today();
           // El ajuste queda en la moneda real del pago bancario (pend.moneda), no en la del lado de la tarjeta.
           diffRegs.push({id:Date.now()+Math.random(), f:fechaDiff, m:mesDe(fechaDiff), a:anoDe(fechaDiff), b:bancoLigadoDiff, t:"Personal", c1:"Otros gastos", c2:"Otros gastos", cat:TX.Personal["Otros gastos"].cat, d:`Diferencia de conciliación con pago bancario (${moneda})`, fm:"Ajuste", be:bancoCarga, plazo:"0", fechaCP:fechaDiff, usd:null, tc:null, p:diff, iva:null, tot:diff, moneda:pend.moneda});
         }
       }
-      if(pendienteSelUYU) marcarPendienteConciliado(pendienteSelUYU);
-      if(pendienteSelUSD) marcarPendienteConciliado(pendienteSelUSD);
-      setPendienteSelUYU(null); setPendienteSelUSD(null);
+      pendientesSelUYU.forEach(id=>marcarPendienteConciliado(id));
+      pendientesSelUSD.forEach(id=>marcarPendienteConciliado(id));
+      setPendientesSelUYU([]); setPendientesSelUSD([]);
     }
     const diffIds = await Promise.all(diffRegs.map(m=>saveRegToDB(m)));
     setRegs(prev=>[
@@ -1783,16 +1787,18 @@ export default function Moneyland() {
                       <div style={{fontSize:10,color:"#8C8C8C",marginBottom:8}}>Marcá a qué lado del resumen corresponde cada pago (si pagaste el lado USD con pesos, los dos pueden ser en UYU).</div>
                       <div style={{display:"flex",flexDirection:"column",gap:6}}>
                         {pendientesTarjeta.map(p=>{
-                          const selUYU = pendienteSelUYU===p.id, selUSD = pendienteSelUSD===p.id;
+                          const selUYU = pendientesSelUYU.includes(p.id), selUSD = pendientesSelUSD.includes(p.id);
                           const btnSt = sel=>({background:sel?"#c860f0":"rgba(221,184,99,0.1)",border:"none",borderRadius:4,color:sel?"#0A0A0A":"#DDB863",fontFamily:"Roboto",fontSize:10,padding:"4px 8px",cursor:"pointer",fontWeight:700,whiteSpace:"nowrap"});
+                          const toggleUYU = ()=>{setFechaPagoTarjeta(p.fecha); setPendientesSelUYU(prev=>prev.includes(p.id)?prev.filter(x=>x!==p.id):[...prev,p.id]);};
+                          const toggleUSD = ()=>{setFechaPagoTarjeta(p.fecha); setPendientesSelUSD(prev=>prev.includes(p.id)?prev.filter(x=>x!==p.id):[...prev,p.id]);};
                           return (
                             <div key={p.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,background:(selUYU||selUSD)?"rgba(200,96,240,0.12)":"#1A1A1A",border:`1px solid ${(selUYU||selUSD)?"rgba(200,96,240,0.5)":"rgba(255,255,255,0.06)"}`,borderRadius:6,padding:"6px 10px"}}>
                               <div style={{fontSize:11,color:"#F8F4E8"}}>{fmtD(p.fecha)} — {p.moneda==="USD"?"U$S ":"$ "}{Math.abs(p.monto).toLocaleString("es-UY",{minimumFractionDigits:0,maximumFractionDigits:0})} {p.moneda} ({p.banco})</div>
                               <div style={{display:"flex",gap:4}}>
-                                <button type="button" onClick={()=>{setFechaPagoTarjeta(p.fecha);setPendienteSelUYU(selUYU?null:p.id);}} style={btnSt(selUYU)}>
+                                <button type="button" onClick={toggleUYU} style={btnSt(selUYU)}>
                                   {selUYU?"✓ Lado UYU":"Usar p/ UYU"}
                                 </button>
-                                <button type="button" onClick={()=>{setFechaPagoTarjeta(p.fecha);setPendienteSelUSD(selUSD?null:p.id);}} style={btnSt(selUSD)}>
+                                <button type="button" onClick={toggleUSD} style={btnSt(selUSD)}>
                                   {selUSD?"✓ Lado USD":"Usar p/ USD"}
                                 </button>
                               </div>
@@ -1882,16 +1888,18 @@ export default function Moneyland() {
                       <div style={{display:"flex",flexDirection:"column",gap:8}}>
                         {currencies.map(moneda=>{
                           const totalCalc = loadMovs.filter(m=>(m.moneda||"UYU")===moneda).reduce((s,m)=>s+(m.tot||0),0);
-                          const pendId = moneda==="USD" ? pendienteSelUSD : pendienteSelUYU;
-                          const pend = pendId ? pagosPendientes.find(p=>p.id===pendId) : null;
+                          const pendIds = moneda==="USD" ? pendientesSelUSD : pendientesSelUYU;
+                          const pends = pendIds.map(id=>pagosPendientes.find(p=>p.id===id)).filter(Boolean);
                           const pre = moneda==="USD" ? "U$S " : "$ ";
                           const absTotal = Math.abs(totalCalc);
-                          if(!pend) return (
+                          if(!pends.length) return (
                             <div key={moneda} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,background:"#1A1A1A",border:"1px solid rgba(255,255,255,0.06)",borderRadius:6,padding:"8px 12px"}}>
                               <div style={{fontSize:11,color:"#8C8C8C"}}>{moneda} — Total tarjeta: {pre}{absTotal.toLocaleString("es-UY",{maximumFractionDigits:0})}</div>
                               <div style={{fontSize:10,color:"#5A5A5A"}}>Sin pago de banco vinculado</div>
                             </div>
                           );
+                          // Referencia de moneda del pago (todos los seleccionados deberían ser la misma moneda)
+                          const pend = pends[0];
                           // El lado de la tarjeta puede haberse pagado en otra moneda (ej. lado USD pagado con pesos) —
                           // convertir antes de comparar contra el pago bancario real.
                           const cruzada = pend.moneda!==moneda;
@@ -1903,11 +1911,14 @@ export default function Moneyland() {
                           );
                           const absTotalComparable = cruzada ? (moneda==="USD" ? absTotal*tcVal : (tcVal?absTotal/tcVal:absTotal)) : absTotal;
                           const prePago = pend.moneda==="USD" ? "U$S " : "$ ";
-                          const diff = absTotalComparable - Math.abs(pend.monto);
+                          // Suma total de todos los pagos bancarios seleccionados para esta moneda
+                          const totalPendsMonto = pends.reduce((s,p)=>s+Math.abs(p.monto),0);
+                          const diff = absTotalComparable - totalPendsMonto;
                           const ok = Math.abs(diff) < 1;
+                          const labelPagos = pends.length>1 ? `${pends.length} pagos: ${prePago}${totalPendsMonto.toLocaleString("es-UY",{maximumFractionDigits:0})}` : `${prePago}${totalPendsMonto.toLocaleString("es-UY",{maximumFractionDigits:0})}`;
                           return (
                             <div key={moneda} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,background:ok?"rgba(76,175,130,0.08)":"rgba(240,96,96,0.08)",border:`1px solid ${ok?"rgba(76,175,130,0.3)":"rgba(240,96,96,0.3)"}`,borderRadius:6,padding:"8px 12px"}}>
-                              <div style={{fontSize:11,color:"#8C8C8C"}}>{moneda} — Pago banco: {prePago}{Math.abs(pend.monto).toLocaleString("es-UY",{maximumFractionDigits:0})}{cruzada?` (lado ${moneda} pagado en ${pend.moneda})`:""} · Total tarjeta: {pre}{absTotal.toLocaleString("es-UY",{maximumFractionDigits:0})}</div>
+                              <div style={{fontSize:11,color:"#8C8C8C"}}>{moneda} — Pago banco: {labelPagos}{cruzada?` (lado ${moneda} pagado en ${pend.moneda})`:""} · Total tarjeta: {pre}{absTotal.toLocaleString("es-UY",{maximumFractionDigits:0})}</div>
                               <div style={{fontFamily:"Lora",fontSize:12,fontWeight:700,color:ok?"#4CAF82":"#f06060",whiteSpace:"nowrap"}}>{ok?"✓ Coincide":`⚠ Dif. ${diff>0?"+":""}${diff.toLocaleString("es-UY",{maximumFractionDigits:0})}`}</div>
                             </div>
                           );
