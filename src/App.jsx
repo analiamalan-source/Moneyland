@@ -1453,6 +1453,14 @@ export default function Moneyland() {
             style={{width:"100%",background:"#DDB863",color:"#0A0A0A",border:"none",borderRadius:8,padding:"12px",fontFamily:"Lora",fontSize:14,fontWeight:700,cursor:"pointer",opacity:authLoading||!authEmail||!authPass?0.6:1}}>
             {authLoading?"Cargando...":(authMode==="login"?"Entrar →":"Crear cuenta →")}
           </button>
+          {authMode==="register" && (
+            <p style={{fontSize:11,color:"#5A5A5A",textAlign:"center",lineHeight:1.5,marginTop:4}}>
+              Al registrarte aceptás nuestros{" "}
+              <a href="/terminos.html" target="_blank" style={{color:"#8C8C8C",textDecoration:"underline"}}>términos de uso</a>
+              {" "}y{" "}
+              <a href="/privacidad.html" target="_blank" style={{color:"#8C8C8C",textDecoration:"underline"}}>política de privacidad</a>.
+            </p>
+          )}
         </div>
       </div>
     );
