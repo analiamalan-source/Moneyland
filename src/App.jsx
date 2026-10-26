@@ -275,6 +275,8 @@ export default function Moneyland() {
   const [pagosPendientes, setPagosPendientes] = useState([]);
   const [pendientesSelUYU, setPendientesSelUYU] = useState([]); // array de IDs — permite vincular múltiples pagos por moneda
   const [pendientesSelUSD, setPendientesSelUSD] = useState([]);
+  const [dupModal, setDupModal] = useState(null); // { duplicados: [], nuevos: [], total: n } — modal de duplicados
+  const [tarjetaSinVincularWarn, setTarjetaSinVincularWarn] = useState(false); // alerta tarjeta sin pago vinculado
 
   // Load session from localStorage on mount, renovando el token si ya venció o está por vencer
   useEffect(()=>{
@@ -1257,9 +1259,58 @@ export default function Moneyland() {
     } else await procesarConIA(text, tipo);
   };
 
+  // ── EJECUTAR IMPORTACIÓN (llamado desde confirmar o desde el modal de duplicados) ─────────────
+  const ejecutarImportacion = async (soloNuevos = false) => {
+    setDupModal(null);
+    setTarjetaSinVincularWarn(false);
+    await confirmarInterno(soloNuevos);
+  };
+
   const confirmar = async () => {
     const tcVal = parseFloat(tcCarga)||0;
-    const toSave = loadMovs.filter(m=>!m.pendiente).map(m=>{
+
+    // ── ALERTA C): tarjeta sin pago vinculado ─────────────────────────────────
+    if(loadType==="tarjeta") {
+      const hayPendientes = pagosPendientes.some(p=>p.tarjeta===bancoCarga && !p.conciliado);
+      const hayVinculado = pendientesSelUYU.length>0 || pendientesSelUSD.length>0;
+      if(hayPendientes && !hayVinculado) {
+        setTarjetaSinVincularWarn(true);
+        return; // mostrar advertencia, el usuario decide si continúa igual
+      }
+    }
+
+    // ── DETECCIÓN A): duplicados en extracto bancario ─────────────────────────
+    if(loadType==="banco" && regs.length>0) {
+      const toSavePreview = loadMovs.filter(m=>!m.pendiente);
+      const duplicados = toSavePreview.filter(m=>
+        regs.some(r=>
+          r.b === (config.bancos.find(b=>b.nombre===bancoCarga)?.nombre || bancoCarga) &&
+          r.f === m.f &&
+          Math.abs(r.tot||0) === Math.abs(m.tot||0) &&
+          (r.d||"").trim().toLowerCase() === (m.d||"").trim().toLowerCase()
+        )
+      );
+      if(duplicados.length>0) {
+        const nuevos = toSavePreview.filter(m=>!duplicados.includes(m));
+        setDupModal({duplicados, nuevos, total: toSavePreview.length});
+        return; // mostrar modal, el usuario elige
+      }
+    }
+
+    await confirmarInterno(false);
+  };
+
+  const confirmarInterno = async (soloNuevos = false) => {
+    const tcVal = parseFloat(tcCarga)||0;
+    // Si soloNuevos=true, filtrar movimientos que ya existen en regs (mismo banco+fecha+monto+desc)
+    const movsFiltrados = soloNuevos
+      ? loadMovs.filter(m=>!m.pendiente && !regs.some(r=>
+          r.b===(config.bancos.find(b=>b.nombre===bancoCarga)?.nombre||bancoCarga) &&
+          r.f===m.f && Math.abs(r.tot||0)===Math.abs(m.tot||0) &&
+          (r.d||"").trim().toLowerCase()===(m.d||"").trim().toLowerCase()
+        ))
+      : loadMovs.filter(m=>!m.pendiente);
+    const toSave = movsFiltrados.map(m=>{
       const base = {...m, a: anoDe(m.f)};
       if(loadType==="tarjeta" && m.moneda==="USD" && tcVal) {
         const usdAmt = Math.abs(m.tot||0);
@@ -1774,7 +1825,7 @@ export default function Moneyland() {
             {/* Selector de modo */}
             <div style={{...S.g4,marginBottom:20}}>
               {[{k:"manual",i:"✏️",t:"Manual",d:"Un registro"},{k:"masiva",i:"📊",t:"Carga masiva",d:"Subí un CSV"},{k:"banco",i:"🏦",t:"Extracto banco",d:"IA categoriza"},{k:"tarjeta",i:"💳",t:"Tarjeta crédito",d:"IA categoriza"}].map(o=>(
-                <div key={o.k} onClick={()=>{setLoadType(o.k);setLoadStep("upload");setLoadMovs([]);setLoadError("");setFileName("");setFechaPagoTarjeta("");setPendienteSelUYU(null);setPendienteSelUSD(null);}}
+                <div key={o.k} onClick={()=>{setLoadType(o.k);setLoadStep("upload");setLoadMovs([]);setLoadError("");setFileName("");setFechaPagoTarjeta("");setPendientesSelUYU([]);setPendientesSelUSD([]);setDupModal(null);setTarjetaSinVincularWarn(false);}}
                   style={{...S.card,cursor:"pointer",border:`1px solid ${loadType===o.k?"rgba(221,184,99,0.4)":"rgba(221,184,99,0.12)"}`,background:loadType===o.k?"rgba(221,184,99,0.08)":"#141414",marginBottom:0,transition:"all .1s"}}>
                   <div style={{fontSize:22,marginBottom:6}}>{o.i}</div>
                   <div style={{fontFamily:"Lora",fontSize:12,fontWeight:700,color:loadType===o.k?"#DDB863":"#F8F4E8",marginBottom:3}}>{o.t}</div>
@@ -1801,6 +1852,33 @@ export default function Moneyland() {
               </div>
             )}
 
+            {/* BANNER ORIENTACIÓN — primera carga de extracto bancario */}
+            {loadType==="banco" && loadStep==="upload" && !localStorage.getItem("ml_banner_banco_ok") && (
+              <div style={{background:"rgba(29,68,92,0.12)",border:"1px solid rgba(90,175,223,0.35)",borderRadius:10,padding:"14px 16px",marginBottom:12,position:"relative"}}>
+                <button onClick={()=>{localStorage.setItem("ml_banner_banco_ok","1");}} style={{position:"absolute",top:10,right:12,background:"none",border:"none",color:"#8C8C8C",fontSize:16,cursor:"pointer",lineHeight:1}}>×</button>
+                <div style={{fontFamily:"Lora",fontSize:13,fontWeight:700,color:"#5AAFDF",marginBottom:6}}>📋 Antes de cargar tu primer extracto bancario</div>
+                <div style={{fontSize:12,color:"#C0D8E8",lineHeight:1.6}}>
+                  <b>¿Cómo funciona?</b> La IA lee cada movimiento y lo categoriza automáticamente.<br/>
+                  <b>Primera vez:</b> Es normal que algunas categorías no sean exactas. Podés corregirlas en la tabla de revisión — cada corrección queda guardada y la próxima carga ya aprende de eso.<br/>
+                  <b>Si pagás tarjetas de crédito:</b> Cargá primero el extracto bancario, y <em>después</em> el estado de la tarjeta — así el sistema puede vincular el pago automáticamente.
+                </div>
+              </div>
+            )}
+
+            {/* BANNER ORIENTACIÓN — primera carga de tarjeta */}
+            {loadType==="tarjeta" && loadStep==="upload" && !localStorage.getItem("ml_banner_tarjeta_ok") && (
+              <div style={{background:"rgba(200,96,240,0.07)",border:"1px solid rgba(200,96,240,0.3)",borderRadius:10,padding:"14px 16px",marginBottom:12,position:"relative"}}>
+                <button onClick={()=>{localStorage.setItem("ml_banner_tarjeta_ok","1");}} style={{position:"absolute",top:10,right:12,background:"none",border:"none",color:"#8C8C8C",fontSize:16,cursor:"pointer",lineHeight:1}}>×</button>
+                <div style={{fontFamily:"Lora",fontSize:13,fontWeight:700,color:"#c860f0",marginBottom:6}}>💳 Cómo cargar el estado de tarjeta</div>
+                <div style={{fontSize:12,color:"#DDD",lineHeight:1.7}}>
+                  <b>Paso 1 —</b> Cargá primero el extracto bancario del mes (si no lo hiciste).<br/>
+                  <b>Paso 2 —</b> Cargá el estado de la tarjeta acá. El sistema detecta el pago en el banco y te pide que lo vinculés.<br/>
+                  <b>Paso 3 —</b> Al vincular, el gasto queda registrado con el detalle de cada compra y el pago bancario queda conciliado.<br/>
+                  <b>⚠ Importante:</b> Si no vinculás el pago bancario con el estado de tarjeta, el mismo monto puede aparecer duplicado en tus reportes — una vez como "pago de tarjeta" en el banco y otra como los gastos de la tarjeta. Podés vincular después desde la sección de pagos pendientes si todavía no cargaste el banco.
+                </div>
+              </div>
+            )}
+
             {/* BANCO / TARJETA — UPLOAD */}
             {(loadType==="banco"||loadType==="tarjeta")&&loadStep==="upload"&&(
               <div style={S.card}>
@@ -1808,7 +1886,7 @@ export default function Moneyland() {
                 <div style={{...(loadType==="tarjeta"?S.g4:S.g3),marginBottom:16}}>
                   <div>
                     <label style={S.lbl}>{loadType==="banco"?"Banco":"Tarjeta"}</label>
-                    <select value={bancoCarga} onChange={e=>{setBancoCarga(e.target.value);setPendienteSelUYU(null);setPendienteSelUSD(null);}} style={S.sel}>
+                    <select value={bancoCarga} onChange={e=>{setBancoCarga(e.target.value);setPendientesSelUYU([]);setPendientesSelUSD([]);}} style={S.sel}>
                       <option value="">— seleccionar —</option>
                       {(loadType==="banco"?bancosActivos:tarjetasActivas).map(b=><option key={b}>{b}</option>)}
                     </select>
@@ -2079,11 +2157,43 @@ export default function Moneyland() {
                     );
                   })}
                 </div>
+                {/* ALERTA C): tarjeta sin pago vinculado */}
+                {tarjetaSinVincularWarn && (
+                  <div style={{background:"rgba(240,160,60,0.1)",border:"1px solid rgba(240,160,60,0.4)",borderRadius:8,padding:"12px 16px",marginBottom:10}}>
+                    <div style={{fontFamily:"Lora",fontSize:13,fontWeight:700,color:"#f0a060",marginBottom:6}}>⚠ No vinculaste ningún pago bancario</div>
+                    <div style={{fontSize:12,color:"#DDD",lineHeight:1.6,marginBottom:10}}>
+                      Si pagás esta tarjeta desde un banco que todavía no cargaste, podés vincular el pago después desde la sección de pagos pendientes — no hay problema.<br/>
+                      Pero si ya cargaste el extracto bancario de este mes y el pago no aparece arriba, revisá que esté registrado como "Pago de tarjeta" en ese extracto.<br/>
+                      <b>Sin vincular, el mismo monto puede aparecer dos veces en tus reportes.</b>
+                    </div>
+                    <div style={{display:"flex",gap:8}}>
+                      <button onClick={()=>setTarjetaSinVincularWarn(false)} style={{flex:1,background:"#2A2A2A",border:"1px solid rgba(240,160,60,0.3)",borderRadius:6,color:"#f0a060",fontFamily:"Roboto",fontSize:12,padding:"8px",cursor:"pointer"}}>← Volver a vincular</button>
+                      <button onClick={()=>ejecutarImportacion(false)} style={{flex:1,background:"#f0a060",border:"none",borderRadius:6,color:"#0A0A0A",fontFamily:"Lora",fontSize:12,fontWeight:700,padding:"8px",cursor:"pointer"}}>Confirmar igual →</button>
+                    </div>
+                  </div>
+                )}
+
+                {/* MODAL A): duplicados detectados */}
+                {dupModal && (
+                  <div style={{background:"rgba(200,96,240,0.07)",border:"1px solid rgba(200,96,240,0.35)",borderRadius:8,padding:"12px 16px",marginBottom:10}}>
+                    <div style={{fontFamily:"Lora",fontSize:13,fontWeight:700,color:"#c860f0",marginBottom:6}}>⚠ Se detectaron movimientos ya registrados</div>
+                    <div style={{fontSize:12,color:"#DDD",lineHeight:1.6,marginBottom:10}}>
+                      De los <b>{dupModal.total}</b> movimientos a importar, <b>{dupModal.duplicados.length}</b> ya existen en tus registros (misma fecha, monto y descripción) y <b>{dupModal.nuevos.length}</b> son nuevos.<br/>
+                      ¿Qué querés hacer?
+                    </div>
+                    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                      <button onClick={()=>setDupModal(null)} style={{flex:1,minWidth:120,background:"#1A1A1A",border:"1px solid rgba(255,255,255,0.1)",borderRadius:6,color:"#8C8C8C",fontFamily:"Roboto",fontSize:12,padding:"8px",cursor:"pointer"}}>← Cancelar</button>
+                      {dupModal.nuevos.length>0 && <button onClick={()=>ejecutarImportacion(true)} style={{flex:2,minWidth:160,background:"#4CAF82",border:"none",borderRadius:6,color:"#0A0A0A",fontFamily:"Lora",fontSize:12,fontWeight:700,padding:"8px",cursor:"pointer"}}>Agregar solo los {dupModal.nuevos.length} nuevos →</button>}
+                      <button onClick={()=>ejecutarImportacion(false)} style={{flex:2,minWidth:160,background:"#c860f0",border:"none",borderRadius:6,color:"#0A0A0A",fontFamily:"Lora",fontSize:12,fontWeight:700,padding:"8px",cursor:"pointer"}}>Importar todos ({dupModal.total}) →</button>
+                    </div>
+                  </div>
+                )}
+
                 {(()=>{
                   const hasUSD = loadType==="tarjeta" && loadMovs.some(m=>m.moneda==="USD");
                   const tcMissing = hasUSD && !parseFloat(tcCarga);
                   const tarjetaFaltante = loadType==="banco" && loadMovs.some(m=>m.esPagoTarjeta && !m.tarjetaDestino);
-                  const blocked = tcMissing || tarjetaFaltante;
+                  const blocked = tcMissing || tarjetaFaltante || !!dupModal || tarjetaSinVincularWarn;
                   return (
                   <div style={{display:"flex",gap:10}}>
                     <button onClick={()=>setLoadStep("upload")} style={{background:"#141414",border:"1px solid rgba(221,184,99,0.2)",borderRadius:6,color:"#8C8C8C",fontFamily:"Roboto",fontSize:12,padding:"10px 20px",cursor:"pointer"}}>← Volver</button>
@@ -2556,12 +2666,22 @@ export default function Moneyland() {
         {mainTab==="informes" && (
           <>
             <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
-              {[["rentabilidad","Rentabilidad negocio"],["flujo","Flujo de fondos"],["personal","Finanzas personales"],["conciliacion","Conciliación bancaria"],["pendientes","💳 Pagos tarjeta pendientes"]].map(([k,l])=>(
-                <button key={k} onClick={()=>setReportTab(k)}
-                  style={{background:reportTab===k?"rgba(221,184,99,0.12)":"#141414",border:`1px solid ${reportTab===k?"rgba(221,184,99,0.45)":"rgba(221,184,99,0.12)"}`,color:reportTab===k?"#DDB863":"#8C8C8C",borderRadius:5,padding:"7px 14px",fontFamily:"Roboto",fontSize:11,cursor:"pointer"}}>
-                  {l}
-                </button>
-              ))}
+              {(()=>{
+                const hoy = new Date(); const ms60 = 60*24*60*60*1000;
+                const viejos = pagosPendientes.filter(p=>!p.conciliado && p.fecha && (hoy - new Date(p.fecha)) > ms60);
+                const tabs = [["rentabilidad","Rentabilidad negocio"],["flujo","Flujo de fondos"],["personal","Finanzas personales"],["conciliacion","Conciliación bancaria"],["pendientes","💳 Pagos tarjeta pendientes"]];
+                return tabs.map(([k,l])=>(
+                  <button key={k} onClick={()=>setReportTab(k)}
+                    style={{background:reportTab===k?"rgba(221,184,99,0.12)":"#141414",border:`1px solid ${reportTab===k?"rgba(221,184,99,0.45)":"rgba(221,184,99,0.12)"}`,color:reportTab===k?"#DDB863":"#8C8C8C",borderRadius:5,padding:"7px 14px",fontFamily:"Roboto",fontSize:11,cursor:"pointer",position:"relative"}}>
+                    {l}
+                    {k==="pendientes" && viejos.length>0 && (
+                      <span style={{position:"absolute",top:-5,right:-5,background:"#e05555",color:"#fff",borderRadius:"50%",width:16,height:16,fontSize:9,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1}}>
+                        {viejos.length>9?"9+":viejos.length}
+                      </span>
+                    )}
+                  </button>
+                ));
+              })()}
             </div>
 
             {["rentabilidad","flujo","personal"].includes(reportTab) && (
