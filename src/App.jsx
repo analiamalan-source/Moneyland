@@ -1304,9 +1304,10 @@ export default function Moneyland() {
     // ── DETECCIÓN A): duplicados en extracto bancario ─────────────────────────
     if(loadType==="banco" && regs.length>0) {
       const toSavePreview = loadMovs.filter(m=>!m.pendiente);
+      const bancoNorm = (bancoCarga||"").trim().toLowerCase();
       const duplicados = toSavePreview.filter(m=>
         regs.some(r=>
-          r.b === (config.bancos.find(b=>b.nombre===bancoCarga)?.nombre || bancoCarga) &&
+          (r.b||"").trim().toLowerCase() === bancoNorm &&
           r.f === m.f &&
           Math.abs(r.tot||0) === Math.abs(m.tot||0) &&
           (r.d||"").trim().toLowerCase() === (m.d||"").trim().toLowerCase()
@@ -1325,9 +1326,10 @@ export default function Moneyland() {
   const confirmarInterno = async (soloNuevos = false) => {
     const tcVal = parseFloat(tcCarga)||0;
     // Si soloNuevos=true, filtrar movimientos que ya existen en regs (mismo banco+fecha+monto+desc)
+    const _bancoNorm = (bancoCarga||"").trim().toLowerCase();
     const movsFiltrados = soloNuevos
       ? loadMovs.filter(m=>!m.pendiente && !regs.some(r=>
-          r.b===(config.bancos.find(b=>b.nombre===bancoCarga)?.nombre||bancoCarga) &&
+          (r.b||"").trim().toLowerCase()===_bancoNorm &&
           r.f===m.f && Math.abs(r.tot||0)===Math.abs(m.tot||0) &&
           (r.d||"").trim().toLowerCase()===(m.d||"").trim().toLowerCase()
         ))
