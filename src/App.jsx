@@ -270,6 +270,7 @@ export default function Moneyland() {
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [dbLoading, setDbLoading] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [reglas, setReglas] = useState({});
   const [pagosPendientes, setPagosPendientes] = useState([]);
   const [pendientesSelUYU, setPendientesSelUYU] = useState([]); // array de IDs — permite vincular múltiples pagos por moneda
@@ -389,7 +390,15 @@ export default function Moneyland() {
     setAuthLoading(true); setAuthError("");
     const data = await sb.auth.signUp(authEmail, authPass);
     if(data.id || data.user?.id) {
-      setAuthError("¡Registro exitoso! Revisá tu email para confirmar la cuenta.");
+      // Si el registro no requiere confirmación de email, logueamos directo y mostramos onboarding
+      if(data.access_token) {
+        const sess = {...data, user: data.user || {id: data.id, email: authEmail}};
+        setSession(sess);
+        localStorage.setItem("ml_session", JSON.stringify(sess));
+        setShowOnboarding(true);
+      } else {
+        setAuthError("¡Cuenta creada! Ingresá con tu email y contraseña.");
+      }
     } else {
       setAuthError(data.msg || data.error_description || "Error al registrarse");
     }
@@ -1311,6 +1320,47 @@ export default function Moneyland() {
     }
     setLoadStep("done"); setLoadMovs([]);
   };
+
+  // ── PANTALLA DE ONBOARDING (solo usuarios nuevos) ────────────────────────
+  if(session?.access_token && showOnboarding) {
+    const pasos = [
+      { icon: "📊", titulo: "Conocé tus números", desc: "Cargá tus extractos bancarios y de tarjeta. La IA los lee y categoriza automáticamente." },
+      { icon: "💬", titulo: "Consultá tu CFO digital", desc: "Preguntale a la IA sobre tus finanzas: gastos, tendencias, alertas. Respuestas en segundos." },
+      { icon: "🏆", titulo: "Tomá mejores decisiones", desc: "Ve reportes de rentabilidad, flujo de fondos y finanzas personales en un solo lugar." },
+    ];
+    return (
+      <div style={{minHeight:"100vh",background:"#0A0A0A",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Roboto',sans-serif",padding:20}}>
+        <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&family=Lora:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet"/>
+        <div style={{maxWidth:480,width:"100%"}}>
+          <div style={{textAlign:"center",marginBottom:36}}>
+            <div style={{fontFamily:"Lora",fontSize:32,fontWeight:700,color:"#F8F4E8",marginBottom:6}}>
+              Bienvenida a Money<span style={{color:"#DDB863"}}>land</span> 🎉
+            </div>
+            <div style={{fontSize:13,color:"#8C8C8C"}}>Tu CFO digital está listo. Acá van 3 cosas que podés hacer:</div>
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:32}}>
+            {pasos.map((p,i)=>(
+              <div key={i} style={{background:"#141414",border:"1px solid rgba(221,184,99,0.15)",borderRadius:12,padding:"16px 20px",display:"flex",gap:16,alignItems:"flex-start"}}>
+                <div style={{fontSize:28,lineHeight:1}}>{p.icon}</div>
+                <div>
+                  <div style={{fontFamily:"Lora",fontSize:15,fontWeight:700,color:"#F8F4E8",marginBottom:4}}>{p.titulo}</div>
+                  <div style={{fontSize:12,color:"#8C8C8C",lineHeight:1.5}}>{p.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={()=>setShowOnboarding(false)}
+            style={{width:"100%",padding:"14px",borderRadius:8,border:"none",background:"#DDB863",color:"#0A0A0A",fontFamily:"Lora",fontSize:16,fontWeight:700,cursor:"pointer"}}>
+            Empezar →
+          </button>
+          <div style={{textAlign:"center",marginTop:12,fontSize:11,color:"#5A5A5A"}}>
+            Podés volver a este tutorial desde Configuración cuando quieras
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // ── PANTALLA DE LOGIN ──────────────────────────────────────────────────────
   if(!session?.access_token) {

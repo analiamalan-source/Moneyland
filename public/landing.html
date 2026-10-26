@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Moneyland — Tu CFO digital para emprendedores uruguayos</title>
+  <meta name="description" content="Cargá tus extractos bancarios, la IA analiza tus finanzas y te dice exactamente en qué gastás tu plata. Gratis para emprendedores uruguayos."/>
+  <meta property="og:title" content="Moneyland — Tu CFO digital"/>
+  <meta property="og:description" content="Finanzas claras para emprendedores. Cargá tus extractos, la IA hace el resto."/>
+  <meta property="og:image" content="/icons/icon-512.png"/>
+  <meta name="theme-color" content="#DDB863"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&family=Lora:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --gold: #DDB863;
+      --gold-dim: rgba(221,184,99,0.15);
+      --bg: #0A0A0A;
+      --bg2: #141414;
+      --bg3: #1A1A1A;
+      --text: #F8F4E8;
+      --muted: #8C8C8C;
+      --green: #4CAF82;
+      --purple: #c860f0;
+    }
+    html { scroll-behavior: smooth; }
+    body { background: var(--bg); color: var(--text); font-family: 'Roboto', sans-serif; line-height: 1.6; }
+    a { color: inherit; text-decoration: none; }
+
+    /* NAV */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(10,10,10,0.92); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--gold-dim);
+      padding: 14px 24px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .nav-logo { font-family: 'Lora', serif; font-size: 20px; font-weight: 700; }
+    .nav-logo span { color: var(--gold); }
+    .btn-primary {
+      background: var(--gold); color: #0A0A0A;
+      border: none; border-radius: 8px;
+      padding: 10px 20px;
+      font-family: 'Lora', serif; font-size: 14px; font-weight: 700;
+      cursor: pointer; transition: opacity .2s;
+      display: inline-block; text-align: center;
+    }
+    .btn-primary:hover { opacity: 0.88; }
+    .btn-secondary {
+      background: transparent; color: var(--gold);
+      border: 1px solid var(--gold-dim); border-radius: 8px;
+      padding: 10px 20px;
+      font-family: 'Roboto', sans-serif; font-size: 14px; font-weight: 500;
+      cursor: pointer; transition: border-color .2s;
+      display: inline-block; text-align: center;
+    }
+    .btn-secondary:hover { border-color: var(--gold); }
+
+    /* HERO */
+    .hero {
+      max-width: 760px; margin: 0 auto;
+      padding: 80px 24px 60px;
+      text-align: center;
+    }
+    .badge {
+      display: inline-block;
+      background: rgba(221,184,99,0.1); border: 1px solid var(--gold-dim);
+      color: var(--gold); font-size: 11px; font-weight: 700; letter-spacing: .08em;
+      padding: 4px 12px; border-radius: 20px; margin-bottom: 24px;
+      text-transform: uppercase;
+    }
+    .hero h1 {
+      font-family: 'Lora', serif; font-size: clamp(28px, 6vw, 52px);
+      font-weight: 700; line-height: 1.15; margin-bottom: 20px;
+    }
+    .hero h1 span { color: var(--gold); }
+    .hero p { font-size: 16px; color: var(--muted); max-width: 520px; margin: 0 auto 36px; }
+    .hero-cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+
+    /* SOCIAL PROOF */
+    .social-proof {
+      text-align: center; padding: 0 24px 60px;
+      font-size: 12px; color: var(--muted);
+    }
+    .social-proof strong { color: var(--text); }
+
+    /* FEATURES */
+    .features {
+      max-width: 900px; margin: 0 auto;
+      padding: 0 24px 80px;
+    }
+    .section-title {
+      font-family: 'Lora', serif; font-size: clamp(22px, 4vw, 32px);
+      font-weight: 700; text-align: center; margin-bottom: 8px;
+    }
+    .section-sub { text-align: center; color: var(--muted); font-size: 14px; margin-bottom: 40px; }
+    .features-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+    }
+    .feature-card {
+      background: var(--bg2); border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 12px; padding: 24px;
+      transition: border-color .2s;
+    }
+    .feature-card:hover { border-color: var(--gold-dim); }
+    .feature-icon { font-size: 28px; margin-bottom: 12px; }
+    .feature-card h3 { font-family: 'Lora', serif; font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+    .feature-card p { font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+    /* HOW IT WORKS */
+    .how {
+      background: var(--bg2); border-top: 1px solid rgba(255,255,255,0.05);
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      padding: 80px 24px;
+    }
+    .how-inner { max-width: 700px; margin: 0 auto; }
+    .steps { display: flex; flex-direction: column; gap: 24px; margin-top: 40px; }
+    .step { display: flex; gap: 20px; align-items: flex-start; }
+    .step-num {
+      min-width: 36px; height: 36px; border-radius: 50%;
+      background: var(--gold); color: #0A0A0A;
+      font-family: 'Lora', serif; font-size: 16px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .step h3 { font-family: 'Lora', serif; font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+    .step p { font-size: 13px; color: var(--muted); }
+
+    /* PARA QUIÉN */
+    .para-quien { max-width: 760px; margin: 0 auto; padding: 80px 24px; text-align: center; }
+    .chips { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 24px; }
+    .chip {
+      background: var(--bg3); border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 20px; padding: 8px 16px; font-size: 13px; color: var(--text);
+    }
+
+    /* CTA FINAL */
+    .cta-final {
+      background: linear-gradient(135deg, rgba(221,184,99,0.08) 0%, rgba(200,96,240,0.06) 100%);
+      border-top: 1px solid var(--gold-dim);
+      padding: 80px 24px; text-align: center;
+    }
+    .cta-final h2 { font-family: 'Lora', serif; font-size: clamp(22px, 4vw, 36px); font-weight: 700; margin-bottom: 16px; }
+    .cta-final p { color: var(--muted); font-size: 14px; margin-bottom: 32px; }
+
+    /* EMAIL FORM */
+    .email-form { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; max-width: 440px; margin: 0 auto; }
+    .email-form input {
+      flex: 1; min-width: 200px;
+      background: var(--bg2); border: 1px solid rgba(221,184,99,0.25);
+      border-radius: 8px; padding: 12px 16px;
+      color: var(--text); font-family: 'Roboto', sans-serif; font-size: 14px;
+      outline: none;
+    }
+    .email-form input:focus { border-color: var(--gold); }
+    .email-form input::placeholder { color: var(--muted); }
+
+    /* FOOTER */
+    footer {
+      border-top: 1px solid rgba(255,255,255,0.05);
+      padding: 24px; text-align: center;
+      font-size: 11px; color: var(--muted);
+    }
+    footer span { color: var(--gold); }
+
+    /* MOBILE */
+    @media (max-width: 480px) {
+      .hero-cta { flex-direction: column; align-items: center; }
+      .btn-primary, .btn-secondary { width: 100%; max-width: 320px; padding: 14px 20px; font-size: 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">Money<span>land</span></div>
+  <a href="/" class="btn-primary">Entrar gratis →</a>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="badge">✨ Gratis para emprendedores</div>
+  <h1>Conocé en qué gastás<br/>tu plata — con <span>IA</span></h1>
+  <p>Cargá tus extractos bancarios y de tarjeta. Moneyland los analiza, categoriza y te dice exactamente cómo están tus finanzas. Sin planillas. Sin contadores. Sin rodeos.</p>
+  <div class="hero-cta">
+    <a href="/" class="btn-primary">Empezar gratis →</a>
+    <a href="#como-funciona" class="btn-secondary">Ver cómo funciona</a>
+  </div>
+</section>
+
+<div class="social-proof">
+  <strong>Hecho en Uruguay</strong> · Diseñado para emprendedores con cuentas en UYU y USD · Sin instalación
+</div>
+
+<!-- FEATURES -->
+<section class="features">
+  <div class="section-title">Todo lo que necesitás para tomar decisiones</div>
+  <div class="section-sub">Sin conocimientos contables. Sin horas pegado a planillas.</div>
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon">🤖</div>
+      <h3>IA que lee tus extractos</h3>
+      <p>Subí el PDF o Excel de tu banco o tarjeta. La IA detecta, categoriza y organiza cada movimiento automáticamente.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">💬</div>
+      <h3>Tu CFO digital personal</h3>
+      <p>Preguntale directamente: "¿cuánto gasté en agosto?" o "¿qué me está comiendo las ganancias?". Respuestas con tus datos reales.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📊</div>
+      <h3>Reportes que se entienden</h3>
+      <p>Rentabilidad, flujo de fondos y finanzas personales en un dashboard claro. Pesos y dólares, todo junto.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🇺🇾</div>
+      <h3>Hecho para Uruguay</h3>
+      <p>Dual moneda UYU/USD nativa. Compatible con los bancos y tarjetas locales. Sin conversiones raras.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📱</div>
+      <h3>Instalable en tu celular</h3>
+      <p>Funciona como app en Android e iOS sin pasar por el App Store. Agregala a tu pantalla de inicio en segundos.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🔒</div>
+      <h3>Tus datos, privados</h3>
+      <p>La información queda en tu cuenta. No vendemos ni compartimos nada. Encriptado con los mismos estándares que los bancos.</p>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="how" id="como-funciona">
+  <div class="how-inner">
+    <div class="section-title">Cómo funciona</div>
+    <div class="section-sub">Tres pasos y ya tenés tus finanzas claras</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div>
+          <h3>Creá tu cuenta gratis</h3>
+          <p>Solo email y contraseña. Sin tarjeta de crédito. Sin compromisos.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div>
+          <h3>Subí tus extractos</h3>
+          <p>Descargá el PDF o Excel de tu banco o tarjeta y arrastralo a Moneyland. La IA hace el resto en segundos.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div>
+          <h3>Entendé tus finanzas</h3>
+          <p>Mirá los reportes, consultale a la IA, tomá decisiones con datos reales.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PARA QUIÉN -->
+<section class="para-quien">
+  <div class="section-title">Para vos si sos…</div>
+  <div class="chips">
+    <span class="chip">🛒 Comerciante</span>
+    <span class="chip">💼 Freelancer</span>
+    <span class="chip">🏗️ Constructor o contratista</span>
+    <span class="chip">🍕 Gastronómico</span>
+    <span class="chip">📐 Profesional independiente</span>
+    <span class="chip">🌿 Emprendedor de cualquier rubro</span>
+    <span class="chip">🏡 Que mezcla plata personal y del negocio</span>
+    <span class="chip">💰 Que tiene cuentas en UYU y USD</span>
+  </div>
+</section>
+
+<!-- CTA FINAL -->
+<section class="cta-final">
+  <h2>Empezá hoy, es gratis</h2>
+  <p>Creá tu cuenta en 30 segundos. Sin tarjeta. Sin letra chica.</p>
+  <a href="/" class="btn-primary" style="font-size:16px; padding:14px 32px;">
+    Crear mi cuenta gratis →
+  </a>
+  <div style="margin-top:20px; font-size:12px; color: var(--muted);">
+    ¿Ya tenés cuenta? <a href="/" style="color: var(--gold);">Entrá acá</a>
+  </div>
+</section>
+
+<footer>
+  <div style="margin-bottom:8px;">
+    Money<span>land</span> · Tu CFO digital · Hecho con ❤️ en Uruguay
+  </div>
+  <div>© 2026 · <a href="mailto:hola@moneyland.uy" style="color:var(--muted)">hola@moneyland.uy</a></div>
+</footer>
+
+</body>
+</html>
