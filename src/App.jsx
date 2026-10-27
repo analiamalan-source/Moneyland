@@ -811,6 +811,9 @@ export default function Moneyland() {
       if(normBancoM(r.b)!==bancNorm) return false;
       if((r.moneda||"UYU")!==bancoDef.moneda) return false;
       if(r.fm==="Ajuste") return false;
+      // Excluir pagos de tarjeta: con Flujo B cada gasto ya va al banco pagador,
+      // el débito del resumen ("Pago tarjeta de crédito") no debe sumarse también
+      if(r.fm==="Pago tarjeta de crédito") return false;
       const rMes = parseInt(r.m||r.mes||0);
       const rAno = parseInt(r.a||r.ano||r.f?.slice(0,4)||0);
       return rMes===parseInt(mes)&&rAno===parseInt(ano);
