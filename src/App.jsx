@@ -276,6 +276,7 @@ export default function Moneyland() {
   const [pagosPendientes, setPagosPendientes] = useState([]);
   const [pendientesSelUYU, setPendientesSelUYU] = useState([]); // array de IDs — permite vincular múltiples pagos por moneda
   const [pendientesSelUSD, setPendientesSelUSD] = useState([]);
+  const [tcPendEdit, setTcPendEdit] = useState({}); // {[id]: tcValue} — TC para convertir pendientes USD a pesos
   const [dupModal, setDupModal] = useState(null); // { duplicados: [], nuevos: [], total: n, todosMovs: [] } — modal de duplicados PRE-revisión
   const [dupModalAllMovs, setDupModalAllMovs] = useState([]); // todos los movimientos antes de filtrar, para "importar todos"
   const [tarjetaSinVincularWarn, setTarjetaSinVincularWarn] = useState(false); // alerta tarjeta sin pago vinculado
@@ -3442,70 +3443,112 @@ export default function Moneyland() {
                           </div>
                         </div>
                         <div style={{display:"flex",flexDirection:"column"}}>
-                          {items.map(p=>(
-                            <div key={p.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,padding:"8px 16px",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
-                              <div style={{fontSize:11,color:"#F8F4E8"}}>{fmtD(p.fecha)} — {p.descripcion||"—"} <span style={{color:"#4A4A4A"}}>({p.banco})</span></div>
-                              <div style={{display:"flex",alignItems:"center",gap:8}}>
-                                <div style={{fontFamily:"Lora",fontSize:12,fontWeight:700,color:p.moneda==="USD"?"#f0c060":"#5AAFDF"}}>{fmtM(p.monto,p.moneda)}</div>
-                                <button
-                                  title={`Moneda: ${p.moneda==="USD"?"USD → cambiar a UYU":"UYU → cambiar a USD"}`}
-                                  onClick={async ()=>{
-                                    const nuevaMoneda = p.moneda==="USD" ? "UYU" : "USD";
-                                    setPagosPendientes(prev=>prev.map(x=>x.id===p.id?{...x,moneda:nuevaMoneda}:x));
-                                    try {
-                                      await fetch(`${SUPABASE_URL}/rest/v1/pagos_tarjeta_pendientes?id=eq.${p.id}`, {
-                                        method: "PATCH",
-                                        headers: {"apikey": SUPABASE_KEY, "Authorization": `Bearer ${session.access_token}`, "Content-Type": "application/json", "Prefer": "return=minimal"},
-                                        body: JSON.stringify({ moneda: nuevaMoneda })
+                          {items.map(p=>{
+                            const tcVal = parseFloat(tcPendEdit[p.id]||"") || 0;
+                            const montoPesosPreview = tcVal ? Math.abs(p.monto||0) * tcVal : 0;
+                            return (
+                            <div key={p.id} style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                              {/* Fila principal */}
+                              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,padding:"8px 16px"}}>
+                                <div style={{fontSize:11,color:"#F8F4E8"}}>{fmtD(p.fecha)} — {p.descripcion||"—"} <span style={{color:"#4A4A4A"}}>({p.banco})</span></div>
+                                <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",justifyContent:"flex-end"}}>
+                                  <div style={{fontFamily:"Lora",fontSize:12,fontWeight:700,color:p.moneda==="USD"?"#f0c060":"#5AAFDF"}}>{fmtM(p.monto,p.moneda)}</div>
+                                  {/* Toggle moneda */}
+                                  <button
+                                    title={`Moneda: ${p.moneda==="USD"?"USD → cambiar a UYU":"UYU → cambiar a USD"}`}
+                                    onClick={async ()=>{
+                                      const nuevaMoneda = p.moneda==="USD" ? "UYU" : "USD";
+                                      setPagosPendientes(prev=>prev.map(x=>x.id===p.id?{...x,moneda:nuevaMoneda}:x));
+                                      setTcPendEdit(prev=>({...prev,[p.id]:""}));
+                                      try {
+                                        await fetch(`${SUPABASE_URL}/rest/v1/pagos_tarjeta_pendientes?id=eq.${p.id}`, {
+                                          method: "PATCH",
+                                          headers: {"apikey": SUPABASE_KEY, "Authorization": `Bearer ${session.access_token}`, "Content-Type": "application/json", "Prefer": "return=minimal"},
+                                          body: JSON.stringify({ moneda: nuevaMoneda })
+                                        });
+                                      } catch(e) {
+                                        setPagosPendientes(prev=>prev.map(x=>x.id===p.id?{...x,moneda:p.moneda}:x));
+                                      }
+                                    }}
+                                    style={{background:p.moneda==="USD"?"rgba(240,192,96,0.15)":"rgba(90,175,223,0.15)",border:`1px solid ${p.moneda==="USD"?"rgba(240,192,96,0.4)":"rgba(90,175,223,0.4)"}`,borderRadius:4,color:p.moneda==="USD"?"#f0c060":"#5AAFDF",fontSize:10,fontWeight:700,cursor:"pointer",padding:"2px 7px",lineHeight:1.5}}>
+                                    {p.moneda==="USD"?"USD":"UYU"}
+                                  </button>
+                                  {/* Registrar manualmente */}
+                                  <button
+                                    title="Registrar manualmente"
+                                    onClick={()=>{
+                                      setForm({
+                                        ...emptyForm(),
+                                        fecha: p.fecha || today(),
+                                        tipo: "Personal",
+                                        c1: "Tarjetas",
+                                        c2: "Pago tarjetas",
+                                        desc: `Resumen ${p.tarjeta}${p.fecha?" "+p.fecha.slice(0,7):""}`,
+                                        bancoEmisor: p.tarjeta || "",
+                                        bancoCobPag: p.banco || "",
+                                        ...(p.moneda==="USD"
+                                          ? { usd: String(Math.abs(p.monto||0)), pesos: "", tc: "" }
+                                          : { pesos: String(Math.abs(p.monto||0)), usd: "", tc: "" }
+                                        ),
+                                        iva: "", plazo: "0", fechaManual: true, fechaCP: p.fecha || today(),
                                       });
-                                    } catch(e) {
-                                      // revertir si falla
-                                      setPagosPendientes(prev=>prev.map(x=>x.id===p.id?{...x,moneda:p.moneda}:x));
-                                    }
-                                  }}
-                                  style={{background:p.moneda==="USD"?"rgba(240,192,96,0.15)":"rgba(90,175,223,0.15)",border:`1px solid ${p.moneda==="USD"?"rgba(240,192,96,0.4)":"rgba(90,175,223,0.4)"}`,borderRadius:4,color:p.moneda==="USD"?"#f0c060":"#5AAFDF",fontSize:10,fontWeight:700,cursor:"pointer",padding:"2px 7px",lineHeight:1.5}}>
-                                  {p.moneda==="USD"?"USD":"UYU"}
-                                </button>
-                                <button
-                                  title="Registrar manualmente"
-                                  onClick={()=>{
-                                    // Pre-cargar el form manual con los datos de este pago pendiente
-                                    setForm({
-                                      ...emptyForm(),
-                                      fecha: p.fecha || today(),
-                                      tipo: "Personal",
-                                      c1: "Tarjetas",
-                                      c2: "Pago tarjetas",
-                                      desc: `Resumen ${p.tarjeta}${p.fecha?" "+p.fecha.slice(0,7):""}`,
-                                      bancoEmisor: p.tarjeta || "",
-                                      bancoCobPag: p.banco || "",
-                                      ...(p.moneda==="USD"
-                                        ? { usd: String(Math.abs(p.monto||0)), pesos: "", tc: "" }
-                                        : { pesos: String(Math.abs(p.monto||0)), usd: "", tc: "" }
-                                      ),
-                                      iva: "",
-                                      plazo: "0",
-                                      fechaManual: true,
-                                      fechaCP: p.fecha || today(),
-                                    });
-                                    setLoadType("manual");
-                                    setMainTab("form");
-                                  }}
-                                  style={{background:"rgba(200,96,240,0.12)",border:"1px solid rgba(200,96,240,0.35)",borderRadius:5,color:"#c860f0",fontSize:11,cursor:"pointer",padding:"3px 9px",lineHeight:1.4}}>
-                                  ✏ Registrar
-                                </button>
-                                <button
-                                  title="Marcar como conciliado (ya lo registré manualmente)"
-                                  onClick={()=>{ if(window.confirm("¿Marcar este pago como conciliado?\nUsá esto si ya lo registraste manualmente y no vas a subir el estado de la tarjeta.")) marcarPendienteConciliado(p.id); }}
-                                  style={{background:"rgba(76,175,130,0.12)",border:"1px solid rgba(76,175,130,0.35)",borderRadius:5,color:"#4CAF82",fontSize:11,cursor:"pointer",padding:"3px 9px",lineHeight:1.4}}>
-                                  ✓ Conciliado
-                                </button>
-                                <button onClick={()=>{ if(window.confirm("¿Borrar este pago pendiente? Esta acción no se puede deshacer.")) deletePagoPendiente(p.id); }}
-                                  title="Borrar"
-                                  style={{background:"none",border:"none",color:"#4A4A4A",fontSize:14,cursor:"pointer",padding:"2px 4px",lineHeight:1}}>✕</button>
+                                      setLoadType("manual");
+                                      setMainTab("form");
+                                    }}
+                                    style={{background:"rgba(200,96,240,0.12)",border:"1px solid rgba(200,96,240,0.35)",borderRadius:5,color:"#c860f0",fontSize:11,cursor:"pointer",padding:"3px 9px",lineHeight:1.4}}>
+                                    ✏ Registrar
+                                  </button>
+                                  {/* Conciliado manual */}
+                                  <button
+                                    title="Marcar como conciliado (ya lo registré manualmente)"
+                                    onClick={()=>{ if(window.confirm("¿Marcar este pago como conciliado?\nUsá esto si ya lo registraste manualmente y no vas a subir el estado de la tarjeta.")) marcarPendienteConciliado(p.id); }}
+                                    style={{background:"rgba(76,175,130,0.12)",border:"1px solid rgba(76,175,130,0.35)",borderRadius:5,color:"#4CAF82",fontSize:11,cursor:"pointer",padding:"3px 9px",lineHeight:1.4}}>
+                                    ✓ Conciliado
+                                  </button>
+                                  <button onClick={()=>{ if(window.confirm("¿Borrar este pago pendiente? Esta acción no se puede deshacer.")) deletePagoPendiente(p.id); }}
+                                    title="Borrar"
+                                    style={{background:"none",border:"none",color:"#4A4A4A",fontSize:14,cursor:"pointer",padding:"2px 4px",lineHeight:1}}>✕</button>
+                                </div>
                               </div>
+                              {/* Panel conversión USD→UYU — solo si el pago es en USD */}
+                              {p.moneda==="USD" && (
+                                <div style={{background:"rgba(240,192,96,0.05)",borderTop:"1px solid rgba(240,192,96,0.12)",padding:"8px 16px",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                                  <span style={{fontSize:10,color:"#8C8C8C"}}>💱 Pagado en USD pero la tarjeta es en pesos:</span>
+                                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                                    <span style={{fontSize:10,color:"#8C8C8C"}}>TC</span>
+                                    <input
+                                      type="number" step="0.01" placeholder="ej: 43.50"
+                                      value={tcPendEdit[p.id]||""}
+                                      onChange={e=>setTcPendEdit(prev=>({...prev,[p.id]:e.target.value}))}
+                                      style={{...S.inp,width:90,padding:"3px 8px",fontSize:11}}/>
+                                    {tcVal>0 && <span style={{fontSize:11,color:"#DDB863",fontFamily:"Lora",fontWeight:700}}>= $ {montoPesosPreview.toLocaleString("es-UY",{maximumFractionDigits:0})}</span>}
+                                  </div>
+                                  {tcVal>0 && (
+                                    <button
+                                      onClick={async ()=>{
+                                        const montoConvertido = -(Math.abs(p.monto||0) * tcVal); // negativo = pago/salida
+                                        setPagosPendientes(prev=>prev.map(x=>x.id===p.id?{...x,moneda:"UYU",monto:montoConvertido}:x));
+                                        setTcPendEdit(prev=>({...prev,[p.id]:""}));
+                                        try {
+                                          await fetch(`${SUPABASE_URL}/rest/v1/pagos_tarjeta_pendientes?id=eq.${p.id}`, {
+                                            method: "PATCH",
+                                            headers: {"apikey": SUPABASE_KEY, "Authorization": `Bearer ${session.access_token}`, "Content-Type": "application/json", "Prefer": "return=minimal"},
+                                            body: JSON.stringify({ moneda: "UYU", monto: montoConvertido })
+                                          });
+                                        } catch(e) {
+                                          setPagosPendientes(prev=>prev.map(x=>x.id===p.id?{...x,moneda:p.moneda,monto:p.monto}:x));
+                                        }
+                                      }}
+                                      style={{background:"rgba(240,192,96,0.15)",border:"1px solid rgba(240,192,96,0.4)",borderRadius:5,color:"#DDB863",fontSize:11,fontWeight:700,cursor:"pointer",padding:"4px 12px"}}>
+                                      Convertir a $ {montoPesosPreview.toLocaleString("es-UY",{maximumFractionDigits:0})} UYU
+                                    </button>
+                                  )}
+                                  <span style={{fontSize:10,color:"#4A4A4A"}}>El monto se guarda en pesos para que concilie con la tarjeta correctamente.</span>
+                                </div>
+                              )}
                             </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     );
