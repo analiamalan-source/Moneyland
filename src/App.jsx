@@ -275,7 +275,8 @@ export default function Moneyland() {
   const [pagosPendientes, setPagosPendientes] = useState([]);
   const [pendientesSelUYU, setPendientesSelUYU] = useState([]); // array de IDs — permite vincular múltiples pagos por moneda
   const [pendientesSelUSD, setPendientesSelUSD] = useState([]);
-  const [dupModal, setDupModal] = useState(null); // { duplicados: [], nuevos: [], total: n } — modal de duplicados
+  const [dupModal, setDupModal] = useState(null); // { duplicados: [], nuevos: [], total: n, todosMovs: [] } — modal de duplicados PRE-revisión
+  const [dupModalAllMovs, setDupModalAllMovs] = useState([]); // todos los movimientos antes de filtrar, para "importar todos"
   const [tarjetaSinVincularWarn, setTarjetaSinVincularWarn] = useState(false); // alerta tarjeta sin pago vinculado
 
   // Desloguea limpiando sesión y mostrando mensaje
@@ -1175,6 +1176,28 @@ export default function Moneyland() {
       } else if(tipo==="banco") {
         setSaldoExtractoDetectado(null);
       }
+      // ── Detección de duplicados ANTES de mostrar pantalla de revisión ──────────
+      if(tipo==="banco" && regs.length>0) {
+        const bancoNorm = (bancoCarga||"").trim().toLowerCase();
+        const movsNoP = movs.filter(m=>!m.pendiente);
+        const duplicados = movsNoP.filter(m=>
+          regs.some(r=>
+            (r.b||"").trim().toLowerCase() === bancoNorm &&
+            r.f === m.f &&
+            Math.abs(Math.abs(r.tot||0) - Math.abs(m.tot||0)) <= 1
+          )
+        );
+        if(duplicados.length>0) {
+          const nuevos = movsNoP.filter(m=>!duplicados.includes(m));
+          // Guardar todos los movs para la opción "importar todos"
+          setDupModalAllMovs(movs);
+          setDupModal({duplicados, nuevos, total: movsNoP.length});
+          // Mostrar solo los nuevos en la lista de revisión
+          setLoadMovs(nuevos.concat(movs.filter(m=>m.pendiente)));
+          setLoadStep("review");
+          return;
+        }
+      }
       setLoadMovs(movs); setLoadStep("review");
     } catch(e) { setLoadError("Error al procesar. Verificá el archivo."); setLoadStep("upload"); }
   };
@@ -1283,9 +1306,16 @@ export default function Moneyland() {
 
   // ── EJECUTAR IMPORTACIÓN (llamado desde confirmar o desde el modal de duplicados) ─────────────
   const ejecutarImportacion = async (soloNuevos = false) => {
+    if(!soloNuevos && dupModalAllMovs.length>0) {
+      // "Importar todos": restaurar lista completa antes de confirmar
+      setLoadMovs(dupModalAllMovs);
+    }
     setDupModal(null);
+    setDupModalAllMovs([]);
     setTarjetaSinVincularWarn(false);
-    await confirmarInterno(soloNuevos);
+    // Pequeño delay para que setLoadMovs se aplique antes de confirmarInterno
+    await new Promise(r=>setTimeout(r,50));
+    await confirmarInterno(false); // soloNuevos ya está reflejado en loadMovs
   };
 
   const confirmar = async () => {
@@ -1298,35 +1328,6 @@ export default function Moneyland() {
       if(hayPendientes && !hayVinculado) {
         setTarjetaSinVincularWarn(true);
         return; // mostrar advertencia, el usuario decide si continúa igual
-      }
-    }
-
-    // ── DETECCIÓN A): duplicados en extracto bancario ─────────────────────────
-    if(loadType==="banco") {
-      // Si regs está vacío, los datos no cargaron (sesión vencida u otro error).
-      // Forzar recarga antes de permitir importar, para no saltear detección de duplicados.
-      if(regs.length===0) {
-        // regs vacío = datos no cargaron (sesión vencida u otro error).
-        // Recargar y pedir que confirme de nuevo con datos frescos.
-        await loadFromDB();
-        alert("Tus datos se recargaron. Hacé clic en Confirmar nuevamente para verificar duplicados correctamente.");
-        return;
-      }
-      const toSavePreview = loadMovs.filter(m=>!m.pendiente);
-      const bancoNorm = (bancoCarga||"").trim().toLowerCase();
-      // Comparar solo banco + fecha + monto (sin descripción: la IA puede variar el texto entre cargas)
-      // Tolerancia de ±1 en monto para evitar diferencias de redondeo
-      const duplicados = toSavePreview.filter(m=>
-        regs.some(r=>
-          (r.b||"").trim().toLowerCase() === bancoNorm &&
-          r.f === m.f &&
-          Math.abs(Math.abs(r.tot||0) - Math.abs(m.tot||0)) <= 1
-        )
-      );
-      if(duplicados.length>0) {
-        const nuevos = toSavePreview.filter(m=>!duplicados.includes(m));
-        setDupModal({duplicados, nuevos, total: toSavePreview.length});
-        return; // mostrar modal, el usuario elige
       }
     }
 
@@ -1867,7 +1868,7 @@ export default function Moneyland() {
             {/* Selector de modo */}
             <div style={{...S.g4,marginBottom:20}}>
               {[{k:"manual",i:"✏️",t:"Manual",d:"Un registro"},{k:"masiva",i:"📊",t:"Carga masiva",d:"Subí un CSV"},{k:"banco",i:"🏦",t:"Extracto banco",d:"IA categoriza"},{k:"tarjeta",i:"💳",t:"Tarjeta crédito",d:"IA categoriza"}].map(o=>(
-                <div key={o.k} onClick={()=>{setLoadType(o.k);setLoadStep("upload");setLoadMovs([]);setLoadError("");setFileName("");setFechaPagoTarjeta("");setPendientesSelUYU([]);setPendientesSelUSD([]);setDupModal(null);setTarjetaSinVincularWarn(false);}}
+                <div key={o.k} onClick={()=>{setLoadType(o.k);setLoadStep("upload");setLoadMovs([]);setLoadError("");setFileName("");setFechaPagoTarjeta("");setPendientesSelUYU([]);setPendientesSelUSD([]);setDupModal(null);setDupModalAllMovs([]);setTarjetaSinVincularWarn(false);}}
                   style={{...S.card,cursor:"pointer",border:`1px solid ${loadType===o.k?"rgba(221,184,99,0.4)":"rgba(221,184,99,0.12)"}`,background:loadType===o.k?"rgba(221,184,99,0.08)":"#141414",marginBottom:0,transition:"all .1s"}}>
                   <div style={{fontSize:22,marginBottom:6}}>{o.i}</div>
                   <div style={{fontFamily:"Lora",fontSize:12,fontWeight:700,color:loadType===o.k?"#DDB863":"#F8F4E8",marginBottom:3}}>{o.t}</div>
@@ -2098,6 +2099,22 @@ export default function Moneyland() {
                   );
                 })()}
 
+                {/* BANNER duplicados — aparece arriba de la lista cuando hay movimientos ya registrados */}
+                {dupModal && (
+                  <div style={{background:"rgba(200,96,240,0.07)",border:"1px solid rgba(200,96,240,0.35)",borderRadius:8,padding:"12px 16px",marginBottom:10}}>
+                    <div style={{fontFamily:"Lora",fontSize:13,fontWeight:700,color:"#c860f0",marginBottom:6}}>⚠ Se detectaron movimientos ya registrados</div>
+                    <div style={{fontSize:12,color:"#DDD",lineHeight:1.6,marginBottom:10}}>
+                      De los <b>{dupModal.total}</b> movimientos del extracto, <b>{dupModal.duplicados.length}</b> ya están en tus registros y fueron filtrados. Abajo ves solo los <b>{dupModal.nuevos.length}</b> nuevos.<br/>
+                      ¿Querés agregar solo los nuevos o importar todo igual?
+                    </div>
+                    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                      <button onClick={()=>{setDupModal(null);setDupModalAllMovs([]);setLoadStep("upload");}} style={{flex:1,minWidth:120,background:"#1A1A1A",border:"1px solid rgba(255,255,255,0.1)",borderRadius:6,color:"#8C8C8C",fontFamily:"Roboto",fontSize:12,padding:"8px",cursor:"pointer"}}>← Cancelar</button>
+                      {dupModal.nuevos.length>0 && <button onClick={()=>{setDupModal(null);setDupModalAllMovs([]);}} style={{flex:2,minWidth:160,background:"#4CAF82",border:"none",borderRadius:6,color:"#0A0A0A",fontFamily:"Lora",fontSize:12,fontWeight:700,padding:"8px",cursor:"pointer"}}>✓ Solo los {dupModal.nuevos.length} nuevos — revisá y confirmá →</button>}
+                      <button onClick={()=>{setLoadMovs(dupModalAllMovs.length>0?dupModalAllMovs:loadMovs);setDupModal(null);setDupModalAllMovs([]);}} style={{flex:2,minWidth:160,background:"#555",border:"none",borderRadius:6,color:"#FFF",fontFamily:"Lora",fontSize:12,fontWeight:700,padding:"8px",cursor:"pointer"}}>Importar todos ({dupModal.total})</button>
+                    </div>
+                  </div>
+                )}
+
                 <div style={{...S.card,padding:0,marginBottom:12}}>
                   <div style={{padding:"10px 14px",borderBottom:"1px solid rgba(221,184,99,0.12)"}}>
                     <div style={{fontFamily:"Lora",fontSize:13,fontWeight:700,marginBottom:4}}>Revisá y ajustá si es necesario</div>
@@ -2215,27 +2232,11 @@ export default function Moneyland() {
                   </div>
                 )}
 
-                {/* MODAL A): duplicados detectados */}
-                {dupModal && (
-                  <div style={{background:"rgba(200,96,240,0.07)",border:"1px solid rgba(200,96,240,0.35)",borderRadius:8,padding:"12px 16px",marginBottom:10}}>
-                    <div style={{fontFamily:"Lora",fontSize:13,fontWeight:700,color:"#c860f0",marginBottom:6}}>⚠ Se detectaron movimientos ya registrados</div>
-                    <div style={{fontSize:12,color:"#DDD",lineHeight:1.6,marginBottom:10}}>
-                      De los <b>{dupModal.total}</b> movimientos a importar, <b>{dupModal.duplicados.length}</b> ya existen en tus registros (misma fecha, monto y descripción) y <b>{dupModal.nuevos.length}</b> son nuevos.<br/>
-                      ¿Qué querés hacer?
-                    </div>
-                    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                      <button onClick={()=>setDupModal(null)} style={{flex:1,minWidth:120,background:"#1A1A1A",border:"1px solid rgba(255,255,255,0.1)",borderRadius:6,color:"#8C8C8C",fontFamily:"Roboto",fontSize:12,padding:"8px",cursor:"pointer"}}>← Cancelar</button>
-                      {dupModal.nuevos.length>0 && <button onClick={()=>ejecutarImportacion(true)} style={{flex:2,minWidth:160,background:"#4CAF82",border:"none",borderRadius:6,color:"#0A0A0A",fontFamily:"Lora",fontSize:12,fontWeight:700,padding:"8px",cursor:"pointer"}}>Agregar solo los {dupModal.nuevos.length} nuevos →</button>}
-                      <button onClick={()=>ejecutarImportacion(false)} style={{flex:2,minWidth:160,background:"#c860f0",border:"none",borderRadius:6,color:"#0A0A0A",fontFamily:"Lora",fontSize:12,fontWeight:700,padding:"8px",cursor:"pointer"}}>Importar todos ({dupModal.total}) →</button>
-                    </div>
-                  </div>
-                )}
-
                 {(()=>{
                   const hasUSD = loadType==="tarjeta" && loadMovs.some(m=>m.moneda==="USD");
                   const tcMissing = hasUSD && !parseFloat(tcCarga);
                   const tarjetaFaltante = loadType==="banco" && loadMovs.some(m=>m.esPagoTarjeta && !m.tarjetaDestino);
-                  const blocked = tcMissing || tarjetaFaltante || !!dupModal || tarjetaSinVincularWarn;
+                  const blocked = tcMissing || tarjetaFaltante || tarjetaSinVincularWarn;
                   return (
                   <div style={{display:"flex",gap:10}}>
                     <button onClick={()=>setLoadStep("upload")} style={{background:"#141414",border:"1px solid rgba(221,184,99,0.2)",borderRadius:6,color:"#8C8C8C",fontFamily:"Roboto",fontSize:12,padding:"10px 20px",cursor:"pointer"}}>← Volver</button>
