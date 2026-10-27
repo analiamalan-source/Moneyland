@@ -687,7 +687,8 @@ export default function Moneyland() {
       const nuevo = Array.isArray(data) ? data[0] : null;
       if(nuevo) setPagosPendientes(prev=>[...prev, nuevo]);
       else console.error("Error guardando pago pendiente:", pago, data);
-    } catch(e) { console.error("Error guardando pago pendiente:", pago, e); }
+      return nuevo?.id || null;
+    } catch(e) { console.error("Error guardando pago pendiente:", pago, e); return null; }
   };
   // Marca un pago pendiente como conciliado al confirmar el estado de la tarjeta correspondiente
   const marcarPendienteConciliado = async (id) => {
@@ -1402,27 +1403,52 @@ export default function Moneyland() {
       const totalUSD = loadMovs.filter(m=>m.moneda==="USD").reduce((s,m)=>s+Math.abs(m.tot||0),0);
       const totalPesosDeUSD = tcVal && totalUSD ? totalUSD * tcVal : 0;
 
+      // Helper: detectar si ya existe movimiento bancario que cubra el pago de esta tarjeta
+      // (Orden B: banco cargado antes que tarjeta). Busca en regs del mismo banco/mes/año
+      // un movimiento negativo con fm que sugiera pago de tarjeta, o que coincida en monto ±5%.
+      const yaCargadoEnBanco = (bancoPago, totalMonto, moneda) => {
+        if(!bancoPago || totalMonto <= 0) return false;
+        const bancNorm = (bancoPago||"").trim().toLowerCase();
+        const candidatos = regs.filter(r =>
+          (r.b||"").trim().toLowerCase() === bancNorm &&
+          String(r.m||r.mes||"") === String(periodoMes) &&
+          String(r.a||r.f?.slice(0,4)||"") === String(periodoAno) &&
+          (r.moneda||"UYU") === moneda &&
+          (r.tot||0) < 0
+        );
+        // Coincide si hay algún movimiento negativo cuyo monto esté dentro del 5% del total de tarjeta
+        return candidatos.some(r => {
+          const diff = Math.abs(Math.abs(r.tot||0) - totalMonto);
+          return diff / totalMonto < 0.05;
+        });
+      };
+
       // Lado UYU: crear pendiente en banco UYU elegido
       if(bancoPagoUYU && totalUYU > 0) {
         const monedaBancoUYU = config.bancos.find(b=>b.nombre===bancoPagoUYU)?.moneda || "UYU";
-        await savePagoPendiente({
+        const montoTotalUYU = totalUYU + totalPesosDeUSD;
+        const yaConc = yaCargadoEnBanco(bancoPagoUYU, montoTotalUYU, "UYU");
+        const pendId = await savePagoPendiente({
           tarjeta: bancoCarga,
           banco: bancoPagoUYU,
           fecha: fechaPago,
           mes: periodoMes,
           ano: periodoAno,
           moneda: monedaBancoUYU,
-          monto: -(totalUYU + totalPesosDeUSD), // total pesos que salió del banco (UYU + conversión USD si pagó en pesos)
+          monto: -montoTotalUYU,
           descripcion: `Pago ${bancoCarga} — lado UYU`,
           banco_pago_uyu: bancoPagoUYU,
           banco_pago_usd: (bancoPagoUSD && bancoPagoUSD!=="__noapl__") ? bancoPagoUSD : null,
           monto_usd: totalUSD > 0 ? totalUSD : null
         });
+        // Orden B: si el banco ya estaba cargado, marcar como conciliado inmediatamente
+        if(yaConc && pendId) await marcarPendienteConciliado(pendId);
       }
 
       // Lado USD: crear pendiente separado si pagó con banco USD distinto
       if(bancoPagoUSD && bancoPagoUSD!=="__noapl__" && totalUSD > 0) {
-        await savePagoPendiente({
+        const yaConc = yaCargadoEnBanco(bancoPagoUSD, totalUSD, "USD");
+        const pendId = await savePagoPendiente({
           tarjeta: bancoCarga,
           banco: bancoPagoUSD,
           fecha: fechaPago,
@@ -1435,6 +1461,7 @@ export default function Moneyland() {
           banco_pago_usd: bancoPagoUSD,
           monto_usd: totalUSD
         });
+        if(yaConc && pendId) await marcarPendienteConciliado(pendId);
       }
 
       // Reset estados Flujo B
@@ -1966,7 +1993,7 @@ export default function Moneyland() {
                 <div style={{fontSize:12,color:"#C0D8E8",lineHeight:1.6}}>
                   <b>¿Cómo funciona?</b> La IA lee cada movimiento y lo categoriza automáticamente.<br/>
                   <b>Primera vez:</b> Es normal que algunas categorías no sean exactas. Podés corregirlas en la tabla de revisión — cada corrección queda guardada y la próxima carga ya aprende de eso.<br/>
-                  <b>Si pagás tarjetas de crédito:</b> Cargá primero el extracto bancario, y <em>después</em> el estado de la tarjeta — así el sistema puede vincular el pago automáticamente.
+                  <b>Si pagás tarjetas de crédito:</b> Podés cargar el banco y la tarjeta en cualquier orden — el sistema concilia automáticamente cuando tenés ambos cargados.
                 </div>
               </div>
             )}
