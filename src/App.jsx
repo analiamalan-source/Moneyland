@@ -1314,12 +1314,13 @@ export default function Moneyland() {
       }
       const toSavePreview = loadMovs.filter(m=>!m.pendiente);
       const bancoNorm = (bancoCarga||"").trim().toLowerCase();
+      // Comparar solo banco + fecha + monto (sin descripción: la IA puede variar el texto entre cargas)
+      // Tolerancia de ±1 en monto para evitar diferencias de redondeo
       const duplicados = toSavePreview.filter(m=>
         regs.some(r=>
           (r.b||"").trim().toLowerCase() === bancoNorm &&
           r.f === m.f &&
-          Math.abs(r.tot||0) === Math.abs(m.tot||0) &&
-          (r.d||"").trim().toLowerCase() === (m.d||"").trim().toLowerCase()
+          Math.abs(Math.abs(r.tot||0) - Math.abs(m.tot||0)) <= 1
         )
       );
       if(duplicados.length>0) {
@@ -1339,8 +1340,8 @@ export default function Moneyland() {
     const movsFiltrados = soloNuevos
       ? loadMovs.filter(m=>!m.pendiente && !regs.some(r=>
           (r.b||"").trim().toLowerCase()===_bancoNorm &&
-          r.f===m.f && Math.abs(r.tot||0)===Math.abs(m.tot||0) &&
-          (r.d||"").trim().toLowerCase()===(m.d||"").trim().toLowerCase()
+          r.f===m.f &&
+          Math.abs(Math.abs(r.tot||0) - Math.abs(m.tot||0)) <= 1
         ))
       : loadMovs.filter(m=>!m.pendiente);
     const toSave = movsFiltrados.map(m=>{
