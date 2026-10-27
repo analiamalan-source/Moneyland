@@ -3423,7 +3423,7 @@ export default function Moneyland() {
               const fmtM = (v,mon) => `${mon==="USD"?"U$S ":"$ "}${Math.abs(v||0).toLocaleString("es-UY",{minimumFractionDigits:0,maximumFractionDigits:0})}`;
               return (
                 <>
-                  <div style={{fontSize:11,color:"#8C8C8C",marginBottom:14}}>Pagos a tarjeta detectados en los extractos bancarios que todavía no se vincularon con el estado de esa tarjeta. Si aparece algo acá, falta cargar (o conciliar) el estado correspondiente.</div>
+                  <div style={{fontSize:11,color:"#8C8C8C",marginBottom:14}}>Pagos a tarjeta detectados en los extractos bancarios que todavía no se vincularon con el estado de esa tarjeta. Si no tenés el PDF del resumen, podés registrar los gastos manualmente con el botón ✏ de cada pago.</div>
                   {tarjetasConPendientes.length===0 ? (
                     <div style={{...S.card,color:"#4CAF82",fontSize:13,fontFamily:"Lora",fontWeight:700}}>✓ No hay pagos pendientes — todas las tarjetas están conciliadas.</div>
                   ) : tarjetasConPendientes.map(tarjeta=>{
@@ -3445,8 +3445,36 @@ export default function Moneyland() {
                           {items.map(p=>(
                             <div key={p.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,padding:"8px 16px",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
                               <div style={{fontSize:11,color:"#F8F4E8"}}>{fmtD(p.fecha)} — {p.descripcion||"—"} <span style={{color:"#4A4A4A"}}>({p.banco})</span></div>
-                              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                              <div style={{display:"flex",alignItems:"center",gap:8}}>
                                 <div style={{fontFamily:"Lora",fontSize:12,fontWeight:700,color:p.moneda==="USD"?"#f0c060":"#5AAFDF"}}>{fmtM(p.monto,p.moneda)}</div>
+                                <button
+                                  title="Registrar manualmente"
+                                  onClick={()=>{
+                                    // Pre-cargar el form manual con los datos de este pago pendiente
+                                    setForm({
+                                      ...emptyForm(),
+                                      fecha: p.fecha || today(),
+                                      tipo: "Personal",
+                                      c1: "Tarjetas",
+                                      c2: "Pago tarjetas",
+                                      desc: `Resumen ${p.tarjeta}${p.fecha?" "+p.fecha.slice(0,7):""}`,
+                                      bancoEmisor: p.tarjeta || "",
+                                      bancoCobPag: p.banco || "",
+                                      ...(p.moneda==="USD"
+                                        ? { usd: String(Math.abs(p.monto||0)), pesos: "", tc: "" }
+                                        : { pesos: String(Math.abs(p.monto||0)), usd: "", tc: "" }
+                                      ),
+                                      iva: "",
+                                      plazo: "0",
+                                      fechaManual: true,
+                                      fechaCP: p.fecha || today(),
+                                    });
+                                    setLoadType("manual");
+                                    setMainTab("form");
+                                  }}
+                                  style={{background:"rgba(200,96,240,0.12)",border:"1px solid rgba(200,96,240,0.35)",borderRadius:5,color:"#c860f0",fontSize:11,cursor:"pointer",padding:"3px 9px",lineHeight:1.4}}>
+                                  ✏ Registrar
+                                </button>
                                 <button onClick={()=>{ if(window.confirm("¿Borrar este pago pendiente? Esta acción no se puede deshacer.")) deletePagoPendiente(p.id); }}
                                   title="Borrar"
                                   style={{background:"none",border:"none",color:"#4A4A4A",fontSize:14,cursor:"pointer",padding:"2px 4px",lineHeight:1}}>✕</button>
