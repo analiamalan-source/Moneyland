@@ -255,6 +255,7 @@ export default function Moneyland() {
   const [loadMovs, setLoadMovs] = useState([]);
   const [montoEdit, setMontoEdit] = useState(null);
   const [loadError, setLoadError] = useState("");
+  const [lastTextoIA, setLastTextoIA] = useState(""); // para reintentar sin re-subir el archivo
   const [bancoCarga, setBancoCarga] = useState("");
   const [periodoMes, setPeriodoMes] = useState("5");
   const [periodoAno, setPeriodoAno] = useState("2026");
@@ -1144,6 +1145,7 @@ export default function Moneyland() {
   };
 
   const procesarConIA = async (texto, tipo) => {
+    setLastTextoIA(texto); // guardar para poder reintentar
     setLoadStep("processing");
     try {
       const res = await fetch("/api/categorizar", {
@@ -1199,7 +1201,7 @@ export default function Moneyland() {
         }
       }
       setLoadMovs(movs); setLoadStep("review");
-    } catch(e) { setLoadError("Error al procesar. Verificá el archivo."); setLoadStep("upload"); }
+    } catch(e) { setLoadError("No se pudo procesar con IA. Intentá de nuevo."); setLoadStep("upload"); }
   };
 
   const extractPdfText = async (file) => {
@@ -1891,7 +1893,12 @@ export default function Moneyland() {
                   <div style={{fontSize:13,color:"#8C8C8C"}}>{fileName||"Subir CSV completado"}</div>
                   <input ref={fileRef} type="file" accept=".csv,.txt" style={{display:"none"}} onChange={e=>handleFile(e.target.files[0],"masiva")}/>
                 </div>
-                {loadError&&<div style={{color:"#f06060",fontSize:12,marginTop:10}}>{loadError}</div>}
+                {loadError&&(
+                  <div style={{marginTop:10,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                    <div style={{color:"#f06060",fontSize:12}}>{loadError}</div>
+                    {lastTextoIA && <button onClick={()=>procesarConIA(lastTextoIA,loadType)} style={{background:"rgba(200,96,240,0.15)",border:"1px solid rgba(200,96,240,0.4)",borderRadius:6,color:"#c860f0",fontSize:12,padding:"4px 12px",cursor:"pointer"}}>↩ Reintentar</button>}
+                  </div>
+                )}
               </div>
             )}
 
@@ -1991,7 +1998,12 @@ export default function Moneyland() {
                   <input ref={fileRef2} type="file" accept=".csv,.txt,.pdf,.xls,.xlsx" style={{display:"none"}} onChange={e=>handleFile(e.target.files[0],loadType)}/>
                 </div>
                 ); })()}
-                {loadError&&<div style={{color:"#f06060",fontSize:12,marginTop:10}}>{loadError}</div>}
+                {loadError&&(
+                  <div style={{marginTop:10,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                    <div style={{color:"#f06060",fontSize:12}}>{loadError}</div>
+                    {lastTextoIA && <button onClick={()=>procesarConIA(lastTextoIA,loadType)} style={{background:"rgba(200,96,240,0.15)",border:"1px solid rgba(200,96,240,0.4)",borderRadius:6,color:"#c860f0",fontSize:12,padding:"4px 12px",cursor:"pointer"}}>↩ Reintentar</button>}
+                  </div>
+                )}
               </div>
             )}
 

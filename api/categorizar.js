@@ -47,26 +47,46 @@ moneda debe ser "USD" solo cuando encontraste esa marca o prefijo; el resto "UYU
 
 Tarjeta: ${banco} Período: ${mesNombre} ${ano}. Solo JSON: {"movimientos":[{"fecha":"","descripcion":"","monto":-500,"moneda":"UYU","tipo":"Personal","concepto1":"","concepto2":"","confianza":"alta"},{"fecha":"","descripcion":"devolución ejemplo","monto":200,"moneda":"UYU","tipo":"Personal","concepto1":"","concepto2":"","confianza":"alta"}],"totalTarjeta":0}`;
 
-  try {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 8192,
-        messages: [
-          { role: "user", content: `${prompt}\n\nArchivo:\n${texto.slice(0, 40000)}` },
-        ],
-      }),
-    });
+  const body = JSON.stringify({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 8192,
+    messages: [
+      { role: "user", content: `${prompt}\n\nArchivo:\n${texto.slice(0, 40000)}` },
+    ],
+  });
 
-    const data = await response.json();
-    return res.status(200).json(data);
-  } catch (e) {
-    return res.status(500).json({ error: "Error llamando a la API de IA" });
+  const MAX_INTENTOS = 3;
+  let lastError = null;
+
+  for (let intento = 1; intento <= MAX_INTENTOS; intento++) {
+    try {
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body,
+      });
+
+      // Si es error de servidor de Anthropic (5xx) o rate limit (429), reintentar
+      if (response.status === 429 || response.status >= 500) {
+        const espera = intento * 1500; // 1.5s, 3s, 4.5s
+        await new Promise(r => setTimeout(r, espera));
+        lastError = `HTTP ${response.status}`;
+        continue;
+      }
+
+      const data = await response.json();
+      return res.status(200).json(data);
+    } catch (e) {
+      lastError = e.message;
+      if (intento < MAX_INTENTOS) {
+        await new Promise(r => setTimeout(r, intento * 1500));
+      }
+    }
   }
+
+  return res.status(500).json({ error: `Error al procesar con IA (${lastError}). Intentá de nuevo.` });
 }
