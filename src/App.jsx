@@ -3494,6 +3494,12 @@ export default function Moneyland() {
                                   style={{background:"rgba(200,96,240,0.12)",border:"1px solid rgba(200,96,240,0.35)",borderRadius:5,color:"#c860f0",fontSize:11,cursor:"pointer",padding:"3px 9px",lineHeight:1.4}}>
                                   ✏ Registrar
                                 </button>
+                                <button
+                                  title="Marcar como conciliado (ya lo registré manualmente)"
+                                  onClick={()=>{ if(window.confirm("¿Marcar este pago como conciliado?\nUsá esto si ya lo registraste manualmente y no vas a subir el estado de la tarjeta.")) marcarPendienteConciliado(p.id); }}
+                                  style={{background:"rgba(76,175,130,0.12)",border:"1px solid rgba(76,175,130,0.35)",borderRadius:5,color:"#4CAF82",fontSize:11,cursor:"pointer",padding:"3px 9px",lineHeight:1.4}}>
+                                  ✓ Conciliado
+                                </button>
                                 <button onClick={()=>{ if(window.confirm("¿Borrar este pago pendiente? Esta acción no se puede deshacer.")) deletePagoPendiente(p.id); }}
                                   title="Borrar"
                                   style={{background:"none",border:"none",color:"#4A4A4A",fontSize:14,cursor:"pointer",padding:"2px 4px",lineHeight:1}}>✕</button>
