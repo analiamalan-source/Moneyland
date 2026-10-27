@@ -202,6 +202,7 @@ export default function Moneyland() {
   const [newTarjeta, setNewTarjeta] = useState({nombre:"",banco:"",moneda:"UYU",tipoCarta:"crédito",tipo:"Personal",activo:true});
   const [reportTab, setReportTab] = useState("rentabilidad");
   const [searchQ, setSearchQ] = useState("");
+  const [regPeriodo, setRegPeriodo] = useState(()=>{ const n=new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}`; }); // "YYYY-MM" o "all"
   const [selectedIds, setSelectedIds] = useState([]);
   const [colDropOpen, setColDropOpen] = useState(false);
   const colDropRef = useRef(null);
@@ -2428,7 +2429,11 @@ export default function Moneyland() {
           };
           const activeFilterCount = Object.keys(colFilters).length;
 
+          // Períodos disponibles: meses únicos en regs + "all"
+          const mesesDisponibles = [...new Set(regs.map(r=>r.f?r.f.slice(0,7):""))].filter(Boolean).sort().reverse();
+
           const filteredAll = regs.filter(r=>{
+            if(regPeriodo!=="all" && r.f && r.f.slice(0,7)!==regPeriodo) return false;
             if(searchQ&&![r.d,r.c1,r.c2,r.b].join(" ").toLowerCase().includes(searchQ.toLowerCase())) return false;
             for(const colId of Object.keys(colFilters)){
               if(!colFilters[colId].includes(colValue(colId,r))) return false;
@@ -2502,7 +2507,17 @@ export default function Moneyland() {
             <>
               {/* Toolbar */}
               <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
-                <input value={searchQ} onChange={e=>setSearchQ(e.target.value)} placeholder="Buscar..." style={{...S.inp,width:160,padding:"5px 10px"}}/>
+                {/* Selector de período */}
+                <select value={regPeriodo} onChange={e=>setRegPeriodo(e.target.value)}
+                  style={{...S.inp,padding:"5px 10px",fontSize:11,minWidth:130}}>
+                  {mesesDisponibles.map(m=>{
+                    const [y,mo]=m.split("-");
+                    const label=new Date(Number(y),Number(mo)-1,1).toLocaleDateString("es-UY",{month:"long",year:"numeric"});
+                    return <option key={m} value={m}>{label.charAt(0).toUpperCase()+label.slice(1)}</option>;
+                  })}
+                  <option value="all">— Todos los períodos —</option>
+                </select>
+                <input value={searchQ} onChange={e=>setSearchQ(e.target.value)} placeholder="Buscar..." style={{...S.inp,width:150,padding:"5px 10px"}}/>
 
                 {activeFilterCount>0 && (
                   <button onClick={()=>setColFilters({})}
