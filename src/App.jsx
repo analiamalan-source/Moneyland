@@ -3448,6 +3448,25 @@ export default function Moneyland() {
                               <div style={{display:"flex",alignItems:"center",gap:8}}>
                                 <div style={{fontFamily:"Lora",fontSize:12,fontWeight:700,color:p.moneda==="USD"?"#f0c060":"#5AAFDF"}}>{fmtM(p.monto,p.moneda)}</div>
                                 <button
+                                  title={`Moneda: ${p.moneda==="USD"?"USD → cambiar a UYU":"UYU → cambiar a USD"}`}
+                                  onClick={async ()=>{
+                                    const nuevaMoneda = p.moneda==="USD" ? "UYU" : "USD";
+                                    setPagosPendientes(prev=>prev.map(x=>x.id===p.id?{...x,moneda:nuevaMoneda}:x));
+                                    try {
+                                      await fetch(`${SUPABASE_URL}/rest/v1/pagos_tarjeta_pendientes?id=eq.${p.id}`, {
+                                        method: "PATCH",
+                                        headers: {"apikey": SUPABASE_KEY, "Authorization": `Bearer ${session.access_token}`, "Content-Type": "application/json", "Prefer": "return=minimal"},
+                                        body: JSON.stringify({ moneda: nuevaMoneda })
+                                      });
+                                    } catch(e) {
+                                      // revertir si falla
+                                      setPagosPendientes(prev=>prev.map(x=>x.id===p.id?{...x,moneda:p.moneda}:x));
+                                    }
+                                  }}
+                                  style={{background:p.moneda==="USD"?"rgba(240,192,96,0.15)":"rgba(90,175,223,0.15)",border:`1px solid ${p.moneda==="USD"?"rgba(240,192,96,0.4)":"rgba(90,175,223,0.4)"}`,borderRadius:4,color:p.moneda==="USD"?"#f0c060":"#5AAFDF",fontSize:10,fontWeight:700,cursor:"pointer",padding:"2px 7px",lineHeight:1.5}}>
+                                  {p.moneda==="USD"?"USD":"UYU"}
+                                </button>
+                                <button
                                   title="Registrar manualmente"
                                   onClick={()=>{
                                     // Pre-cargar el form manual con los datos de este pago pendiente
