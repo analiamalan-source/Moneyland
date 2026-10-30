@@ -275,6 +275,7 @@ export default function Moneyland() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [reglas, setReglas] = useState({});
   const [pagosPendientes, setPagosPendientes] = useState([]);
+  const [procProgreso, setProcProgreso] = useState(null); // {hechos,total} mientras la IA procesa un extracto largo
   const [pendientesSelUYU, setPendientesSelUYU] = useState([]); // array de IDs — permite vincular múltiples pagos por moneda (flujo banco→tarjeta, legacy)
   const [pendientesSelUSD, setPendientesSelUSD] = useState([]); // legacy
   // Flujo B: al cargar tarjeta, el usuario elige con qué banco pagó cada lado
@@ -1173,13 +1174,49 @@ export default function Moneyland() {
     setLastTextoIA(texto); // guardar para poder reintentar
     setLoadStep("processing");
     try {
-      const res = await fetch("/api/categorizar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ texto, tipo, banco: bancoCarga, mesNombre: MESES_NOM[+periodoMes], ano: periodoAno }),
-      });
-      const data = await res.json();
-      const parsed = JSON.parse((data.content?.[0]?.text||"{}").replace(/```json|```/g,"").trim());
+      // El tiempo de la IA es casi todo escribir el JSON de salida, y crece con la cantidad de movimientos.
+      // Un extracto largo se parte en tramos por línea y se procesan en paralelo (hasta 4 a la vez):
+      // el tiempo total pasa a ser el de un tramo en vez de el de todo el documento.
+      const TRAMO = 5000, PARALELO = 4;
+      const lineas = texto.split("\n");
+      const reSeccion = /operaciones|resumen|moneda|pesos|d[oó]lares|u\$s|usd/i;
+      const tramos = []; let actual = [], largo = 0, ultimaSeccion = "", ctxActual = "";
+      for(const ln of lineas) {
+        if(largo + ln.length > TRAMO && actual.length) { tramos.push({ctx:ctxActual, txt:actual.join("\n")}); actual = []; largo = 0; ctxActual = ultimaSeccion; }
+        actual.push(ln); largo += ln.length + 1;
+        if(ln.length < 90 && reSeccion.test(ln) && !/\d{1,2}[\/-]\d{1,2}/.test(ln)) ultimaSeccion = ln.trim();
+      }
+      if(actual.length) tramos.push({ctx:ctxActual, txt:actual.join("\n")});
+      setProcProgreso({hechos:0, total:tramos.length});
+      const resultados = new Array(tramos.length);
+      let siguiente = 0, hechos = 0;
+      const llamar = async (t) => {
+        const textoTramo = t.ctx
+          ? `[ENCABEZADO DE SECCIÓN ANTERIOR — solo contexto de moneda, NO extraer movimientos de esta línea]\n${t.ctx}\n[FIN DEL CONTEXTO]\n${t.txt}`
+          : t.txt;
+        const r = await fetch("/api/categorizar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ texto: textoTramo, tipo, banco: bancoCarga, mesNombre: MESES_NOM[+periodoMes], ano: periodoAno }),
+        });
+        const d = await r.json();
+        return JSON.parse((d.content?.[0]?.text||"{}").replace(/```json|```/g,"").trim());
+      };
+      const worker = async () => {
+        while(siguiente < tramos.length) {
+          const i = siguiente++;
+          resultados[i] = await llamar(tramos[i]);
+          hechos++; setProcProgreso({hechos, total:tramos.length});
+        }
+      };
+      await Promise.all(Array.from({length:Math.min(PARALELO, tramos.length)}, worker));
+      const parsed = {
+        movimientos: resultados.flatMap(r=>r.movimientos||[]),
+        // El saldo final está al cierre del documento: vale el del último tramo que lo informe
+        saldoFinal: [...resultados].reverse().map(r=>r.saldoFinal).find(v=>typeof v==="number" && v!==0) ?? 0,
+        totalTarjeta: resultados.reduce((x,r)=>x+(r.totalTarjeta||0),0),
+      };
+      setProcProgreso(null);
       // Para extractos bancarios, la moneda es la de la cuenta elegida (cada cuenta es de una sola moneda) —
       // no se confía en lo que la IA detecte por movimiento, que puede ser inconsistente.
       const monedaCuenta = tipo==="banco" ? (config.bancos.find(b=>b.nombre===bancoCarga)?.moneda || "UYU") : null;
@@ -1226,7 +1263,7 @@ export default function Moneyland() {
         }
       }
       setLoadMovs(movs); setLoadStep("review");
-    } catch(e) { setLoadError("No se pudo procesar con IA. Intentá de nuevo."); setLoadStep("upload"); }
+    } catch(e) { setProcProgreso(null); setLoadError("No se pudo procesar con IA. Intentá de nuevo."); setLoadStep("upload"); }
   };
 
   const extractPdfText = async (file) => {
@@ -2174,7 +2211,7 @@ export default function Moneyland() {
             {loadStep==="processing"&&(
               <div style={{...S.card,textAlign:"center",padding:48}}>
                 <div style={{fontFamily:"Lora",fontSize:16,fontWeight:700,marginBottom:8}}>Procesando con IA...</div>
-                <div style={{fontSize:12,color:"#8C8C8C",marginBottom:28}}>Leyendo y categorizando movimientos</div>
+                <div style={{fontSize:12,color:"#8C8C8C",marginBottom:28}}>Leyendo y categorizando movimientos{procProgreso&&procProgreso.total>1?` — parte ${Math.min(procProgreso.hechos+1,procProgreso.total)} de ${procProgreso.total}`:""}</div>
                 <div style={{display:"flex",justifyContent:"center",gap:6}}>{[0,1,2].map(i=><div key={i} style={{width:8,height:8,borderRadius:"50%",background:"#DDB863",animation:`bounce 1.2s ${i*0.2}s ease-in-out infinite`}}/>)}</div>
                 <style>{`@keyframes bounce{0%,80%,100%{transform:translateY(0);opacity:.3}40%{transform:translateY(-8px);opacity:1}}`}</style>
               </div>
