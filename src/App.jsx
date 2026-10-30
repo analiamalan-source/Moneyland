@@ -3342,6 +3342,19 @@ export default function Moneyland() {
                         ];
                       })()}
 
+                      {/* Pagos por necesidades y deseos: total de gastos del mes (no incluye inversiones) */}
+                      {(()=>{
+                        const gastoMes=(m)=>grupoTotMes("Necesidades",m)+grupoTotMes("Deseos",m);
+                        const gastoTot=mesesFiltrados.reduce((s,m)=>s+gastoMes(m),0);
+                        return (
+                          <tr key="gastos-nec-des" style={{borderBottom:"2px solid rgba(240,96,96,0.2)",background:"rgba(240,96,96,0.04)"}}>
+                            <td style={{padding:"7px 12px",fontSize:12,fontWeight:700,color:"#f06060",background:"#1a1212",position:"sticky",left:0,borderRight:"1px solid rgba(221,184,99,0.12)"}}>Pagos por necesidades y deseos</td>
+                            {mesesFiltrados.map(m=>{const v=gastoMes(m);return <td key={m} style={{...cellSt(v),fontFamily:"Lora",fontWeight:700}}>{fmtCell(v)}</td>;})}
+                            <td style={{...cellSt(gastoTot),fontFamily:"Lora",fontWeight:800,borderLeft:"1px solid rgba(221,184,99,0.15)"}}>{fmtCell(gastoTot)}</td>
+                          </tr>
+                        );
+                      })()}
+
                       {Object.entries(GRUPOS).map(([grupo,filasGrupo])=>{
                         const filasOrd=[...filasGrupo].sort((a,b)=>Math.abs(rowTotRow(grupo,b))-Math.abs(rowTotRow(grupo,a)));
                         const gTotM=(m)=>grupoTotMes(grupo,m);
