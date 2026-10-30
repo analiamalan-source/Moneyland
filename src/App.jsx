@@ -703,6 +703,19 @@ export default function Moneyland() {
     } catch(e) { console.error("Error conciliando pago pendiente:", id, e); }
   };
 
+  // Actualiza campos de un pago pendiente (ej. el monto real del extracto bancario al conciliar)
+  const actualizarPendiente = async (id, fields) => {
+    if(!session?.access_token || !id) return;
+    setPagosPendientes(prev=>prev.map(p=>p.id===id?{...p,...fields}:p));
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/pagos_tarjeta_pendientes?id=eq.${id}`, {
+        method: "PATCH",
+        headers: {"apikey": SUPABASE_KEY, "Authorization": `Bearer ${session.access_token}`, "Content-Type": "application/json", "Prefer": "return=minimal"},
+        body: JSON.stringify(fields)
+      });
+    } catch(e) { console.error("Error actualizando pago pendiente:", id, e); }
+  };
+
   // Borra un pago de tarjeta pendiente (ej. duplicado, o ya conciliado a mano por otra vía)
   const deletePagoPendiente = async (id) => {
     if(!session?.access_token || !id) return;
@@ -1406,65 +1419,65 @@ export default function Moneyland() {
       const totalUSD = loadMovs.filter(m=>m.moneda==="USD").reduce((s,m)=>s+Math.abs(m.tot||0),0);
       const totalPesosDeUSD = tcVal && totalUSD ? totalUSD * tcVal : 0;
 
-      // Helper: detectar si ya existe movimiento bancario que cubra el pago de esta tarjeta
-      // (Orden B: banco cargado antes que tarjeta). Busca en regs del mismo banco/mes/año
-      // un movimiento negativo con fm que sugiera pago de tarjeta, o que coincida en monto ±5%.
-      const yaCargadoEnBanco = (bancoPago, totalMonto, moneda) => {
-        if(!bancoPago || totalMonto <= 0) return false;
-        const bancNorm = (bancoPago||"").trim().toLowerCase();
-        const candidatos = regs.filter(r =>
-          (r.b||"").trim().toLowerCase() === bancNorm &&
-          String(r.m||r.mes||"") === String(periodoMes) &&
-          String(r.a||r.f?.slice(0,4)||"") === String(periodoAno) &&
-          (r.moneda||"UYU") === moneda &&
-          (r.tot||0) < 0
+      // Orden B (banco cargado antes que la tarjeta): el extracto bancario ya dejó un pendiente por ese pago
+      // (sin banco_pago_uyu/usd, que solo llevan los creados desde la tarjeta). Si existe, lo conciliamos
+      // y NO creamos otro, para que el mismo pago no se cuente dos veces. El monto del extracto manda.
+      const normPB = x => (x||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
+      const buscarPendienteBanco = (bancoPago, totalMonto, moneda) => {
+        if(!bancoPago || totalMonto <= 0) return null;
+        const cands = pagosPendientes.filter(p=>
+          p.tarjeta===bancoCarga && !p.conciliado && !p.banco_pago_uyu && !p.banco_pago_usd &&
+          normPB(p.banco)===normPB(bancoPago) && (p.moneda||"UYU")===moneda &&
+          Math.abs(Math.abs(p.monto||0) - totalMonto) / totalMonto < 0.05
         );
-        // Coincide si hay algún movimiento negativo cuyo monto esté dentro del 5% del total de tarjeta
-        return candidatos.some(r => {
-          const diff = Math.abs(Math.abs(r.tot||0) - totalMonto);
-          return diff / totalMonto < 0.05;
-        });
+        cands.sort((a,b)=>Math.abs(Math.abs(a.monto||0)-totalMonto)-Math.abs(Math.abs(b.monto||0)-totalMonto));
+        return cands[0] || null;
       };
 
-      // Lado UYU: crear pendiente en banco UYU elegido
+      // Lado UYU: conciliar el pendiente del extracto, o crear uno que espera al extracto
       if(bancoPagoUYU && totalUYU > 0) {
         const monedaBancoUYU = config.bancos.find(b=>b.nombre===bancoPagoUYU)?.moneda || "UYU";
         const montoTotalUYU = totalUYU + totalPesosDeUSD;
-        const yaConc = yaCargadoEnBanco(bancoPagoUYU, montoTotalUYU, "UYU");
-        const pendId = await savePagoPendiente({
-          tarjeta: bancoCarga,
-          banco: bancoPagoUYU,
-          fecha: fechaPago,
-          mes: periodoMes,
-          ano: periodoAno,
-          moneda: monedaBancoUYU,
-          monto: -montoTotalUYU,
-          descripcion: `Pago ${bancoCarga} — lado UYU`,
-          banco_pago_uyu: bancoPagoUYU,
-          banco_pago_usd: (bancoPagoUSD && bancoPagoUSD!=="__noapl__") ? bancoPagoUSD : null,
-          monto_usd: totalUSD > 0 ? totalUSD : null
-        });
-        // Orden B: si el banco ya estaba cargado, marcar como conciliado inmediatamente
-        if(yaConc && pendId) await marcarPendienteConciliado(pendId);
+        const pendBanco = buscarPendienteBanco(bancoPagoUYU, montoTotalUYU, monedaBancoUYU);
+        if(pendBanco) {
+          await actualizarPendiente(pendBanco.id, {conciliado:true, banco_pago_uyu:bancoPagoUYU});
+        } else {
+          await savePagoPendiente({
+            tarjeta: bancoCarga,
+            banco: bancoPagoUYU,
+            fecha: fechaPago,
+            mes: periodoMes,
+            ano: periodoAno,
+            moneda: monedaBancoUYU,
+            monto: montoTotalUYU, // siempre positivo: es un egreso del banco, la conciliación lo resta
+            descripcion: `Pago ${bancoCarga} — lado UYU`,
+            banco_pago_uyu: bancoPagoUYU,
+            banco_pago_usd: (bancoPagoUSD && bancoPagoUSD!=="__noapl__") ? bancoPagoUSD : null,
+            monto_usd: totalUSD > 0 ? totalUSD : null
+          });
+        }
       }
 
-      // Lado USD: crear pendiente separado si pagó con banco USD distinto
+      // Lado USD: ídem para el banco en dólares
       if(bancoPagoUSD && bancoPagoUSD!=="__noapl__" && totalUSD > 0) {
-        const yaConc = yaCargadoEnBanco(bancoPagoUSD, totalUSD, "USD");
-        const pendId = await savePagoPendiente({
-          tarjeta: bancoCarga,
-          banco: bancoPagoUSD,
-          fecha: fechaPago,
-          mes: periodoMes,
-          ano: periodoAno,
-          moneda: "USD",
-          monto: -totalUSD,
-          descripcion: `Pago ${bancoCarga} — lado USD`,
-          banco_pago_uyu: bancoPagoUYU || null,
-          banco_pago_usd: bancoPagoUSD,
-          monto_usd: totalUSD
-        });
-        if(yaConc && pendId) await marcarPendienteConciliado(pendId);
+        const pendBanco = buscarPendienteBanco(bancoPagoUSD, totalUSD, "USD");
+        if(pendBanco) {
+          await actualizarPendiente(pendBanco.id, {conciliado:true, banco_pago_usd:bancoPagoUSD});
+        } else {
+          await savePagoPendiente({
+            tarjeta: bancoCarga,
+            banco: bancoPagoUSD,
+            fecha: fechaPago,
+            mes: periodoMes,
+            ano: periodoAno,
+            moneda: "USD",
+            monto: totalUSD,
+            descripcion: `Pago ${bancoCarga} — lado USD`,
+            banco_pago_uyu: bancoPagoUYU || null,
+            banco_pago_usd: bancoPagoUSD,
+            monto_usd: totalUSD
+          });
+        }
       }
 
       // Reset estados Flujo B
@@ -1473,13 +1486,41 @@ export default function Moneyland() {
       setPendientesSelUYU([]); setPendientesSelUSD([]);
     }
 
-    // ── FLUJO B: al confirmar banco, conciliar automáticamente pendientes de tarjeta ─
+    // ── BANCO: cada línea "pago de tarjeta" del extracto es un egreso real de esta cuenta. No se guarda como
+    // movimiento (sus gastos van con la tarjeta), pero SÍ tiene que quedar registrada como pago pendiente para
+    // que la conciliación bancaria la cuente. Funciona en cualquier orden:
+    //  - si la tarjeta ya se cargó (Flujo B), se concilia ese pendiente y se corrige su monto al del extracto;
+    //  - si no, se crea un pendiente que espera al estado de la tarjeta.
     if(loadType==="banco" && bancoCarga) {
-      const pendsBanco = pagosPendientes.filter(p=>
-        !p.conciliado && (p.banco_pago_uyu===bancoCarga || p.banco_pago_usd===bancoCarga || p.banco===bancoCarga)
-      );
-      for(const p of pendsBanco) {
-        await marcarPendienteConciliado(p.id);
+      const normPB = x => (x||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
+      const monedaCuentaBanco = config.bancos.find(b=>b.nombre===bancoCarga)?.moneda || "UYU";
+      const pendLocal = [...pagosPendientes];
+      for(const m of loadMovs.filter(x=>x.esPagoTarjeta && x.tarjetaDestino)) {
+        const monto = Math.abs(m.tot||0);
+        if(!monto) continue;
+        const mon = m.monedaPago||m.moneda||monedaCuentaBanco;
+        // Ya registrado (recarga del mismo extracto): no duplicar
+        const yaExiste = pendLocal.some(p=>
+          normPB(p.banco)===normPB(bancoCarga) && (p.moneda||"UYU")===mon &&
+          p.fecha===m.f && Math.abs(Math.abs(p.monto||0)-monto)<0.01
+        );
+        if(yaExiste) continue;
+        // Tarjeta cargada antes: conciliar el pendiente que dejó el Flujo B
+        const delResumen = pendLocal
+          .filter(p=>
+            p.tarjeta===m.tarjetaDestino && !p.conciliado && (p.banco_pago_uyu || p.banco_pago_usd) &&
+            normPB(p.banco)===normPB(bancoCarga) && (p.moneda||"UYU")===mon &&
+            Math.abs(Math.abs(p.monto||0)-monto)/monto < 0.05
+          )
+          .sort((x,y)=>Math.abs(Math.abs(x.monto||0)-monto)-Math.abs(Math.abs(y.monto||0)-monto))[0];
+        if(delResumen) {
+          await actualizarPendiente(delResumen.id, {monto, fecha:m.f, conciliado:true});
+          delResumen.conciliado = true; // evita reusarlo con otra línea del mismo extracto
+          continue;
+        }
+        // Tarjeta todavía no cargada: queda pendiente de conciliar
+        const id = await savePagoPendiente({tarjeta:m.tarjetaDestino, banco:bancoCarga, fecha:m.f, mes:periodoMes, ano:periodoAno, moneda:mon, monto, descripcion:m.d});
+        pendLocal.push({id, tarjeta:m.tarjetaDestino, banco:bancoCarga, moneda:mon, fecha:m.f, monto, conciliado:false});
       }
     }
 
@@ -3352,7 +3393,7 @@ export default function Moneyland() {
                     return String(d.getMonth()+1)===mes&&String(d.getFullYear())===conciliarAno;
                   });
                   const {cobrosPersonal,cobrosNegocio,pagosPersonal,pagosNegocio:pagosNegocioRegs} = bancoTipoTotales(bancoDef, mes, conciliarAno);
-                  const pagosTarjeta = pagosT.reduce((s,p)=>s+(p.monto||0),0);
+                  const pagosTarjeta = pagosT.reduce((s,p)=>s+Math.abs(p.monto||0),0); // egreso: siempre en positivo
                   const pagosNegocio = pagosNegocioRegs + pagosTarjeta;
                   const cobros = cobrosPersonal + cobrosNegocio;
                   const pagos = pagosPersonal + pagosNegocio;
