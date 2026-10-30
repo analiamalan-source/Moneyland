@@ -1435,7 +1435,8 @@ export default function Moneyland() {
       };
 
       // Lado UYU: conciliar el pendiente del extracto, o crear uno que espera al extracto
-      if(bancoPagoUYU && totalUYU > 0) {
+      const ladoUYUCubierto = pendientesSelUYU.length>0, ladoUSDCubierto = pendientesSelUSD.length>0;
+      if(bancoPagoUYU && totalUYU > 0 && !ladoUYUCubierto) {
         const monedaBancoUYU = config.bancos.find(b=>b.nombre===bancoPagoUYU)?.moneda || "UYU";
         const montoTotalUYU = totalUYU + totalPesosDeUSD;
         const pendBanco = buscarPendienteBanco(bancoPagoUYU, montoTotalUYU, monedaBancoUYU);
@@ -1459,7 +1460,7 @@ export default function Moneyland() {
       }
 
       // Lado USD: ídem para el banco en dólares
-      if(bancoPagoUSD && bancoPagoUSD!=="__noapl__" && totalUSD > 0) {
+      if(bancoPagoUSD && bancoPagoUSD!=="__noapl__" && totalUSD > 0 && !ladoUSDCubierto) {
         const pendBanco = buscarPendienteBanco(bancoPagoUSD, totalUSD, "USD");
         if(pendBanco) {
           await actualizarPendiente(pendBanco.id, {conciliado:true, banco_pago_usd:bancoPagoUSD});
@@ -1479,6 +1480,9 @@ export default function Moneyland() {
           });
         }
       }
+
+      // Pagos del banco elegidos a mano en la pantalla de carga: quedan conciliados (el monto del extracto manda)
+      for(const id of new Set([...pendientesSelUYU, ...pendientesSelUSD])) { await marcarPendienteConciliado(id); }
 
       // Reset estados Flujo B
       setBancoPagoUYU(""); setBancoPagoUSD("");
@@ -2083,6 +2087,44 @@ export default function Moneyland() {
                     </div>
                   )}
                 </div>
+                {/* TARJETA: pagos detectados en extractos bancarios para esta tarjeta (banco cargado primero) */}
+                {loadType==="tarjeta" && bancoCarga && (()=>{
+                  const pendientesTarjeta = pagosPendientes.filter(p=>p.tarjeta===bancoCarga && !p.conciliado && !p.banco_pago_uyu && !p.banco_pago_usd);
+                  if(!pendientesTarjeta.length) return null;
+                  return (
+                    <div style={{...S.card,background:"rgba(200,96,240,0.06)",border:"1px solid rgba(200,96,240,0.3)",marginBottom:16,padding:"12px 16px"}}>
+                      <div style={{fontFamily:"Lora",fontSize:13,fontWeight:700,color:"#c860f0",marginBottom:8}}>💳 Pagos detectados en el banco para esta tarjeta</div>
+                      <div style={{fontSize:10,color:"#8C8C8C",marginBottom:8}}>Marcá a qué lado del resumen corresponde cada pago (si pagaste el lado USD con pesos, los dos pueden ser en UYU). Al elegirlo se completa la fecha de pago y el banco pagador.</div>
+                      <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                        {pendientesTarjeta.map(p=>{
+                          const selUYU = pendientesSelUYU.includes(p.id), selUSD = pendientesSelUSD.includes(p.id);
+                          const btnSt = sel=>({background:sel?"#c860f0":"rgba(221,184,99,0.1)",border:"none",borderRadius:4,color:sel?"#0A0A0A":"#DDB863",fontFamily:"Roboto",fontSize:10,padding:"4px 8px",cursor:"pointer",fontWeight:700,whiteSpace:"nowrap"});
+                          const toggleUYU = ()=>{
+                            if(!selUYU){ setFechaPagoTarjeta(p.fecha); setBancoPagoUYU(p.banco); }
+                            setPendientesSelUYU(prev=>prev.includes(p.id)?prev.filter(x=>x!==p.id):[...prev,p.id]);
+                          };
+                          const toggleUSD = ()=>{
+                            if(!selUSD){
+                              setFechaPagoTarjeta(p.fecha);
+                              if(p.moneda==="USD") setBancoPagoUSD(p.banco);
+                              else { setBancoPagoUSD("__noapl__"); if(!bancoPagoUYU) setBancoPagoUYU(p.banco); }
+                            }
+                            setPendientesSelUSD(prev=>prev.includes(p.id)?prev.filter(x=>x!==p.id):[...prev,p.id]);
+                          };
+                          return (
+                            <div key={p.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,background:(selUYU||selUSD)?"rgba(200,96,240,0.12)":"#1A1A1A",border:`1px solid ${(selUYU||selUSD)?"rgba(200,96,240,0.5)":"rgba(255,255,255,0.06)"}`,borderRadius:6,padding:"6px 10px"}}>
+                              <div style={{fontSize:11,color:"#F8F4E8"}}>{fmtD(p.fecha)} — {p.moneda==="USD"?"U$S ":"$ "}{Math.abs(p.monto).toLocaleString("es-UY",{minimumFractionDigits:0,maximumFractionDigits:0})} {p.moneda} ({p.banco})</div>
+                              <div style={{display:"flex",gap:4}}>
+                                <button type="button" onClick={toggleUYU} style={btnSt(selUYU)}>{selUYU?"✓ Lado UYU":"Usar p/ UYU"}</button>
+                                <button type="button" onClick={toggleUSD} style={btnSt(selUSD)}>{selUSD?"✓ Lado USD":"Usar p/ USD"}</button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
                 {/* FLUJO B: al cargar banco, mostrar pendientes de tarjeta que apuntan a este banco */}
                 {loadType==="banco" && bancoCarga && (()=>{
                   const pendsBanco = pagosPendientes.filter(p=>
@@ -2092,7 +2134,7 @@ export default function Moneyland() {
                   return (
                     <div style={{...S.card,background:"rgba(76,175,130,0.06)",border:"1px solid rgba(76,175,130,0.3)",marginBottom:16,padding:"12px 16px"}}>
                       <div style={{fontFamily:"Lora",fontSize:13,fontWeight:700,color:"#4CAF82",marginBottom:4}}>💳 Pagos de tarjeta pendientes de conciliar con este banco</div>
-                      <div style={{fontSize:11,color:"#8C8C8C",marginBottom:8}}>Al confirmar el extracto, se van a conciliar automáticamente contra los movimientos del banco.</div>
+                      <div style={{fontSize:11,color:"#8C8C8C",marginBottom:8}}>Al confirmar el extracto, se concilian los que figuren como pago de tarjeta en los movimientos del banco.</div>
                       <div style={{display:"flex",flexDirection:"column",gap:6}}>
                         {pendsBanco.map(p=>{
                           const lado = p.banco_pago_usd===bancoCarga && p.banco_pago_usd ? "USD" : "UYU";
