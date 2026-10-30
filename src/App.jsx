@@ -1177,7 +1177,9 @@ export default function Moneyland() {
       // El tiempo de la IA es casi todo escribir el JSON de salida, y crece con la cantidad de movimientos.
       // Un extracto largo se parte en tramos por línea y se procesan en paralelo (hasta 4 a la vez):
       // el tiempo total pasa a ser el de un tramo en vez de el de todo el documento.
-      const TRAMO = 5000, PARALELO = 4;
+      // Tramos parejos de ~4.500 caracteres como máximo (un documento de 5.500 se parte en 2 de 2.750, no en 5.000 + 500)
+      const PARALELO = 4;
+      const TRAMO = Math.ceil(texto.length / Math.max(1, Math.ceil(texto.length / 4500)));
       const lineas = texto.split("\n");
       const reSeccion = /operaciones|resumen|moneda|pesos|d[oó]lares|u\$s|usd/i;
       const tramos = []; let actual = [], largo = 0, ultimaSeccion = "", ctxActual = "";
@@ -1271,6 +1273,9 @@ export default function Moneyland() {
     pdfjsLib.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).href;
     const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
     let text = "";
+    // Las columnas se detectan una vez por documento: las páginas siguientes de un estado largo
+    // repiten la tabla pero no el encabezado, y sin esto sus montos quedaban sin moneda.
+    let colsDoc = null, usdColXDoc = null;
     for (let p = 1; p <= pdf.numPages; p++) {
       const page = await pdf.getPage(p);
       const content = await page.getTextContent();
@@ -1279,7 +1284,16 @@ export default function Moneyland() {
         const dy = b.transform[5] - a.transform[5];
         return Math.abs(dy) > 3 ? dy : a.transform[4] - b.transform[4];
       });
-      // Detectar x del encabezado de columna USD para etiquetar montos por columna.
+      // Tabla con tres columnas de importe ("IMPORTE EN ORIGEN" / "IMPORTE $" / "IMPORTE U$S"): los montos van
+      // alineados a la derecha del encabezado. Se etiqueta cada monto por la columna más cercana: [ORIG] (moneda
+      // original de una compra en el exterior, solo informativo), [UYU] o [USD].
+      const rEdge = it => it.transform[4] + (it.width || 0);
+      const hO = items.find(i => /^IMPORTE\s+EN\s+ORIGEN$/i.test(i.str.trim()));
+      const hP = items.find(i => /^IMPORTE\s+\$$/i.test(i.str.trim()));
+      const hU = items.find(i => /^IMPORTE\s+U\$S$/i.test(i.str.trim()));
+      let headerY = null;
+      if (hO && hP && hU) { colsDoc = { orig: rEdge(hO), pesos: rEdge(hP), usd: rEdge(hU) }; headerY = hP.transform[5]; }
+      // Detectar x del encabezado de columna USD para etiquetar montos por columna (formato de dos columnas).
       // Priorizamos encabezados reales de la tabla de movimientos (ej. "IMPORTE U$S") por sobre
       // menciones sueltas de "U$S"/"USD" en otras secciones del documento (resúmenes, tasas, etc.),
       // que suelen aparecer más arriba en la página y hacían que se tomara la columna equivocada.
@@ -1292,6 +1306,7 @@ export default function Moneyland() {
           if (/U\$S|U\$\$|USD/i.test(item.str.trim())) { usdColX = item.transform[4] + (item.width || 0) / 2; break; }
         }
       }
+      if (usdColX !== null) usdColXDoc = usdColX; else usdColX = usdColXDoc;
       let lastY = null;
       let row = [];
       const flush = () => { if (row.length) { text += row.join("\t") + "\n"; row = []; } };
@@ -1300,7 +1315,12 @@ export default function Moneyland() {
         const xCenter = item.transform[4] + (item.width || 0) / 2;
         if (lastY !== null && Math.abs(y - lastY) > 3) flush();
         let str = item.str;
-        if (usdColX !== null && /^[\d.,]+$/.test(str.trim())) {
+        if (colsDoc && /^-?[\d.,]+$/.test(str.trim()) && (headerY === null || y < headerY - 2)) {
+          const re = item.transform[4] + (item.width || 0);
+          const cands = [["ORIG", colsDoc.orig], ["UYU", colsDoc.pesos], ["USD", colsDoc.usd]]
+            .map(([k, x]) => [k, Math.abs(re - x)]).sort((a, b) => a[1] - b[1]);
+          if (cands[0][1] <= 14) str = `[${cands[0][0]}]${str}`;
+        } else if (!colsDoc && usdColX !== null && /^-?[\d.,]+$/.test(str.trim())) {
           if (Math.abs(xCenter - usdColX) < 35) str = `[USD]${str}`;
           else if (xCenter < usdColX - 20) str = `[UYU]${str}`;
         }
