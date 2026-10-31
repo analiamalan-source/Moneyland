@@ -275,6 +275,9 @@ export default function Moneyland() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [reglas, setReglas] = useState({});
   const [pagosPendientes, setPagosPendientes] = useState([]);
+  const [concDet, setConcDet] = useState(null); // detalle abierto en Conciliación: {banco, moneda, mes, fila}
+  const [concEdit, setConcEdit] = useState(null); // edición rápida en el detalle: {kind:'reg'|'pend', id, ...campos}
+  const [concBorrar, setConcBorrar] = useState(null); // 'reg:ID' | 'pend:ID' esperando confirmación
   const [procProgreso, setProcProgreso] = useState(null); // {hechos,total} mientras la IA procesa un extracto largo
   const [pendientesSelUYU, setPendientesSelUYU] = useState([]); // array de IDs — permite vincular múltiples pagos por moneda (flujo banco→tarjeta, legacy)
   const [pendientesSelUSD, setPendientesSelUSD] = useState([]); // legacy
@@ -818,10 +821,11 @@ export default function Moneyland() {
   // Cobros/pagos reales de un banco en un mes, separados por tipo Personal/Negocio (excluye pagos
   // de tarjeta pendientes de conciliar y ajustes, igual que Conciliación bancaria). Usado en esa
   // pestaña y en la comparación de Finanzas personales contra la conciliación.
-  const bancoTipoTotales = (bancoDef, mes, ano) => {
+  // Registros que la conciliación cuenta para un banco/mes (los mismos que suma bancoTipoTotales),
+  // para poder mostrarlos y editarlos desde la pestaña Conciliación.
+  const bancoRegsMes = (bancoDef, mes, ano) => {
     const bancNorm = normBancoM(bancoDef.nombre);
-    const isUSD = bancoDef.moneda==="USD";
-    const regsDelMes = regs.filter(r=>{
+    return regs.filter(r=>{
       if(normBancoM(r.b)!==bancNorm) return false;
       if((r.moneda||"UYU")!==bancoDef.moneda) return false;
       if(r.fm==="Ajuste") return false;
@@ -832,6 +836,10 @@ export default function Moneyland() {
       const rAno = parseInt(r.a||r.ano||r.f?.slice(0,4)||0);
       return rMes===parseInt(mes)&&rAno===parseInt(ano);
     });
+  };
+  const bancoTipoTotales = (bancoDef, mes, ano) => {
+    const isUSD = bancoDef.moneda==="USD";
+    const regsDelMes = bancoRegsMes(bancoDef, mes, ano);
     const montoAbs = r => isUSD?Math.abs(r.usd||(r.tot||0)):Math.abs(r.tot||0);
     const cobrosPersonal = regsDelMes.filter(r=>r.t==="Personal"&&(r.tot||0)>0).reduce((s,r)=>s+montoAbs(r),0);
     const cobrosNegocio = regsDelMes.filter(r=>r.t!=="Personal"&&(r.tot||0)>0).reduce((s,r)=>s+montoAbs(r),0);
@@ -3486,11 +3494,8 @@ export default function Moneyland() {
               const stickyCel = {background:"#141414",position:"sticky",left:0,zIndex:1,borderRight:"1px solid rgba(221,184,99,0.1)"};
               const inpConci = (color) => ({width:120,background:"#111",border:`1px solid ${color}33`,borderRadius:4,color,fontFamily:"Lora",fontSize:12,padding:"4px 8px",textAlign:"right",outline:"none",boxSizing:"border-box"});
               // Calcula todas las filas para un banco (siempre los 12 meses para propagar saldo_inicial)
-              const computar = (bancoDef) => {
-                const byMes = {};
-                let prevSaldoFinal = null;                for(let n=1; n<=12; n++){
-                  const mes = String(n);
-                  const conci = conciliaciones.find(c=>c.banco===bancoDef.nombre&&c.moneda===bancoDef.moneda&&String(c.ano)===conciliarAno&&String(c.mes)===mes);
+              // Pagos de tarjeta que la conciliación suma a un banco/mes (mismo criterio que usa computar)
+              const pagosTDe = (bancoDef, mes) => {
                   const normB = s => {
                     let t = (s||"").replace(/[Â-ß][-¿]/g, m => {
                       try { return new TextDecoder("utf-8").decode(new Uint8Array([m.charCodeAt(0),m.charCodeAt(1)])); } catch(e){ return m; }
@@ -3498,12 +3503,19 @@ export default function Moneyland() {
                     return t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").trim();
                   };
                   const bancNorm = normB(bancoDef.nombre);
-                  const pagosT = pagosPendientes.filter(p=>{
+                  return pagosPendientes.filter(p=>{
                     if(normB(p.banco)!==bancNorm) return false;
                     if((p.moneda||"UYU")!==bancoDef.moneda) return false;
                     const d = new Date((p.fecha||"")+"T00:00:00");
                     return String(d.getMonth()+1)===mes&&String(d.getFullYear())===conciliarAno;
                   });
+              };
+              const computar = (bancoDef) => {
+                const byMes = {};
+                let prevSaldoFinal = null;                for(let n=1; n<=12; n++){
+                  const mes = String(n);
+                  const conci = conciliaciones.find(c=>c.banco===bancoDef.nombre&&c.moneda===bancoDef.moneda&&String(c.ano)===conciliarAno&&String(c.mes)===mes);
+                  const pagosT = pagosTDe(bancoDef, mes);
                   const {cobrosPersonal,cobrosNegocio,pagosPersonal,pagosNegocio:pagosNegocioRegs} = bancoTipoTotales(bancoDef, mes, conciliarAno);
                   const pagosTarjeta = pagosT.reduce((s,p)=>s+Math.abs(p.monto||0),0); // egreso: siempre en positivo
                   const pagosNegocio = pagosNegocioRegs + pagosTarjeta;
@@ -3517,6 +3529,121 @@ export default function Moneyland() {
                   if(saldo_final_calc!=null) prevSaldoFinal = saldo_final_calc;
                 }
                 return byMes;
+              };
+              // ── Detalle de cada cifra de la conciliación: click en Cobros/Pagos abre lo que la compone ──
+              const FILAS_CONC = {
+                cobP:{label:"Cobros Personal", match:r=>r.t==="Personal"&&(r.tot||0)>0},
+                cobN:{label:"Cobros Negocio",  match:r=>r.t!=="Personal"&&(r.tot||0)>0},
+                pagP:{label:"Pagos Personal",  match:r=>r.t==="Personal"&&(r.tot||0)<0},
+                pagN:{label:"Pagos Negocio",   match:r=>r.t!=="Personal"&&(r.tot||0)<0, conTarjeta:true},
+              };
+              const detAbierto = (bancoDef,fila) => !!concDet && concDet.banco===bancoDef.nombre && concDet.moneda===bancoDef.moneda && concDet.fila===fila;
+              const toggleDet = (bancoDef,mes,fila) => { setConcEdit(null); setConcBorrar(null); setConcDet(d=>(d&&d.banco===bancoDef.nombre&&d.moneda===bancoDef.moneda&&d.mes===mes&&d.fila===fila)?null:{banco:bancoDef.nombre,moneda:bancoDef.moneda,mes,fila}); };
+              const celdaConc = (bancoDef,byMes,m,fila,campo,color,opac) => {
+                const v = byMes[m]?.[campo]??0;
+                const abierta = detAbierto(bancoDef,fila) && concDet.mes===m;
+                return (
+                  <td key={m} onClick={()=>v>0&&toggleDet(bancoDef,m,fila)} title={v>0?"Ver detalle y editar":""}
+                    style={{padding:"7px 14px",textAlign:"right",fontFamily:"Lora",fontSize:11,color:v>0?color:"#3A3A3A",opacity:v>0?opac:1,cursor:v>0?"pointer":"default",background:abierta?"rgba(221,184,99,0.10)":"transparent",textDecoration:v>0?"underline dotted rgba(255,255,255,0.25)":"none",textUnderlineOffset:3}}>
+                    {v>0?fmtV(v,bancoDef.moneda):"—"}
+                  </td>
+                );
+              };
+              const panelConc = (bancoDef,fila) => {
+                if(!detAbierto(bancoDef,fila)) return null;
+                const mes = concDet.mes, mon = bancoDef.moneda, isUSD = mon==="USD", cfg = FILAS_CONC[fila];
+                const lista = bancoRegsMes(bancoDef,mes,conciliarAno).filter(cfg.match).sort((a,b)=>(b.f||"").localeCompare(a.f||""));
+                const pend = cfg.conTarjeta ? pagosTDe(bancoDef,mes).slice().sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")) : [];
+                const montoReg = r => isUSD?Math.abs(r.usd||(r.tot||0)):Math.abs(r.tot||0);
+                const total = lista.reduce((x,r)=>x+montoReg(r),0) + pend.reduce((x,pp)=>x+Math.abs(pp.monto||0),0);
+                const bancosOpc = config.bancos.filter(b=>b.activo!==false).map(b=>b.nombre);
+                const btn = (color) => ({background:"transparent",border:`1px solid ${color}55`,borderRadius:4,color,fontFamily:"Roboto",fontSize:10,padding:"3px 8px",cursor:"pointer",whiteSpace:"nowrap"});
+                const inp = {...S.inp,padding:"4px 8px",fontSize:11};
+                const fila_ = {display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",padding:"6px 0",borderBottom:"1px solid rgba(255,255,255,0.05)"};
+                const abrirEdicionReg = (r) => setConcEdit({kind:"reg",id:r.id,f:r.f||"",d:r.d||"",b:r.b||bancoDef.nombre,monto:String(montoReg(r))});
+                const guardarReg = async (r) => {
+                  const e = concEdit; if(!e) return;
+                  const f = e.f || r.f;
+                  const bk = config.bancos.find(b=>b.nombre===e.b);
+                  const monedaN = bk?.moneda || r.moneda || "UYU";
+                  const abs = Math.abs(parseFloat(e.monto)||0);
+                  const sign = (r.tot||0)<0 ? -1 : 1;
+                  let usd = r.usd ?? null, tot;
+                  if(monedaN==="USD") { usd = sign*abs; tot = sign*abs*(r.tc||1); }
+                  else { tot = sign*abs; }
+                  const updated = {...r, f, m:mesDe(f), a:anoDe(f), d:e.d, b:e.b, moneda:monedaN, usd, tot, p:tot-(r.iva||0)};
+                  await updateRegInDB(r.id, updated);
+                  setRegs(prev=>prev.map(x=>x.id===r.id?{...x,...updated}:x));
+                  setConcEdit(null);
+                };
+                const guardarPend = async (pp) => {
+                  const e = concEdit; if(!e) return;
+                  await actualizarPendiente(pp.id, {fecha:e.f||pp.fecha, monto:Math.abs(parseFloat(e.monto)||0)});
+                  setConcEdit(null);
+                };
+                const confirmarBorrar = (clave, onSi) => concBorrar===clave
+                  ? <span style={{display:"inline-flex",gap:4,alignItems:"center",fontSize:10,color:"#f06060"}}>¿Borrar? <button onClick={async()=>{setConcBorrar(null);await onSi();}} style={btn("#f06060")}>Sí</button><button onClick={()=>setConcBorrar(null)} style={btn("#8C8C8C")}>No</button></span>
+                  : <button onClick={()=>setConcBorrar(clave)} title="Borrar" style={btn("#f06060")}>🗑</button>;
+                return (
+                  <tr>
+                    <td colSpan={mesesVer.length+1} style={{padding:0,background:"#0d0d10",borderBottom:"1px solid rgba(221,184,99,0.15)"}}>
+                      <div style={{position:"sticky",left:0,width:"min(880px, calc(100vw - 90px))",padding:"10px 16px 12px 24px",boxSizing:"border-box"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+                          <span style={{fontFamily:"Lora",fontSize:12,fontWeight:700,color:"#DDB863"}}>{cfg.label} · {MESES_NOM[+mes]} {conciliarAno} · {bancoDef.nombre}</span>
+                          <span style={{fontSize:10,color:"#8C8C8C"}}>{lista.length+pend.length} movimiento{lista.length+pend.length!==1?"s":""} · {fmtV(total,mon)}</span>
+                          <button onClick={()=>{setConcDet(null);setConcEdit(null);setConcBorrar(null);}} style={{...btn("#8C8C8C"),marginLeft:"auto"}}>✕ Cerrar</button>
+                        </div>
+                        {lista.length===0 && pend.length===0 && <div style={{fontSize:11,color:"#4A4A4A",padding:"6px 0"}}>Sin movimientos</div>}
+                        {lista.map(r=>{
+                          const editando = concEdit && concEdit.kind==="reg" && concEdit.id===r.id;
+                          return editando ? (
+                            <div key={r.id} style={{...fila_,background:"rgba(221,184,99,0.05)"}}>
+                              <input type="date" value={concEdit.f} onChange={e=>setConcEdit(c=>({...c,f:e.target.value}))} style={{...inp,width:130}}/>
+                              <input value={concEdit.d} onChange={e=>setConcEdit(c=>({...c,d:e.target.value}))} placeholder="Descripción" style={{...inp,flex:1,minWidth:160}}/>
+                              <select value={concEdit.b} onChange={e=>setConcEdit(c=>({...c,b:e.target.value}))} style={{...S.sel,padding:"4px 8px",fontSize:11,width:150}}>
+                                {!bancosOpc.includes(concEdit.b)&&<option value={concEdit.b}>{concEdit.b}</option>}
+                                {bancosOpc.map(b=><option key={b} value={b}>{b}</option>)}
+                              </select>
+                              <input type="number" step="0.01" value={concEdit.monto} onChange={e=>setConcEdit(c=>({...c,monto:e.target.value}))} style={{...inp,width:110,textAlign:"right"}} title={isUSD?"Monto en U$S":"Monto en $"}/>
+                              <button onClick={()=>guardarReg(r)} style={btn("#4CAF82")}>Guardar</button>
+                              <button onClick={()=>setConcEdit(null)} style={btn("#8C8C8C")}>Cancelar</button>
+                            </div>
+                          ) : (
+                            <div key={r.id} style={fila_}>
+                              <span style={{fontSize:11,color:"#8C8C8C",width:78}}>{r.f?fmtD(r.f):"—"}</span>
+                              <span style={{fontSize:11,color:"#F8F4E8",flex:1,minWidth:160}}>{r.d||"—"} <span style={{color:"#4A4A4A"}}>· {r.c1}{r.c2?` · ${r.c2}`:""} · {r.fm||""}</span></span>
+                              <span style={{fontFamily:"Lora",fontSize:11,fontWeight:700,color:(r.tot||0)>=0?"#4CAF82":"#f06060",width:100,textAlign:"right"}}>{fmtV(montoReg(r),mon)}</span>
+                              <button onClick={()=>abrirEdicionReg(r)} title="Editar fecha, descripción, banco o monto" style={btn("#DDB863")}>✏ Editar</button>
+                              <button onClick={()=>goToRegistro(r)} title="Abrir el registro completo (tipo, categoría, etc.)" style={btn("#5AAFDF")}>↗ Registro</button>
+                              {confirmarBorrar(`reg:${r.id}`, ()=>deleteRegsFromDB([r.id]))}
+                            </div>
+                          );
+                        })}
+                        {pend.length>0 && <div style={{fontSize:10,color:"#c860f0",margin:"10px 0 2px",textTransform:"uppercase",letterSpacing:0.6}}>💳 Pagos de tarjeta (vienen de la lista de pagos pendientes, no de Registros)</div>}
+                        {pend.map(pp=>{
+                          const editando = concEdit && concEdit.kind==="pend" && concEdit.id===pp.id;
+                          return editando ? (
+                            <div key={`p${pp.id}`} style={{...fila_,background:"rgba(200,96,240,0.06)"}}>
+                              <input type="date" value={concEdit.f} onChange={e=>setConcEdit(c=>({...c,f:e.target.value}))} style={{...inp,width:130}}/>
+                              <span style={{fontSize:11,color:"#c860f0",flex:1,minWidth:160}}>{pp.tarjeta}</span>
+                              <input type="number" step="0.01" value={concEdit.monto} onChange={e=>setConcEdit(c=>({...c,monto:e.target.value}))} style={{...inp,width:110,textAlign:"right"}}/>
+                              <button onClick={()=>guardarPend(pp)} style={btn("#4CAF82")}>Guardar</button>
+                              <button onClick={()=>setConcEdit(null)} style={btn("#8C8C8C")}>Cancelar</button>
+                            </div>
+                          ) : (
+                            <div key={`p${pp.id}`} style={fila_}>
+                              <span style={{fontSize:11,color:"#8C8C8C",width:78}}>{pp.fecha?fmtD(pp.fecha):"—"}</span>
+                              <span style={{fontSize:11,color:"#F8F4E8",flex:1,minWidth:160}}>💳 {pp.tarjeta} <span style={{color:"#4A4A4A"}}>· {pp.descripcion||"Pago de tarjeta"} · {pp.conciliado?"conciliado":"pendiente"}</span></span>
+                              <span style={{fontFamily:"Lora",fontSize:11,fontWeight:700,color:"#f06060",width:100,textAlign:"right"}}>{fmtV(Math.abs(pp.monto||0),pp.moneda||mon)}</span>
+                              <button onClick={()=>setConcEdit({kind:"pend",id:pp.id,f:pp.fecha||"",monto:String(Math.abs(pp.monto||0))})} title="Editar fecha o monto" style={btn("#DDB863")}>✏ Editar</button>
+                              {confirmarBorrar(`pend:${pp.id}`, ()=>deletePagoPendiente(pp.id))}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </td>
+                  </tr>
+                );
               };
               return (
                 <>
@@ -3590,24 +3717,28 @@ export default function Moneyland() {
                                   );
                                 })}
                               </tr>
-                              {/* Cobros Personal / Negocio */}
+                              {/* Cobros Personal / Negocio — click en una cifra abre el detalle editable */}
                               <tr style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
                                 <td style={{...stickyCel,padding:"7px 16px 7px 24px",color:"#4CAF82"}}>+ Cobros Personal</td>
-                                {mesesVer.map(m=>{const v=byMes[m]?.cobrosPersonal??0;return <td key={m} style={{padding:"7px 14px",textAlign:"right",fontFamily:"Lora",fontSize:11,color:v>0?"#4CAF82":"#3A3A3A"}}>{v>0?fmtV(v,mon):"—"}</td>;})}
+                                {mesesVer.map(m=>celdaConc(bancoDef,byMes,m,"cobP","cobrosPersonal","#4CAF82",1))}
                               </tr>
+                              {panelConc(bancoDef,"cobP")}
                               <tr style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
                                 <td style={{...stickyCel,padding:"7px 16px 7px 24px",color:"#4CAF82",opacity:0.7}}>+ Cobros Negocio</td>
-                                {mesesVer.map(m=>{const v=byMes[m]?.cobrosNegocio??0;return <td key={m} style={{padding:"7px 14px",textAlign:"right",fontFamily:"Lora",fontSize:11,color:v>0?"#4CAF82":"#3A3A3A",opacity:v>0?0.7:1}}>{v>0?fmtV(v,mon):"—"}</td>;})}
+                                {mesesVer.map(m=>celdaConc(bancoDef,byMes,m,"cobN","cobrosNegocio","#4CAF82",0.7))}
                               </tr>
+                              {panelConc(bancoDef,"cobN")}
                               {/* Pagos Personal / Negocio */}
                               <tr style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
                                 <td style={{...stickyCel,padding:"7px 16px 7px 24px",color:"#f06060"}}>− Pagos Personal</td>
-                                {mesesVer.map(m=>{const v=byMes[m]?.pagosPersonal??0;return <td key={m} style={{padding:"7px 14px",textAlign:"right",fontFamily:"Lora",fontSize:11,color:v>0?"#f06060":"#3A3A3A"}}>{v>0?fmtV(v,mon):"—"}</td>;})}
+                                {mesesVer.map(m=>celdaConc(bancoDef,byMes,m,"pagP","pagosPersonal","#f06060",1))}
                               </tr>
+                              {panelConc(bancoDef,"pagP")}
                               <tr style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
-                                <td style={{...stickyCel,padding:"7px 16px 7px 24px",color:"#f06060",opacity:0.7}} title="Incluye pagos de tarjeta pendientes de conciliar no atribuidos a un tipo">− Pagos Negocio</td>
-                                {mesesVer.map(m=>{const v=byMes[m]?.pagosNegocio??0;return <td key={m} style={{padding:"7px 14px",textAlign:"right",fontFamily:"Lora",fontSize:11,color:v>0?"#f06060":"#3A3A3A",opacity:v>0?0.7:1}}>{v>0?fmtV(v,mon):"—"}</td>;})}
+                                <td style={{...stickyCel,padding:"7px 16px 7px 24px",color:"#f06060",opacity:0.7}} title="Incluye los pagos de tarjeta de la lista de pagos pendientes (se ven y se editan en el detalle)">− Pagos Negocio</td>
+                                {mesesVer.map(m=>celdaConc(bancoDef,byMes,m,"pagN","pagosNegocio","#f06060",0.7))}
                               </tr>
+                              {panelConc(bancoDef,"pagN")}
                               {/* Saldo calculado */}
                               <tr style={{borderBottom:"2px solid rgba(221,184,99,0.15)",background:"rgba(255,255,255,0.015)"}}>
                                 <td style={{...stickyCel,padding:"8px 16px",fontWeight:700,color:"#F8F4E8",background:"rgba(255,255,255,0.015)"}}>= Saldo final calculado</td>
