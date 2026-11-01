@@ -278,6 +278,7 @@ export default function Moneyland() {
   const [concDet, setConcDet] = useState(null); // detalle abierto en Conciliación: {banco, moneda, mes, fila}
   const [concEdit, setConcEdit] = useState(null); // edición rápida en el detalle: {kind:'reg'|'pend', id, ...campos}
   const [concBorrar, setConcBorrar] = useState(null); // 'reg:ID' | 'pend:ID' esperando confirmación
+  const [concAjConf, setConcAjConf] = useState(null); // {banco,moneda,mes}: confirmación de ajuste de conciliación
   const [procProgreso, setProcProgreso] = useState(null); // {hechos,total} mientras la IA procesa un extracto largo
   const [pendientesSelUYU, setPendientesSelUYU] = useState([]); // array de IDs — permite vincular múltiples pagos por moneda (flujo banco→tarjeta, legacy)
   const [pendientesSelUSD, setPendientesSelUSD] = useState([]); // legacy
@@ -3498,7 +3499,7 @@ export default function Moneyland() {
               const mesesVer = TODOS_MESES.filter(m=>conciliarMeses.includes(m));
               const toggleMes = (m) => setConciliarMeses(p=>p.includes(m)?p.filter(x=>x!==m):[...p,m].sort((a,b)=>+a-+b));
               const pre = (mon) => mon==="USD"?"U$S ":"$ ";
-              const fmtV = (v, mon) => v==null?"—":`${pre(mon)}${Math.abs(v).toLocaleString("es-UY",{minimumFractionDigits:0,maximumFractionDigits:0})}`;
+              const fmtV = (v, mon) => v==null?"—":`${pre(mon)}${Math.abs(v).toLocaleString("es-UY",{minimumFractionDigits:0,maximumFractionDigits:(Math.abs(v)<100&&Math.abs(v)%1!==0)?2:0})}`;
               const bancosActivos = config.bancos.filter(b=>b.activo!==false);
               const anosDisp = ["2025","2026","2027"];
               const stickyCel = {background:"#141414",position:"sticky",left:0,zIndex:1,borderRight:"1px solid rgba(221,184,99,0.1)"};
@@ -3520,6 +3521,15 @@ export default function Moneyland() {
                     return String(d.getMonth()+1)===mes&&String(d.getFullYear())===conciliarAno;
                   });
               };
+              // Ajustes de conciliación: registros t="Ajuste"/fm="Ajuste" de ese banco y mes. Importe con signo
+              // (+ suma al saldo calculado, − resta). No entran en ningún reporte (solo en esta pestaña).
+              const montoAjuste = (r, isUSD) => isUSD ? (r.usd ?? r.tot ?? 0) : (r.tot||0);
+              const ajustesDe = (bancoDef, mes) => {
+                const bn = normBancoM(bancoDef.nombre);
+                return regs.filter(r=>r.t==="Ajuste" && r.fm==="Ajuste" && normBancoM(r.b)===bn &&
+                  (r.moneda||"UYU")===bancoDef.moneda &&
+                  parseInt(r.m||r.mes||0)===parseInt(mes) && parseInt(r.a||r.ano||(r.f||"").slice(0,4)||0)===parseInt(conciliarAno));
+              };
               const computar = (bancoDef) => {
                 const byMes = {};
                 let prevSaldoFinal = null;                for(let n=1; n<=12; n++){
@@ -3532,10 +3542,11 @@ export default function Moneyland() {
                   const cobros = cobrosPersonal + cobrosNegocio;
                   const pagos = pagosPersonal + pagosNegocio;
                   const saldo_inicial = conci?.saldo_inicial??prevSaldoFinal;
-                  const saldo_final_calc = saldo_inicial!=null ? saldo_inicial+cobros-pagos : null;
+                  const ajuste = ajustesDe(bancoDef, mes).reduce((s,r)=>s+montoAjuste(r, bancoDef.moneda==="USD"),0);
+                  const saldo_final_calc = saldo_inicial!=null ? saldo_inicial+cobros-pagos+ajuste : null;
                   const saldo_extracto = conci?.saldo_extracto??null;
                   const diferencia = saldo_final_calc!=null&&saldo_extracto!=null ? saldo_final_calc-Math.abs(saldo_extracto) : null;
-                  byMes[mes] = {cobros,cobrosPersonal,cobrosNegocio,pagos,pagosPersonal,pagosNegocio,saldo_inicial,saldo_final_calc,saldo_extracto,diferencia,conci};
+                  byMes[mes] = {ajuste,cobros,cobrosPersonal,cobrosNegocio,pagos,pagosPersonal,pagosNegocio,saldo_inicial,saldo_final_calc,saldo_extracto,diferencia,conci};
                   if(saldo_final_calc!=null) prevSaldoFinal = saldo_final_calc;
                 }
                 return byMes;
@@ -3546,6 +3557,7 @@ export default function Moneyland() {
                 cobN:{label:"Cobros Negocio",  match:r=>r.t!=="Personal"&&(r.tot||0)>0},
                 pagP:{label:"Pagos Personal",  match:r=>r.t==="Personal"&&(r.tot||0)<0},
                 pagN:{label:"Pagos Negocio",   match:r=>r.t!=="Personal"&&(r.tot||0)<0, conTarjeta:true},
+                aju:{label:"Ajuste de conciliación", match:()=>true, ajuste:true},
               };
               const detAbierto = (bancoDef,fila) => !!concDet && concDet.banco===bancoDef.nombre && concDet.moneda===bancoDef.moneda && concDet.fila===fila;
               const toggleDet = (bancoDef,mes,fila) => { setConcEdit(null); setConcBorrar(null); setConcDet(d=>(d&&d.banco===bancoDef.nombre&&d.moneda===bancoDef.moneda&&d.mes===mes&&d.fila===fila)?null:{banco:bancoDef.nombre,moneda:bancoDef.moneda,mes,fila}); };
@@ -3562,10 +3574,10 @@ export default function Moneyland() {
               const panelConc = (bancoDef,fila) => {
                 if(!detAbierto(bancoDef,fila)) return null;
                 const mes = concDet.mes, mon = bancoDef.moneda, isUSD = mon==="USD", cfg = FILAS_CONC[fila];
-                const lista = bancoRegsMes(bancoDef,mes,conciliarAno).filter(cfg.match).sort((a,b)=>(b.f||"").localeCompare(a.f||""));
+                const lista = (cfg.ajuste ? ajustesDe(bancoDef,mes) : bancoRegsMes(bancoDef,mes,conciliarAno).filter(cfg.match)).slice().sort((a,b)=>(b.f||"").localeCompare(a.f||""));
                 const pend = cfg.conTarjeta ? pagosTDe(bancoDef,mes).slice().sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")) : [];
                 const montoReg = r => isUSD?Math.abs(r.usd||(r.tot||0)):Math.abs(r.tot||0);
-                const total = lista.reduce((x,r)=>x+montoReg(r),0) + pend.reduce((x,pp)=>x+Math.abs(pp.monto||0),0);
+                const total = cfg.ajuste ? lista.reduce((x,r)=>x+montoAjuste(r,isUSD),0) : lista.reduce((x,r)=>x+montoReg(r),0) + pend.reduce((x,pp)=>x+Math.abs(pp.monto||0),0);
                 const bancosOpc = config.bancos.filter(b=>b.activo!==false).map(b=>b.nombre);
                 const btn = (color) => ({background:"transparent",border:`1px solid ${color}55`,borderRadius:4,color,fontFamily:"Roboto",fontSize:10,padding:"3px 8px",cursor:"pointer",whiteSpace:"nowrap"});
                 const inp = {...S.inp,padding:"4px 8px",fontSize:11};
@@ -3600,7 +3612,7 @@ export default function Moneyland() {
                       <div style={{position:"sticky",left:0,width:"min(880px, calc(100vw - 90px))",padding:"10px 16px 12px 24px",boxSizing:"border-box"}}>
                         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
                           <span style={{fontFamily:"Lora",fontSize:12,fontWeight:700,color:"#DDB863"}}>{cfg.label} · {MESES_NOM[+mes]} {conciliarAno} · {bancoDef.nombre}</span>
-                          <span style={{fontSize:10,color:"#8C8C8C"}}>{lista.length+pend.length} movimiento{lista.length+pend.length!==1?"s":""} · {fmtV(total,mon)}</span>
+                          <span style={{fontSize:10,color:"#8C8C8C"}}>{lista.length+pend.length} movimiento{lista.length+pend.length!==1?"s":""} · {cfg.ajuste&&total!==0?(total>0?"+":"−"):""}{fmtV(total,mon)}</span>
                           <button onClick={()=>{setConcDet(null);setConcEdit(null);setConcBorrar(null);}} style={{...btn("#8C8C8C"),marginLeft:"auto"}}>✕ Cerrar</button>
                         </div>
                         {lista.length===0 && pend.length===0 && <div style={{fontSize:11,color:"#4A4A4A",padding:"6px 0"}}>Sin movimientos</div>}
@@ -3622,7 +3634,7 @@ export default function Moneyland() {
                             <div key={r.id} style={fila_}>
                               <span style={{fontSize:11,color:"#8C8C8C",width:78}}>{r.f?fmtD(r.f):"—"}</span>
                               <span style={{fontSize:11,color:"#F8F4E8",flex:1,minWidth:160}}>{r.d||"—"} <span style={{color:"#4A4A4A"}}>· {r.c1}{r.c2?` · ${r.c2}`:""} · {r.fm||""}</span></span>
-                              <span style={{fontFamily:"Lora",fontSize:11,fontWeight:700,color:(r.tot||0)>=0?"#4CAF82":"#f06060",width:100,textAlign:"right"}}>{fmtV(montoReg(r),mon)}</span>
+                              <span style={{fontFamily:"Lora",fontSize:11,fontWeight:700,color:(r.tot||0)>=0?"#4CAF82":"#f06060",width:100,textAlign:"right"}}>{cfg.ajuste?(montoAjuste(r,isUSD)<0?"−":"+"):""}{fmtV(montoReg(r),mon)}</span>
                               <button onClick={()=>abrirEdicionReg(r)} title="Editar fecha, descripción, banco o monto" style={btn("#DDB863")}>✏ Editar</button>
                               <button onClick={()=>goToRegistro(r)} title="Abrir el registro completo (tipo, categoría, etc.)" style={btn("#5AAFDF")}>↗ Registro</button>
                               {confirmarBorrar(`reg:${r.id}`, ()=>deleteRegsFromDB([r.id]))}
@@ -3654,6 +3666,21 @@ export default function Moneyland() {
                     </td>
                   </tr>
                 );
+              };
+              // Registra un ajuste de conciliación que lleva el saldo calculado al saldo del extracto.
+              const crearAjuste = async (bancoDef, mes, diff) => {
+                const isUSD = bancoDef.moneda==="USD";
+                const monto = Math.round(-diff*100)/100; // si el calculado sobra (diff>0), el ajuste resta
+                const ultimo = new Date(Number(conciliarAno), Number(mes), 0).getDate();
+                const f = `${conciliarAno}-${String(mes).padStart(2,"0")}-${String(ultimo).padStart(2,"0")}`;
+                const reg = {id:Date.now(), f, m:String(mes), a:String(conciliarAno), b:bancoDef.nombre, t:"Ajuste",
+                  c1:"Ajuste de conciliación", c2:"", cat:"", d:"Ajuste de conciliación bancaria", fm:"Ajuste", be:"", plazo:null,
+                  p:monto, iva:0, tot:monto, moneda:bancoDef.moneda, usd:isUSD?monto:null, tc:null};
+                const id = await saveRegToDB(reg);
+                setConcAjConf(null);
+                if(!id) { alert("No se pudo guardar el ajuste. Revisá la conexión e intentá de nuevo."); return; }
+                setRegs(prev=>[{...reg,id},...prev]);
+                setConcDet({banco:bancoDef.nombre,moneda:bancoDef.moneda,mes,fila:"aju"});
               };
               return (
                 <>
@@ -3749,6 +3776,21 @@ export default function Moneyland() {
                                 {mesesVer.map(m=>celdaConc(bancoDef,byMes,m,"pagN","pagosNegocio","#f06060",0.7))}
                               </tr>
                               {panelConc(bancoDef,"pagN")}
+                              {/* Ajuste de conciliación (registrado desde la fila Diferencia) */}
+                              <tr style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                                <td style={{...stickyCel,padding:"7px 16px 7px 24px",color:"#DDB863",opacity:0.85}} title="Ajustes que registraste para cerrar diferencias; solo afectan esta conciliación, no los reportes">± Ajuste de conciliación</td>
+                                {mesesVer.map(m=>{
+                                  const v = byMes[m]?.ajuste||0;
+                                  const abierta = detAbierto(bancoDef,"aju") && concDet.mes===m;
+                                  return (
+                                    <td key={m} onClick={()=>v!==0&&toggleDet(bancoDef,m,"aju")} title={v!==0?"Ver detalle, editar o borrar":""}
+                                      style={{padding:"7px 14px",textAlign:"right",fontFamily:"Lora",fontSize:11,color:v!==0?"#DDB863":"#3A3A3A",cursor:v!==0?"pointer":"default",background:abierta?"rgba(221,184,99,0.10)":"transparent",textDecoration:v!==0?"underline dotted rgba(255,255,255,0.25)":"none",textUnderlineOffset:3}}>
+                                      {v!==0?`${v>0?"+":"−"}${fmtV(v,mon)}`:"—"}
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                              {panelConc(bancoDef,"aju")}
                               {/* Saldo calculado */}
                               <tr style={{borderBottom:"2px solid rgba(221,184,99,0.15)",background:"rgba(255,255,255,0.015)"}}>
                                 <td style={{...stickyCel,padding:"8px 16px",fontWeight:700,color:"#F8F4E8",background:"rgba(255,255,255,0.015)"}}>= Saldo final calculado</td>
@@ -3782,7 +3824,19 @@ export default function Moneyland() {
                                     <td key={m} style={{padding:"8px 14px",textAlign:"right",background:ok?"rgba(76,175,130,0.08)":haydif?"rgba(240,96,96,0.08)":"transparent"}}>
                                       {diff==null?<span style={{color:"#3A3A3A"}}>—</span>:ok?
                                         <span style={{color:"#4CAF82",fontWeight:700}}>✓ OK</span>:
-                                        <span style={{color:"#f06060",fontWeight:700}}>⚠ {diff>0?"+":""}{diff.toLocaleString("es-UY",{maximumFractionDigits:0})}</span>
+                                        <span style={{display:"inline-flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
+                                          <span style={{color:"#f06060",fontWeight:700}}>⚠ {diff>0?"+":""}{diff.toLocaleString("es-UY",{maximumFractionDigits:mon==="USD"?2:0})}</span>
+                                          {concAjConf && concAjConf.banco===bancoDef.nombre && concAjConf.moneda===mon && concAjConf.mes===m ? (
+                                            <span style={{display:"inline-flex",gap:4,alignItems:"center",fontSize:10,color:"#DDB863"}}>
+                                              ¿Ajustar {-diff>0?"+":"−"}{fmtV(diff,mon)}?
+                                              <button onClick={()=>crearAjuste(bancoDef,m,diff)} style={{background:"transparent",border:"1px solid #4CAF8255",borderRadius:4,color:"#4CAF82",fontFamily:"Roboto",fontSize:10,padding:"2px 8px",cursor:"pointer"}}>Sí</button>
+                                              <button onClick={()=>setConcAjConf(null)} style={{background:"transparent",border:"1px solid #8C8C8C55",borderRadius:4,color:"#8C8C8C",fontFamily:"Roboto",fontSize:10,padding:"2px 8px",cursor:"pointer"}}>No</button>
+                                            </span>
+                                          ) : (
+                                            <button onClick={()=>setConcAjConf({banco:bancoDef.nombre,moneda:mon,mes:m})} title="Registrar un ajuste de conciliación bancaria por esta diferencia"
+                                              style={{background:"transparent",border:"1px solid #DDB86355",borderRadius:4,color:"#DDB863",fontFamily:"Roboto",fontSize:10,padding:"2px 8px",cursor:"pointer",whiteSpace:"nowrap"}}>＋ Registrar ajuste</button>
+                                          )}
+                                        </span>
                                       }
                                     </td>
                                   );
