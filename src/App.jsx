@@ -1178,7 +1178,9 @@ export default function Moneyland() {
     const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"})); a.download = "FinCFO_plantilla.csv"; a.click();
   };
 
+  const bancoCargaEsUSD = (config.bancos.find(b=>b.nombre===bancoCarga)?.moneda || "UYU")==="USD";
   const procesarConIA = async (texto, tipo) => {
+    setTcCarga(""); // el tipo de cambio es de cada extracto: no arrastrar el de una carga anterior
     setLastTextoIA(texto); // guardar para poder reintentar
     setLoadStep("processing");
     try {
@@ -1258,7 +1260,7 @@ export default function Moneyland() {
           regs.some(r=>
             (r.b||"").trim().toLowerCase() === bancoNorm &&
             r.f === m.f &&
-            Math.abs(Math.abs(r.tot||0) - Math.abs(m.tot||0)) <= 1
+            Math.abs(Math.abs((r.moneda==="USD"&&r.usd)?r.usd:(r.tot||0)) - Math.abs(m.tot||0)) <= 1
           )
         );
         if(duplicados.length>0) {
@@ -1436,7 +1438,7 @@ export default function Moneyland() {
       ? loadMovs.filter(m=>!m.pendiente && !regs.some(r=>
           (r.b||"").trim().toLowerCase()===_bancoNorm &&
           r.f===m.f &&
-          Math.abs(Math.abs(r.tot||0) - Math.abs(m.tot||0)) <= 1
+          Math.abs(Math.abs((r.moneda==="USD"&&r.usd)?r.usd:(r.tot||0)) - Math.abs(m.tot||0)) <= 1
         ))
       : loadMovs.filter(m=>!m.pendiente);
 
@@ -1446,6 +1448,14 @@ export default function Moneyland() {
     const toSave = movsFiltrados.map(m=>{
       const monedaM = m.moneda||"UYU";
       const base = {...m, a: anoDe(m.f)};
+      // Extracto de una cuenta bancaria en USD: se guarda el importe en USD (usd) y su equivalente en pesos (tot/p)
+      // con el tipo de cambio ingresado, igual que un registro manual en cuenta USD.
+      if(loadType==="banco" && monedaM==="USD" && tcVal) {
+        const usdAmt = Math.abs(m.tot||0);
+        const sign = (m.tot||0)<0 ? -1 : 1;
+        const pesos = Math.round(usdAmt * tcVal * sign * 100)/100;
+        return {...base, b:bancoCarga, usd:usdAmt, tc:tcVal, p:pesos, tot:pesos, moneda:"USD"};
+      }
       // Banco pagador según la moneda de la línea
       const bancoM = monedaM==="USD"
         ? (bancoPagoUSD && bancoPagoUSD!=="__noapl__" ? bancoPagoUSD : bancoCarga)
@@ -2271,13 +2281,13 @@ export default function Moneyland() {
                 {/* Panel tipo de cambio para movimientos en USD — solo aplica a tarjeta: un resumen de tarjeta en
                     pesos puede traer compras en dólares que hay que convertir para sumarlas al total en pesos.
                     Un extracto bancario de una cuenta en USD ya viene en USD y no se convierte. */}
-                {loadType==="tarjeta" && loadMovs.some(m=>m.moneda==="USD")&&(
+                {((loadType==="tarjeta" && loadMovs.some(m=>m.moneda==="USD")) || (loadType==="banco" && bancoCargaEsUSD && loadMovs.some(m=>!m.esPagoTarjeta)))&&(
                   <div style={{...S.card,background:"rgba(221,184,99,0.06)",border:"1px solid rgba(221,184,99,0.3)",marginBottom:12,padding:"12px 16px"}}>
                     <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
                       <span style={{fontSize:16}}>💱</span>
                       <div style={{flex:1}}>
                         <div style={{fontFamily:"Lora",fontSize:13,fontWeight:700,color:"#DDB863"}}>Movimientos en USD detectados</div>
-                        <div style={{fontSize:11,color:"#8C8C8C",marginTop:2}}>{loadMovs.filter(m=>m.moneda==="USD").length} movimiento(s) en USD — ingresá el tipo de cambio para convertir a pesos uruguayos</div>
+                        <div style={{fontSize:11,color:"#8C8C8C",marginTop:2}}>{loadType==="banco" ? `Cuenta en USD (${bancoCarga}) — ingresá el tipo de cambio para registrar cada movimiento también en pesos (se guarda el importe en USD y su equivalente en $)` : `${loadMovs.filter(m=>m.moneda==="USD").length} movimiento(s) en USD — ingresá el tipo de cambio para convertir a pesos uruguayos`}</div>
                       </div>
                       <div style={{display:"flex",alignItems:"center",gap:8}}>
                         <span style={{fontSize:11,color:"#8C8C8C",whiteSpace:"nowrap"}}>1 USD =</span>
@@ -2469,7 +2479,7 @@ export default function Moneyland() {
                 )}
 
                 {(()=>{
-                  const hasUSD = loadType==="tarjeta" && loadMovs.some(m=>m.moneda==="USD");
+                  const hasUSD = (loadType==="tarjeta" && loadMovs.some(m=>m.moneda==="USD")) || (loadType==="banco" && bancoCargaEsUSD && loadMovs.some(m=>!m.esPagoTarjeta));
                   const tcMissing = hasUSD && !parseFloat(tcCarga);
                   const tarjetaFaltante = loadType==="banco" && loadMovs.some(m=>m.esPagoTarjeta && !m.tarjetaDestino);
                   const blocked = tcMissing || tarjetaFaltante || tarjetaSinVincularWarn;
