@@ -2370,7 +2370,7 @@ export default function Moneyland() {
                   {loadMovs.map(m=>{
                     const tcVal = parseFloat(tcCarga)||0;
                     const isUSD = m.moneda==="USD";
-                    const montoDisplay = loadType==="tarjeta" && isUSD && tcVal ? Math.abs(m.tot||0)*tcVal : Math.abs(m.tot||0);
+                    const montoDisplay = isUSD && tcVal ? Math.abs(m.tot||0)*tcVal : Math.abs(m.tot||0);
                     const sign = (m.tot||0)>=0;
                     const editing = montoEdit?.id === m.id;
                     return (
