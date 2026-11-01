@@ -824,15 +824,22 @@ export default function Moneyland() {
   // pestaña y en la comparación de Finanzas personales contra la conciliación.
   // Registros que la conciliación cuenta para un banco/mes (los mismos que suma bancoTipoTotales),
   // para poder mostrarlos y editarlos desde la pestaña Conciliación.
+  // Importe (positivo) de un registro en la moneda de la cuenta. En cuentas USD: el USD guardado; si el
+  // registro no lo tiene, lo deduce con el tipo de cambio, y si tampoco, toma el total tal cual.
+  const montoBancoReg = (r, isUSD) => {
+    if(!isUSD) return Math.abs(r.tot||0);
+    if(r.usd) return Math.abs(r.usd);
+    if(r.moneda!=="USD" && r.tc) return Math.abs((r.tot||0)/r.tc);
+    return Math.abs(r.tot||0);
+  };
   const bancoRegsMes = (bancoDef, mes, ano) => {
     const bancNorm = normBancoM(bancoDef.nombre);
     return regs.filter(r=>{
       if(normBancoM(r.b)!==bancNorm) return false;
-      if((r.moneda||"UYU")!==bancoDef.moneda) return false;
-      if(r.fm==="Ajuste") return false;
-      // Excluir pagos de tarjeta: con Flujo B cada gasto ya va al banco pagador,
-      // el débito del resumen ("Pago tarjeta de crédito") no debe sumarse también
-      if(r.fm==="Pago tarjeta de crédito") return false;
+      // La conciliación toma TODO registro que tenga ese banco (cobro/pago), sin mirar forma de cobro/pago
+      // ni la moneda del registro: la moneda de la cuenta la define el banco. Solo se excluyen los ajustes
+      // de conciliación, que se cuentan aparte (ajustesDe).
+      if(r.t==="Ajuste"||r.fm==="Ajuste") return false;
       const rMes = parseInt(r.m||r.mes||0);
       const rAno = parseInt(r.a||r.ano||r.f?.slice(0,4)||0);
       return rMes===parseInt(mes)&&rAno===parseInt(ano);
@@ -841,7 +848,7 @@ export default function Moneyland() {
   const bancoTipoTotales = (bancoDef, mes, ano) => {
     const isUSD = bancoDef.moneda==="USD";
     const regsDelMes = bancoRegsMes(bancoDef, mes, ano);
-    const montoAbs = r => isUSD?Math.abs(r.usd||(r.tot||0)):Math.abs(r.tot||0);
+    const montoAbs = r => montoBancoReg(r, isUSD);
     const cobrosPersonal = regsDelMes.filter(r=>r.t==="Personal"&&(r.tot||0)>0).reduce((s,r)=>s+montoAbs(r),0);
     const cobrosNegocio = regsDelMes.filter(r=>r.t!=="Personal"&&(r.tot||0)>0).reduce((s,r)=>s+montoAbs(r),0);
     const pagosPersonal = regsDelMes.filter(r=>r.t==="Personal"&&(r.tot||0)<0).reduce((s,r)=>s+montoAbs(r),0);
@@ -3517,6 +3524,10 @@ export default function Moneyland() {
                   return pagosPendientes.filter(p=>{
                     if(normB(p.banco)!==bancNorm) return false;
                     if((p.moneda||"UYU")!==bancoDef.moneda) return false;
+                    // Solo cuentan los pagos que vio el extracto del banco y todavía no tienen el resumen de la
+                    // tarjeta cargado. Cuando se carga la tarjeta, cada línea ya queda como registro en este banco
+                    // (y se cuenta ahí); los pendientes creados desde la tarjeta tampoco suman, por lo mismo.
+                    if(p.conciliado || p.banco_pago_uyu || p.banco_pago_usd) return false;
                     const d = new Date((p.fecha||"")+"T00:00:00");
                     return String(d.getMonth()+1)===mes&&String(d.getFullYear())===conciliarAno;
                   });
@@ -3576,7 +3587,7 @@ export default function Moneyland() {
                 const mes = concDet.mes, mon = bancoDef.moneda, isUSD = mon==="USD", cfg = FILAS_CONC[fila];
                 const lista = (cfg.ajuste ? ajustesDe(bancoDef,mes) : bancoRegsMes(bancoDef,mes,conciliarAno).filter(cfg.match)).slice().sort((a,b)=>(b.f||"").localeCompare(a.f||""));
                 const pend = cfg.conTarjeta ? pagosTDe(bancoDef,mes).slice().sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")) : [];
-                const montoReg = r => isUSD?Math.abs(r.usd||(r.tot||0)):Math.abs(r.tot||0);
+                const montoReg = r => montoBancoReg(r, isUSD);
                 const total = cfg.ajuste ? lista.reduce((x,r)=>x+montoAjuste(r,isUSD),0) : lista.reduce((x,r)=>x+montoReg(r),0) + pend.reduce((x,pp)=>x+Math.abs(pp.monto||0),0);
                 const bancosOpc = config.bancos.filter(b=>b.activo!==false).map(b=>b.nombre);
                 const btn = (color) => ({background:"transparent",border:`1px solid ${color}55`,borderRadius:4,color,fontFamily:"Roboto",fontSize:10,padding:"3px 8px",cursor:"pointer",whiteSpace:"nowrap"});
