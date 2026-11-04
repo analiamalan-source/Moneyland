@@ -838,8 +838,8 @@ export default function Moneyland() {
       if(normBancoM(r.b)!==bancNorm) return false;
       // La conciliación toma TODO registro que tenga ese banco (cobro/pago), sin mirar forma de cobro/pago
       // ni la moneda del registro: la moneda de la cuenta la define el banco. Solo se excluyen los ajustes
-      // de conciliación, que se cuentan aparte (ajustesDe).
-      if(r.t==="Ajuste"||r.fm==="Ajuste") return false;
+      // de conciliación (tipo Ajuste), que se cuentan aparte (ajustesDe).
+      if(r.t==="Ajuste") return false; // (los registros viejos con forma "Ajuste" y tipo Personal/Negocio sí cuentan)
       const rMes = parseInt(r.m||r.mes||0);
       const rAno = parseInt(r.a||r.ano||r.f?.slice(0,4)||0);
       return rMes===parseInt(mes)&&rAno===parseInt(ano);
